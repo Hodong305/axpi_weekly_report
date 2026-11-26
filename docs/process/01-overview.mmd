@@ -13,9 +13,9 @@ flowchart TD
         direction TB
         H2["<b>② 월요일 · 사내(사내 PC + 사내 AI) — 고르고 쓰기</b>"]:::hdr
         B1["<b>관련 기사 고르고 점수 매기기</b><br/><span class='g'>제조 AI와 관련 있는지 판단 → 같은 사건끼리 묶기 →<br/>중요도 100점 채점 → 핵심·단신 자동 배치</span><br/><span class='t'>S1~S5 · 사내 LLM + 코드</span>"]:::ai
-        R1(["<b>편집자 확인 ①</b><br/><span class='g'>실을 기사와 순서 확정</span>"]):::human
+        R1(["<b>담당자 확인 ①</b><br/><span class='g'>실을 기사와 순서 확정</span>"]):::human
         B2["<b>원고 쓰고 자동 검사</b><br/><span class='g'>브리핑·요점·숫자의 의미·검색어까지 작성,<br/>숫자·출처·원문 베끼기를 자동 검사</span><br/><span class='t'>S6 원고 · S7 검사</span>"]:::ai
-        R2(["<b>편집자 확인 ②</b><br/><span class='g'>헤드라인·요약·제목 고르기</span>"]):::human
+        R2(["<b>담당자 확인 ②</b><br/><span class='g'>헤드라인·요약·제목 고르기</span>"]):::human
         H2 ~~~ B1
         B1 --> R1 --> B2 --> R2
     end
@@ -23,7 +23,7 @@ flowchart TD
         direction TB
         H3["<b>③ 화요일 오전 — 발행</b>"]:::hdr
         C1["<b>소식지 완성</b><br/><span class='g'>메일 파일과 미리 보기 생성</span><br/><span class='t'>S8 newsletter.eml / .html / .txt</span>"]:::auto
-        R3(["<b>편집자 발송 확인</b><br/><span class='g'>최종 확인 후 임직원에게 발송</span>"]):::human
+        R3(["<b>담당자 발송 검토</b><br/><span class='g'>완성본을 검토하고 임직원에게 발송</span>"]):::human
         C2["<b>MTC 임직원 수신</b><br/><span class='g'>주간 소식지 1통</span>"]:::out
         H3 ~~~ C1
         C1 --> R3 --> C2

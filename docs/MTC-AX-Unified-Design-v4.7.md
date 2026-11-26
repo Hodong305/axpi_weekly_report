@@ -18,9 +18,9 @@
 | 발송본 | B3(민트 블록, 꼭지 번호) | **후보 두 가지: B6 브리핑 리포트(기본, B4 발전형)와 S4 매거진(S 발전형).** 공통: 보내는 곳 줄 · 이번 호 구성(구역별 건수) · 브리핑 · 숫자로 보는 이번 주 · 핵심(요점 4) · 단신 · 더 볼 거리 · 용어 · 이 메일을 받는 이유. 이전 시안 B4·B5·E·S·S2·S3와 B3·A·B·C는 그대로 고를 수 있다 |
 | 검사 | 제목·본문·MTC가 볼 것 | 한 줄 핵심·요점에도 글자 수·URL·원문 연속 일치·숫자·기업명 검사를 똑같이 적용 |
 | **주 목적** | 네 분야 동향 전달 | **경쟁 칩메이커의 AX·AI 동향 센싱이 가장 주된 콘텐츠**(1장). 탐색 프롬프트 전체에 최우선 목표로 넣고 회사별 확인 목록·확인 결과(`coverage`)를 받는다(4.5). 핵심 편성에서 경쟁사 사건을 우선한다(9.5) |
-| 편성 | 핵심 2~3, 단신 최대 6 | **핵심은 점수 낙차 컷(상한 없음, 10점 이상 떨어지는 지점에서 자름, 최소 2건), 단신 최대 4**(9.5) |
+| 편성 | 핵심 2~3, 단신 최대 6 | **핵심은 최소 4건(80점 이상 안에서) + 그 뒤 10점 이상 떨어지는 지점에서 자름(상한 없음), 단신 최대 4**(9.5) |
 | 기술 이름·검색어 | 없음 | 기술·제품·시스템의 원문 이름을 괄호로(예: `결함 원인 분석 AI 에이전트(Defect Agent)`), 적용 범위(업무 흐름의 어디부터 어디까지)를 함께 쓴다. 기사마다 원문 표기 **검색어**(`search_terms`)를 붙여 링크 없이도 원문을 찾게 한다(9.6, 9.8) |
-| 설정 | `config_version` 5 | 9: `deck_chars`, `point_chars`, `figure_why_chars`, `read_chars_per_min`, `core_gap`, `core_min_count`, `core_alert_count`, `competitor_core_min`, `search_terms_max`, `internal.competitors` 추가, 분량 키 조정, `newsletter_theme: B6`. 사외 `queries.yaml`에 `competitors`(회사별 검색어) 추가 |
+| 설정 | `config_version` 5 | 10: `deck_chars`, `point_chars`, `figure_why_chars`, `read_chars_per_min`, `core_gap`, `core_min_count`, `core_alert_count`, `competitor_core_min`, `search_terms_max`, `internal.competitors` 추가, 분량 키 조정, `newsletter_theme: B6`. 사외 `queries.yaml`에 `competitors`(회사별 검색어) 추가 |
 
 견본: `docs/samples/sample-draft-v4.7.yaml`을 `python tools/render_sample.py --png`로 B3·B4·B5 각각 만들어 비교한다(`out_internal/samples/`).
 
@@ -738,8 +738,8 @@ evidence_ids, maturity, score_tiers, placement_cap, fact, mtc_impact, action_wat
 
 ### 9.5 자동 편성 규칙
 
-- 핵심(v4.7, **점수 낙차 컷**): 핵심 자격 사건(`core_min_score` 이상, 게재 상한이 단신이 아닌 사건)을 점수 순(동점은 아래 동점 규칙)으로 놓고, **바로 앞 사건보다 `core_gap`점(10) 이상 떨어지는 첫 지점에서 자른다.** 그 앞까지가 핵심이다. 상한은 두지 않는다. 단 핵심 자격 사건이 있으면 최소 `core_min_count`건(2)은 핵심으로 한다(첫 사건 바로 뒤에서 낙차가 나도 2건까지는 싣는다). 낙차가 없으면 자격 사건 전부가 핵심이다. 핵심이 `core_alert_count`건(8)을 넘으면 검토 요청 ①에 "핵심이 N건입니다. 줄이려면 순위를 조정하세요"를 표시한다.
-  - 예: 95·90·90·85·85·70·65 → 85와 70 사이 낙차 15 → 핵심 5건. 95·90·85·80 → 어디서도 낙차가 10 미만 → 4건 모두. 95·85·80·80 → 95와 85 사이 낙차가 정확히 10 → 2건(95·85). 95·80·80 → 95와 80 사이 낙차 15지만 최소 2건 → 95·80 두 건(나머지 80은 단신 후보).
+- 핵심(v4.7, **점수 낙차 컷**): 핵심 자격 사건(`core_min_score` 이상, 게재 상한이 단신이 아닌 사건)을 점수 순(동점은 아래 동점 규칙)으로 놓고, 앞의 `core_min_count`건(4)은 낙차와 관계없이 핵심이다(자격 사건이 4건보다 적으면 전부). **그 뒤부터 바로 앞 사건보다 `core_gap`점(10) 이상 떨어지는 첫 지점에서 자른다.** 그 앞까지가 핵심이다. 상한은 두지 않는다. 낙차가 없으면 자격 사건 전부가 핵심이다. 최소 건수는 80점 미만 사건으로 채우지 않는다(분량보다 질). 같은 주체 한도로 빠지는 사건이 있으면 4건보다 적을 수 있다. 핵심이 `core_alert_count`건(8)을 넘으면 검토 요청 ①에 "핵심이 N건입니다. 줄이려면 순위를 조정하세요"를 표시한다.
+  - 예: 95·90·90·85·85·70·65 → 4건 뒤 85→85는 이어지고 85→70에서 낙차 15 → 핵심 5건. 95·85·80·80 → 앞 4건은 낙차와 관계없이 핵심 → 4건. 95·80·80·80·80·80·65 → 앞 4건 + 그 뒤 80·80은 이어짐, 80→65에서 컷 → 6건. 95·85·80 → 자격 사건이 3건뿐 → 3건. 95·90·85·80·70 → 4건 뒤 80→70 낙차 10 → 4건.
 - **경쟁사 우선**: 핵심 자격(`core_min_score` 이상)이 있는 경쟁 칩메이커 사건(주체가 `internal.competitors`에 있거나, 주 분류와 무관하게 경쟁사 팹에서의 적용인 사건)이 있는데 낙차 컷으로 정한 핵심에 경쟁사 사건이 `competitor_core_min`건(2)보다 적으면, 컷 아래의 핵심 자격 경쟁사 사건을 점수 순으로 더해 그 수를 채운다(경쟁사 사건도 1단계 적합도와 3장 분야 기준을 통과한 제조 AX·AI 사건이어야 한다. 설계·개발 사건은 경쟁사여도 우선하지 않는다). 같은 주체 한도(`same_subject_max`)는 그대로 적용한다. (v4.6의 "상위 2건 + 3위가 `core3_min_score` 이상이면 3건" 규칙과 v4.7 초안의 `core_max` 상한은 없앤다.)
 - 단신: 남은 `brief_min_score` 이상 중 최대 `brief_max`건(4). 경쟁사 사건을 점수가 같으면 먼저 넣는다. 산업 배경은 최대 1건.
 - 같은 주체: 핵심과 단신을 합쳐 같은 주체(`subject`)는 최대 `same_subject_max`건이다. 넘는 사건은 점수가 낮은 쪽부터 '더 볼 거리'로 보내고 사유를 '같은 주체 한도'로 남긴다.
@@ -976,7 +976,7 @@ review_log: []             # 검토 요청 응답과 적용 결과
 
 **S5 편성과 번호**
 - 정렬은 총점 → FAB 관련성 → 근거 수준 → 이번 주 변화(모두 내림차순) → `event_key` 순이다. 마지막 기준 때문에 같은 입력이면 순서가 항상 같다.
-- 핵심은 점수 낙차 컷(`core_gap`, 최소 `core_min_count`건, 상한 없음, `core_alert_count` 초과 시 알림)과 경쟁사 최소 `competitor_core_min`건으로 정하고, 단신은 최대 `brief_max`건이다(v4.7). 핵심·단신을 합쳐 같은 주체는 최대 `same_subject_max`건이다.
+- 핵심은 최소 `core_min_count`건(4) + 그 뒤 점수 낙차 컷(`core_gap`, 상한 없음, `core_alert_count` 초과 시 알림)과 경쟁사 최소 `competitor_core_min`건으로 정하고, 단신은 최대 `brief_max`건이다(v4.7). 핵심·단신을 합쳐 같은 주체는 최대 `same_subject_max`건이다.
 - `brief_min_score` 미만이거나 편성 한도를 넘은 사건은 `out`이며, 검토 요청 ①의 제외 표본(X)으로 보인다.
 - 동점 표시: 정렬 기준값이 모두 같은 사건 중 하나라도 편성되면, 같은 값의 사건 전부에 '동점'을 붙인다.
 - 핵심 자격(8장)은 편성된 사건 중 `core_min_score` 이상이면서 상한이 단신이 아닌 사건이다. 호 유형(정규·축약·현황)은 검토 요청 ①을 반영한 편성으로 정한다.
@@ -1047,7 +1047,7 @@ review_log: []             # 검토 요청 응답과 적용 결과
 | `blocked_domains` | 도메인 목록 | 4.4 |
 | `thresholds.intake_min` / `intake_target` | 10 / 15 | 8 |
 | `internal.core_min_score` / `brief_min_score` | 80 / 60 (`core3_min_score`는 v4.7에서 없앰) | 8, 9.5 |
-| `internal.core_gap` / `core_min_count` / `core_alert_count` / `competitor_core_min` | 10 / 2 / 8 / 2 (`core_max`는 없앰: 상한 없음) | 9.5 |
+| `internal.core_gap` / `core_min_count` / `core_alert_count` / `competitor_core_min` | 10 / 4 / 8 / 2 (`core_max`는 없앰: 상한 없음) | 9.5 |
 | `internal.competitors` | 경쟁 칩메이커 이름과 별칭 목록(1장) | 9.5 경쟁사 판정 |
 | `internal.search_terms_max` | 3 | 9.6 검색어 |
 | `internal.ledger_lookback_issues` | 12 | 7.2 |

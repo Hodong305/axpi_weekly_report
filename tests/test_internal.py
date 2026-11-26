@@ -477,7 +477,7 @@ def _core_ids(evs):
 
 def test_selection_core_gap_cut_keys_and_no_upper_limit():
     assert "core3_min_score" not in CFG and "core_max" not in CFG and CFG["brief_max"] == 4
-    assert (CFG["core_gap"], CFG["core_min_count"], CFG["core_alert_count"]) == (10, 2, 8)
+    assert (CFG["core_gap"], CFG["core_min_count"], CFG["core_alert_count"]) == (10, 4, 8)
     evs = [mk("a", 95), mk("b", 92), mk("c", 90), mk("d", 89), mk("e", 88), mk("f", 87), mk("g", 70)]
     sel.select(evs, CFG)
     s = slots(evs)
@@ -488,28 +488,27 @@ def test_selection_core_gap_cut_keys_and_no_upper_limit():
 
 
 def test_selection_core_gap_doc_examples():
-    for scores, n in (([95, 90, 90, 85, 85, 70, 65], 5), ([95, 86, 80, 80], 4), ([95, 80, 80], 2)):
+    # 설계서 9.5 예시(최소 4건, 낙차는 4번째 뒤부터)
+    for scores, n in (([95, 90, 90, 85, 85, 70, 65], 5), ([95, 85, 80, 80], 4), ([95, 80, 80, 80, 80, 80, 65], 6),
+                      ([95, 85, 80], 3), ([95, 90, 85, 80, 70], 4)):
         evs = [mk(f"e{i}", t) for i, t in enumerate(scores)]
         sel.select(evs, CFG)
         assert len(_core_ids(evs)) == n, scores
-    evs = [mk(f"e{i}", t) for i, t in enumerate([95, 80, 80])]
-    sel.select(evs, CFG)
-    assert slots(evs)["e2"][0] == "brief"                                                                   # 최소 2건 뒤의 80점은 단신 후보
 
 
 def test_selection_core_gap_exactly_ten_cuts_nine_does_not():
-    evs = [mk("a", 95), mk("b", 94), mk("c", 84)]
+    evs = [mk("a", 99), mk("b", 98), mk("c", 97), mk("d", 95), mk("e", 85)]
     sel.select(evs, CFG)
-    assert _core_ids(evs) == ["a", "b"]
-    evs = [mk("a", 95), mk("b", 94), mk("c", 85)]
+    assert _core_ids(evs) == ["a", "b", "c", "d"]                      # 4번째 뒤 낙차 정확히 10 → 컷
+    evs = [mk("a", 99), mk("b", 98), mk("c", 97), mk("d", 95), mk("e", 86)]
     sel.select(evs, CFG)
-    assert _core_ids(evs) == ["a", "b", "c"]
+    assert _core_ids(evs) == ["a", "b", "c", "d", "e"]                 # 낙차 9 → 계속
 
 
 def test_selection_core_min_count_even_when_drop_after_first():
-    evs = [mk("a", 99), mk("b", 82), mk("c", 81)]
+    evs = [mk("a", 99), mk("b", 82), mk("c", 81), mk("d", 80), mk("e", 80)]
     sel.select(evs, CFG)
-    assert _core_ids(evs) == ["a", "b"] and slots(evs)["c"][0] == "brief"
+    assert _core_ids(evs) == ["a", "b", "c", "d", "e"]                 # 99→82 낙차는 최소 4건 안이라 무시, 그 뒤 낙차 없음
     evs = [mk("a", 99)]
     sel.select(evs, CFG)
     assert _core_ids(evs) == ["a"]                                                                          # 자격 사건이 1건뿐이면 1건
@@ -526,7 +525,7 @@ def test_selection_core_same_subject_limit_inside_cut():
     for e in evs[:3]:
         e["subject"] = "S사"
     sel.select(evs, dict(CFG, same_subject_max=2))
-    assert _core_ids(evs) == ["a", "b", "d"] and slots(evs)["c"][0] == "out"
+    assert _core_ids(evs) == ["a", "b", "d"] and slots(evs)["c"][0] == "out"      # 같은 주체 한도로 빠지면 4건보다 적을 수 있다
 
 
 def test_review1_alert_when_core_over_alert_count():
@@ -1233,7 +1232,7 @@ def test_fingerprint_change_warning(tmp_path):
     rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
     fp = rows[WEEK]
     assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.7" and fp["fp_internal_version"]
-    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "9"
+    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "10"
 
 
 def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):

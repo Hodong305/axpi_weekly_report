@@ -1,5 +1,5 @@
 # MTC AX/PI 위클리 설정값 (설계서 v4.7 10장). 값을 바꾸면 config_version을 올린다.
-config_version: "9"
+config_version: "10"
 
 paths:
   work_dir: work      # 주차별 작업 폴더: candidates/, manual/, prompts/
@@ -43,7 +43,7 @@ thresholds:
 internal:
   core_min_score: 80
   core_gap: 10                # 핵심 낙차 컷(9.5): 바로 앞 사건보다 이 점수 이상 떨어지는 첫 지점에서 핵심을 자른다(상한 없음)
-  core_min_count: 2           # 핵심 자격 사건이 있으면 낙차와 관계없이 최소 핵심 건수
+  core_min_count: 4           # 낙차와 관계없이 최소 핵심 건수(80점 이상 사건 안에서). 낙차 컷은 이 건수 뒤부터 적용
   core_alert_count: 8         # 핵심이 이 건수를 넘으면 검토 요청 ①에 '줄이려면 순위를 조정하세요'를 표시한다
   competitor_core_min: 2      # 핵심 자격이 있는 경쟁사 사건을 핵심에 먼저 배정하는 최소 건수
   brief_min_score: 60

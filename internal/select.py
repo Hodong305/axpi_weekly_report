@@ -74,12 +74,12 @@ def select(events, cfg, records=None):
 
     pool = [e for e in cands if e["cap"] != "brief" and e["score"]["total"] >= core_min]
     # 낙차 컷: 바로 앞 사건보다 core_gap점 이상 낮아지는 첫 지점에서 자른다. 자격 사건이 있으면 최소 core_min_count건은 핵심.
+    # 앞의 core_min_count건(4)은 낙차와 관계없이 핵심이고(자격 사건이 그보다 적으면 전부), 낙차는 그 뒤에서부터 찾는다.
     cut = len(pool)
-    for i in range(1, len(pool)):
+    for i in range(max(1, core_min_count), len(pool)):
         if pool[i - 1]["score"]["total"] - pool[i]["score"]["total"] >= core_gap:
             cut = i
             break
-    cut = min(len(pool), max(cut, core_min_count))
     core = []
     for e in pool[:cut]:
         if room(e):
