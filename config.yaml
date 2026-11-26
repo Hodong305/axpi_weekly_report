@@ -1,0 +1,51 @@
+# MTC AX/PI 위클리 설정값 (설계서 v4.5 10장). 값을 바꾸면 config_version을 올린다.
+config_version: "1"
+
+paths:
+  work_dir: work      # 주차별 작업 폴더: candidates/, manual/, prompts/
+  out_dir: out        # 주차별 결과: pass1/pass2/merged/intake/report, package/
+
+collection:
+  user_agent: "Mozilla/5.0 (compatible; MTC-AX-Weekly-Collector/0.1)"
+  accept_language: "ko,en;q=0.9,ja;q=0.8"
+  fetch_timeout_sec: 30
+  fetch_retries: 3
+  retry_backoff_sec: 2          # 2, 4, 8초 지수 백오프
+  per_host_delay_sec: 1.0       # 같은 호스트 연속 요청 간격
+  max_bytes: 30000000           # 응답 최대 크기(PDF 포함)
+  browser_fallback: true        # playwright가 설치돼 있으면 pass2에서 렌더링 재시도
+  feed_date_margin_days: 1      # 피드 날짜 힌트로 건너뛸 때 두는 여유일
+  max_items_per_source: 200
+
+extraction:
+  min_body_chars: 200
+  lead_min_chars: 40
+  # <title>에 있으면 봇 차단 페이지로 본다 → ACCESS_BLOCKED
+  block_page_markers: ["Just a moment", "Attention Required", "Access Denied", "Are you a robot", "Request unsuccessful"]
+  # 본문이 짧은데 페이지에 이 문구가 있으면 로그인·구독 벽으로 본다 → ACCESS_BLOCKED
+  login_markers: ["sign in to continue", "log in to continue", "subscribe to continue", "to continue reading",
+                  "회원만", "로그인 후", "로그인이 필요", "구독자 전용", "유료 회원", "会員登録", "ログインして"]
+  # 마지막 블록 끝에 있으면 본문이 잘린 것으로 본다 → BODY_TRUNCATED
+  truncation_markers: ["continue reading", "read the full article", "기사 전문 보기", "続きを読む"]
+
+blocked_domains: []             # 콘텐츠 팜·익명 재전재 도메인 → UNTRUSTED_SOURCE
+
+thresholds:
+  intake_min: 10
+  intake_target: 15
+
+# 사내 파이프라인 값 (설계서 7.2, 9장)
+internal:
+  core_min_score: 80
+  core3_min_score: 90
+  brief_min_score: 60
+  ledger_lookback_issues: 12
+  article_title_max: 30
+  issue_title_max: 30
+  one_line_max: 60
+  abstract_chars: [220, 350]
+  hook_chars: 120
+  core_chars: [250, 320]
+  brief_chars: [60, 95]
+  issue_body_max: 1400
+  verbatim_max_run: 30

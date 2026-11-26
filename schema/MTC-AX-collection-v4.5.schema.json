@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mtc-ax.internal/schema/MTC-AX-collection-v4.4.schema.json",
-  "title": "MTC AX/PI 위클리 사외 수집 계약 v4.4",
-  "description": "사외 수집 스크립트가 생성하고 사내 파이프라인이 읽는 단일 JSON 형식. 설계서 v4.4 '공통 JSON 필드 사전'과 1:1로 대응한다. 스키마로 표현할 수 없는 검사(ISO 주차·KST 경계, URL 재계산, 해시 재계산, ID 순번, summary 집계)는 설계서의 '코드 검사' 항목으로 실행한다.",
+  "$id": "https://mtc-ax.internal/schema/MTC-AX-collection-v4.5.schema.json",
+  "title": "MTC AX/PI 위클리 사외 수집 계약 v4.5",
+  "description": "사외 수집 스크립트가 생성하고 사내 파이프라인이 읽는 단일 JSON 형식. 설계서 v4.5 '공통 JSON 필드 사전'과 1:1로 대응한다. 스키마로 표현할 수 없는 검사(ISO 주차·KST 경계, URL 재계산, 해시 재계산, ID 순번, summary 집계)는 설계서의 '코드 검사' 항목으로 실행한다.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,9 +10,9 @@
     "phase",
     "revision",
     "issue_week",
+    "window_weeks",
     "window_start",
     "window_end_exclusive",
-    "lookback_start",
     "generated_at",
     "generator",
     "summary",
@@ -20,7 +20,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "4.4"
+      "const": "4.5"
     },
     "phase": {
       "enum": [
@@ -42,9 +42,6 @@
       "$ref": "#/$defs/kstMidnight"
     },
     "window_end_exclusive": {
-      "$ref": "#/$defs/kstMidnight"
-    },
-    "lookback_start": {
       "$ref": "#/$defs/kstMidnight"
     },
     "generated_at": {
@@ -86,9 +83,7 @@
         "complete",
         "partial",
         "drop",
-        "paywall",
-        "late_discovery",
-        "carried_over"
+        "paywall"
       ],
       "properties": {
         "records": {
@@ -110,14 +105,6 @@
         "paywall": {
           "type": "integer",
           "minimum": 0
-        },
-        "late_discovery": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "carried_over": {
-          "type": "integer",
-          "minimum": 0
         }
       }
     },
@@ -129,6 +116,13 @@
       "items": {
         "$ref": "#/$defs/record"
       }
+    },
+    "window_weeks": {
+      "enum": [
+        1,
+        2
+      ],
+      "description": "1: 기본(직전 일~일 7일). 2: 사용자가 요청한 경우에만, 지난주 발행을 건너뛰었을 때 14일."
     }
   },
   "$defs": {
@@ -461,6 +455,7 @@
         "agent": {
           "enum": [
             "script",
+            "claude",
             "gpt",
             "gemini",
             "manual"
@@ -490,7 +485,6 @@
         "published_at",
         "change_at",
         "change_note",
-        "late_discovery",
         "discovery",
         "event_key",
         "track",
@@ -575,11 +569,14 @@
         "change_note": {
           "$ref": "#/$defs/nullableString"
         },
-        "late_discovery": {
-          "type": "boolean"
-        },
         "discovery": {
-          "$ref": "#/$defs/discovery"
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "이 문서를 후보로 제시한 경로 전체. (route, agent, source_id, query) 순으로 정렬. 레코드의 다른 값은 발견 경로와 무관하다.",
+          "items": {
+            "$ref": "#/$defs/discovery"
+          }
         },
         "event_key": {
           "type": "null",

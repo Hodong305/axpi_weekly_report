@@ -1,0 +1,104 @@
+# LLM 후보 탐색용 분야 정의와 검색어 묶음 (설계서 v4.5 3장, 4.5).
+# 모든 LLM(Claude·GPT·Gemini)이 같은 정의·같은 검색어를 받는다. 바꾸면 registry_version처럼 날짜를 남긴다.
+queries_version: "2026-11-26.1"
+
+topics:
+  T1:
+    name: "① 칩메이커 (T1_CHIPMAKER)"
+    scope: |
+      대상: 삼성전자, SK하이닉스, Micron, TSMC, Intel Foundry, GlobalFoundries 등 팹 운영사.
+      채택: 팹 운영사의 수율 분석·결함 대응·설비 보전·물류·생산계획 변화에 AI·자동화를 쓴 사례.
+            팹 투자·양산 전환은 팹 운영 판단과 직접 연결될 때만.
+      오탐: AI용 칩 판매, 신제품 연산 성능, 주가·메모리 가격만 다룬 기사.
+    queries:
+      - "삼성전자 반도체 AI 수율 분석 / 결함 / 설비 예지보전 / 스마트 팩토리"
+      - "SK하이닉스 AI 팹 / 제조 지능화 / 수율 / 계측 데이터"
+      - "Samsung foundry fab AI yield defect predictive maintenance"
+      - "SK hynix fab AI manufacturing yield"
+      - "Micron smart manufacturing AI fab yield"
+      - "TSMC AI fab automation yield defect intelligent manufacturing"
+      - "Intel Foundry fab AI yield / GlobalFoundries fab AI"
+      - "TSMC 智慧製造 AI 良率 (현지어)"
+      - "wafer map root cause analysis AI fab"
+      - "fab dispatch scheduling AI semiconductor"
+    resurvey_queries:
+      - "각 칩메이커 IR 발표자료·실적 발표 중 제조 AI 언급(이번 기간)"
+      - "각 칩메이커 기술 블로그·학회 발표(IEDM, SEMICON, ASMC, AEC/APC) 중 팹 운영 AI"
+      - "현지어 원문: 한국어(삼성·SK), 중국어 번체(TSMC), 일본어(Kioxia 등)"
+      - "언론 보도로만 확인된 사건의 원발표(뉴스룸·IR·고객사 발표)"
+
+  T2:
+    name: "② 반도체 장비사 (T2_EQUIPMENT)"
+    scope: |
+      대상: Lam Research, Applied Materials, ASML, Tokyo Electron, KLA 등.
+      채택: 고객 팹에서의 계측·검사·제어·보전 AI, 장비사 자체 제조 현장의 조립·검사 AI. 어느 현장인지 명시된 것.
+      오탐: 칩·장비 제품 설계 최적화, 설계용 시뮬레이션, AI 칩용 장비 수주.
+    queries:
+      - "Lam Research AI chamber matching / equipment intelligence / fleet"
+      - "Applied Materials AI process control / AIx / metrology"
+      - "ASML computational lithography AI fab / holistic lithography"
+      - "Tokyo Electron AI equipment maintenance / 東京エレクトロン AI 装置"
+      - "KLA AI inspection defect classification fab"
+      - "chamber matching AI"
+      - "virtual metrology equipment vendor"
+      - "equipment predictive maintenance semiconductor AI"
+    resurvey_queries:
+      - "각 장비사 뉴스룸 외 기술 블로그·고객 사례·백서(이번 기간)"
+      - "장비사 실적 발표·투자자 행사 중 고객 팹 AI 적용 언급"
+      - "일본어 원문(TEL, SCREEN, Hitachi High-Tech), 네덜란드어·영문(ASML)"
+      - "장비사 협력 발표를 고객사(칩메이커) 쪽에서 낸 원발표"
+
+  T3:
+    name: "③ 장비사 외 제조 솔루션 공급사 (T3_SOLUTION)"
+    scope: |
+      대상: Synopsys, Siemens, PDF Solutions, Gauss Labs 등.
+      채택: 실제 제조 데이터를 활용한 가상계측·수율 분석·배치 최적화·MES 연계, 또는 반도체 제조 조건을 명시한 검증.
+      오탐: 회로 설계·배치배선·설계 검증 EDA, 범용 AI·MES 소개.
+    queries:
+      - "PDF Solutions Exensio AI yield analytics"
+      - "Synopsys silicon lifecycle / manufacturing analytics / yield"
+      - "Siemens semiconductor manufacturing MES AI / Opcenter"
+      - "Gauss Labs virtual metrology / 가우스랩스"
+      - "semiconductor MES AI scheduling"
+      - "virtual metrology deployment fab"
+      - "yield management system AI semiconductor"
+    resurvey_queries:
+      - "각 공급사 고객 사례·웨비나·기술 블로그(이번 기간)"
+      - "학회·심사 논문(IEEE TSM, ASMC, APC) 중 공급사 공동 발표"
+      - "스타트업·국내 공급사(가우스랩스 등) 한국어 원문"
+      - "언론 보도로만 확인된 사건의 원발표"
+
+  T4:
+    name: "④ 팹 관련 Physical AI (T4_PHYSICAL_AI)"
+    scope: |
+      대상: 팹 운영사와 로봇 공급사, 반도체 분야 실증 기관.
+      채택: 코봇·자율이동로봇 등이 서브팹 순찰, 웨이퍼 반송, 부품 취급·교체 등을 위해 환경을 인식하고 판단·행동한 사례.
+            현장, 작업, 실증 단계가 드러난 것.
+      오탐: 범용 휴머노이드 시연, 타 업종 사례, 반도체 공장용이라는 설명만 있는 고정 동작 자동화.
+    queries:
+      - "sub-fab inspection robot"
+      - "fab autonomous mobile robot wafer"
+      - "cleanroom robot AI semiconductor"
+      - "humanoid semiconductor fab pilot"
+      - "반도체 팹 로봇 순찰 / 웨이퍼 이송 로봇 AI / 클린룸 로봇"
+      - "semiconductor fab robot maintenance part replacement AI"
+      - "AMHS OHT AI semiconductor"
+    resurvey_queries:
+      - "로봇 공급사 고객 사례 중 반도체 팹(이번 기간)"
+      - "팹 운영사 채용·기술 발표 중 로봇 실증"
+      - "일본어·중국어 번체 원문(반도체 공장 로봇)"
+      - "언론 보도로만 확인된 사건의 원발표"
+
+  B:
+    name: "B 경로: 제조로 전이 가능한 기반기술"
+    scope: |
+      공식 연구·릴리스 채널에서 공개된 멀티모달 결함 추론, 시계열 기반 모델, 로봇 시뮬레이션·sim-to-real,
+      산업용 비전 검사 모델 등 반도체 제조로 전이 가능한 기술 변화. 다섯 번째 게재 분야가 아니라 탐색 경로다.
+    queries:
+      - "multimodal defect detection model release"
+      - "time series foundation model release"
+      - "robot simulation sim-to-real release industrial"
+      - "industrial visual inspection foundation model"
+      - "NVIDIA Omniverse / Isaac manufacturing release"
+      - "Google DeepMind robotics release"
+    resurvey_queries: []

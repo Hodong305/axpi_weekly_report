@@ -1,0 +1,12 @@
+# 사외 수집기 (Python 3.11 이상)
+requests>=2.31
+lxml>=5.0
+cssselect>=1.2
+beautifulsoup4>=4.12
+trafilatura>=2.0
+feedparser>=6.0
+pdfplumber>=0.11
+PyYAML>=6.0
+jsonschema[format-nongpl]>=4.20
+# 선택: 자바스크립트 렌더링·봇 차단 페이지 재시도(pass2). 설치 후 `playwright install chromium`
+# playwright>=1.45
