@@ -16,7 +16,7 @@
 #   (분야 적합성 판정은 사내에서 한다. 설계서 3장).
 # 아래 URL은 공개 정보 기준의 초기값이며 모두 verified: false다. 첫 실행 전에 check-sources로 확인한다.
 
-registry_version: "2026-11-26.2"
+registry_version: "2026-11-26.3"
 
 sources:
   # ── ① 칩메이커 ───────────────────────────────────────────────
@@ -207,6 +207,67 @@ sources:
     source_tier: primary
     method: llm_only
     home_url: https://www.kla.com/
+    verified: false
+
+  # 설비사 담당 지정 추가 탐색 페이지(IR·ESG). 매주 LLM 탐색 프롬프트의 '우선 확인 발행처'에 들어간다.
+  - id: tel-ir
+    publisher: Tokyo Electron IR 뉴스
+    domains: []            # 발행처 판정은 본사 항목(domains)이 맡는다. 이 항목은 탐색 대상 페이지만 추가한다
+    topics: [T2_EQUIPMENT]
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://www.tel.com/news/ir/
+    verified: false
+
+  - id: asml-ir
+    publisher: ASML 투자자 뉴스
+    domains: []            # 발행처 판정은 본사 항목(domains)이 맡는다. 이 항목은 탐색 대상 페이지만 추가한다
+    topics: [T2_EQUIPMENT]
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://investor.asml.com/news
+    verified: false
+
+  - id: amat-ir
+    publisher: Applied Materials IR
+    domains: []            # 발행처 판정은 본사 항목(domains)이 맡는다. 이 항목은 탐색 대상 페이지만 추가한다
+    topics: [T2_EQUIPMENT]
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://ir.appliedmaterials.com
+    verified: false
+
+  - id: lam-esg
+    publisher: Lam Research ESG 보고서
+    domains: []            # 발행처 판정은 본사 항목(domains)이 맡는다. 이 항목은 탐색 대상 페이지만 추가한다
+    topics: [T2_EQUIPMENT]
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://www.lamresearch.com/company/environmental-social-and-governance/#report
+    verified: false
+
+  - id: kla-ir
+    publisher: KLA 보도자료(IR)
+    domains: []            # 발행처 판정은 본사 항목(domains)이 맡는다. 이 항목은 탐색 대상 페이지만 추가한다
+    topics: [T2_EQUIPMENT]
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://ir.kla.com/news-events/press-releases
     verified: false
 
   # ── ③ 장비사 외 제조 솔루션 공급사 ─────────────────────────────
