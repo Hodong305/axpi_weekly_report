@@ -1,5 +1,5 @@
 # MTC AX/PI 위클리 설정값 (설계서 v4.6 10장). 값을 바꾸면 config_version을 올린다.
-config_version: "4"
+config_version: "5"
 
 paths:
   work_dir: work      # 주차별 작업 폴더: candidates/, manual/, prompts/
@@ -58,13 +58,13 @@ internal:
   watch_chars: 80             # 핵심 기사 'MTC가 볼 것' 한 문장
   more_max: 20                # 더 볼 거리 최대 건수
   more_line_chars: 70         # 더 볼 거리 한 줄 요약
-  newsletter_name: "FAB4 위클리"                  # 후보, 확정 전
-  newsletter_tagline: "칩 · 장비 · 솔루션 · 로봇, 네 박자로 읽는 제조 AI"
-  newsletter_team: "삼성전자 DS · 메모리 MTC AX/PI"   # 꼬리말 소개
+  newsletter_name: "MTC AX Tech Brief"            # 후보, 확정 전. B3 테마는 끝 두 단어(Tech Brief)를 강조색으로 쓴다
+  newsletter_tagline: "메모리 제조기술센터 AX/PI팀이 매주 정리하는 팹 AI 브리프"
+  newsletter_team: "삼성전자 DS부문 메모리 제조기술센터(MTC) AX/PI팀"   # 꼬리말 소개("…팀이 매주 화요일 보내는")
   image_caption_chars: 40       # 대표 이미지 설명(새로 쓴 문장)
   image_max_kb: 300             # 발송본 이미지 한 장의 파일 크기 상한(표시 폭 624px)
   newsletter_from: ""           # newsletter.eml의 From. 비우면 헤더를 넣지 않는다(편집자가 메일 프로그램에서 정한다)
-  newsletter_theme: A                                # A 삼성 블루 팝 / B 클린룸 민트 / C 웨이퍼 나이트
+  newsletter_theme: B3                               # A 삼성 블루 팝 / B 클린룸 민트 / C 웨이퍼 나이트 / B3 민트 블록(꼭지 번호)
   # 사내 모델 접속(OpenAI 호환 /v1/chat/completions, 예: vLLM·Ollama). 모든 LLM 단계가 같은 모델을 쓴다.
   llm:
     backend: http                         # http(OpenAI 호환 서버) | file(요청·응답 파일을 주고받음, 사람·에이전트가 모델 역할)

@@ -314,7 +314,7 @@ def test_core_image_selected_validated_and_rendered(tmp_path):
     # 산출물: eml(cid) + 미리 보기 html(data URI) + txt
     out = tmp_path / "out_internal" / WEEK
     eml = email.message_from_bytes((out / "newsletter.eml").read_bytes(), policy=email.policy.default)
-    assert eml["Subject"].startswith("FAB4 위클리 ") and eml["To"] is None and eml["From"] is None and eml["X-Unsent"] == "1"
+    assert eml["Subject"].startswith("MTC AX Tech Brief ") and eml["To"] is None and eml["From"] is None and eml["X-Unsent"] == "1"
     assert eml.get_content_type() == "multipart/alternative"
     parts = list(eml.iter_parts())
     assert parts[0].get_content_type() == "text/plain" and parts[1].get_content_type() == "multipart/related"

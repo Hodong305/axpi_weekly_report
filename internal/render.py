@@ -108,6 +108,17 @@ def prepare_image(data, max_kb, width=624):
 
 # 내용 -------------------------------------------------------------------------
 
+B3_NAME = {"T1": "칩메이커", "T2": "장비사", "T3": "제조 솔루션", "T4": "Physical AI", "B": "기반기술"}
+B3_NUM = {"T1": "01", "T2": "02", "T3": "03", "T4": "04", "B": "+"}
+
+
+def number_marker(theme, code):
+    """B3 꼭지 표식: 번호 배지(01~04, 기반기술은 +) + 꼭지 이름. 이모지 대신 색 표식을 쓴다."""
+    fg, _ = theme["topic"][code]
+    return (f'<span style="display:inline-block;background:{fg};color:#ffffff;font-size:11px;font-weight:bold;padding:2px 6px;border-radius:4px;">'
+            f'{B3_NUM[code]}</span>&nbsp;<span style="font-size:12px;font-weight:bold;color:{fg};">{B3_NAME[code]}</span>')
+
+
 def chip(theme, code, size="12px"):
     fg, bg = theme["topic"][code]
     return (f'<span style="display:inline-block;background:{bg};color:{fg};font-weight:bold;padding:3px 10px;border-radius:999px;'
@@ -129,8 +140,13 @@ def _followup(ev):
     return ""
 
 
-def name_html(name, accent):
-    """이름의 첫 숫자에 강조색을 입힌다(예: FAB4 위클리). 숫자가 없으면 그대로."""
+def name_html(name, accent, theme=None):
+    """이름 꾸밈. 테마에 name_em_words가 있으면 끝 N단어(예: Tech Brief)를 name_em_color로, 없으면 이름의 첫 숫자에 강조색을 입힌다(예: FAB4 위클리)."""
+    n = (theme or {}).get("name_em_words")
+    if n:
+        words = name.split(" ")
+        if len(words) > n:
+            return html.escape(" ".join(words[:-n])) + f' <span style="color:{theme["name_em_color"]};">' + html.escape(" ".join(words[-n:])) + "</span>"
     m = re.search(r"\d+", name)
     if not m:
         return html.escape(name)
@@ -188,6 +204,7 @@ def _build(draft, ctx, imgs, mode):
     if key not in themes:
         raise ValueError(f"알 수 없는 테마: {key} (A|B|C)")
     th = themes[key]
+    b3 = th.get("template") == "newsletter-b3.html"
     by_id = {e["event_id"]: e for e in ctx["events"]}
     segs = glossed(draft)
     note = ""
@@ -207,7 +224,9 @@ def _build(draft, ctx, imgs, mode):
         figs = a.get("key_figures") or []
         w = max(1, 100 // max(1, len(figs)))
         fig = a.get("figure")
-        return {"title": a["title"], "followup": _followup(by_id.get(a["event_id"])), "topic_chip": chip(th, code), "topic_fg": fg, "topic_bg": bg,
+        return {"marker_html": number_marker(th, code) if b3 else "", "tags_text": " · ".join((a.get("tags") or [])[1:]),
+                "inner_pad": "10px 18px 16px 18px" if i in imgs else "16px 18px",
+                "title": a["title"], "followup": _followup(by_id.get(a["event_id"])), "topic_chip": chip(th, code), "topic_fg": fg, "topic_bg": bg,
                 "tags": [{"text": t} for t in (a.get("tags") or [])[1:]], "body_html": to_html(segs[("articles", i, "body")]),
                 "watch_html": to_html(segs[("articles", i, "watch")]) if ("articles", i, "watch") in segs else "",
                 "credit": " / ".join(a["credits"]), "has_figures": bool(figs),
@@ -220,16 +239,18 @@ def _build(draft, ctx, imgs, mode):
         code = TOPIC_CODE.get(m["topic"], "B")
         head = TOPIC_NAME[code]
         if not groups or groups[-1]["heading"] != head:
-            groups.append({"heading": head, "icon": TOPIC_ICON[code], "fg": th["topic"][code][0], "items": []})
+            groups.append({"heading": head, "icon": TOPIC_ICON[code], "fg": th["topic"][code][0], "items": [],
+                           "marker_html": number_marker(th, code) if b3 else ""})
         groups[-1]["items"].append({"line_html": to_html(segs[("more", j, "line")]), "credit": m["credit"]})
     status = [{"name": n, "result": r} for n, r in ctx["status_rows"]] if ctx["issue_type"] == "현황호" else []
     corr = [f"{c.get('event_key', '')} 이전 표현 「{c['before']}」 → 수정 표현 「{c['after']}」 ({c.get('date', '')})" for c in ctx.get("corrections") or []]
     gl = [g for g in draft.get("glossary") or [] if g.get("meaning")]
     big = punch["big"] if punch else ""
-    t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark")},
+    t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark", "template", "name_em_words", "name_em_color")},
+         "has_image": bool(imgs),
          "hero_dark": th["hero_dark"], "hero_light": not th["hero_dark"],
          "title_tag": f"{ctx['newsletter_name']} {ctx['issue_week']} {draft['issue_title']}", "name": ctx["newsletter_name"],
-         "name_html": name_html(ctx["newsletter_name"], th["accent"]), "tagline": ctx["newsletter_tagline"], "team": ctx["newsletter_team"],
+         "name_html": name_html(ctx["newsletter_name"], th["accent"], th), "tagline": ctx["newsletter_tagline"], "team": ctx["newsletter_team"],
          "issue_no": ctx["issue_no"], "issue_week": ctx["issue_week"], "period_short": ctx["period_short"], "period": ctx["period"],
          "masthead_chips": [{"chip": chip(th, c, "11.5px")} for c in ("T1", "T2", "T3", "T4")],
          "n_docs": ctx["n_docs"], "n_pub": ctx["counts"]["published"], "note": note,
@@ -241,15 +262,15 @@ def _build(draft, ctx, imgs, mode):
          "has_core": bool(core), "core": [art(i, a) for i, a in core], "has_brief": bool(brief), "brief": [art(i, a) for i, a in brief],
          "has_more": bool(groups), "more": groups, "has_gloss": bool(gl), "glossary": [{"term": g["term"], "meaning": g["meaning"]} for g in gl],
          "has_corr": bool(corr), "corrections": [{"text": c} for c in corr], "excluded_count": draft.get("excluded_count", 0)}
-    out_html = fill(TEMPLATE.read_text(encoding="utf-8"), t)
+    out_html = fill((TEMPLATE_DIR / th.get("template", "newsletter.html")).read_text(encoding="utf-8"), t)
     verify_static(out_html)
-    return out_html, build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs)
+    return out_html, build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs, b3)
 
 
-def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None):
+def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3=False):
     imgs = imgs or {}
     L = [f"{ctx['newsletter_name']} · 제{ctx['issue_no']}호 · {ctx['issue_week']}", ctx["newsletter_tagline"],
-         f"대상 기간 {ctx['period']}", "🏭 칩메이커 · ⚙️ 장비사 · 📊 제조 솔루션 · 🤖 Physical AI", "",
+         f"대상 기간 {ctx['period']}", "01 칩메이커 · 02 장비사 · 03 제조 솔루션 · 04 Physical AI" if b3 else "🏭 칩메이커 · ⚙️ 장비사 · 📊 제조 솔루션 · 🤖 Physical AI", "",
          "[이번 주 헤드라인]", draft["issue_title"], "", "[한 줄 요약]", draft["summary"], ""]
     if note:
         L += [note, ""]
@@ -297,8 +318,9 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None):
         L += [f"- {g['term']}: {g['meaning']}" for g in gl] + [""]
     if t["has_corr"]:
         L += ["[정정]"] + [c["text"] for c in t["corrections"]] + [""]
-    L += [f"{ctx['newsletter_name']}는 {ctx['newsletter_team']}팀이 매주 화요일 보내는 제조 AI 동향 소식지입니다. 이번 호는 공개 자료 {ctx['n_docs']}건을 검토해 "
-          f"{ctx['counts']['published']}건을 골랐고, 사내 AI가 초안을 쓰고 편집자가 검토했습니다. 원문 링크는 보안 정책상 싣지 않으니 출처의 발행처·제목으로 검색해 보세요.",
+    L += [f"{ctx['newsletter_name']}는 {ctx['newsletter_team']}이 매주 화요일 보내는 제조 AI 동향 소식지입니다. 이번 호는 공개 자료 {ctx['n_docs']}건을 검토해 "
+          f"{ctx['counts']['published']}건을 골랐고, 사내 AI가 초안을 쓰고 편집자가 검토했습니다. 원문 링크는 보안 정책상 싣지 않으니 출처의 발행처·제목으로 검색해 보세요."
+          + (" 이미지는 각 발행처의 공개 자료이며 저작권은 발행처에 있습니다." if imgs else ""),
           f"이 밖에 검토했으나 싣지 않은 자료는 {t['excluded_count']}건입니다.", "의견·제보·정정은 이 메일에 회신해 주세요."]
     return "\n".join(_s(x) for x in L) + "\n"
 

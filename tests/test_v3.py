@@ -116,7 +116,7 @@ def test_s7_proposes_glossary_for_unknown_acronym_and_pipeline_appends(tmp_path)
     assert "  QWXZ: 직접 고친 풀이" in gfile and "검토 요청 ②에서 확정" in gfile
     assert "  # 제조·공정" in gfile and (ROOT / "glossary.yaml").read_text(encoding="utf-8").count("QWXZ") == 0        # 저장소 파일은 건드리지 않았다
     html_doc = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
-    assert "QWXZ<span" in html_doc and "(직접 고친 풀이)" in html_doc and "📖 이번 호 용어 사전" in html_doc and "시험용" not in html_doc
+    assert "QWXZ<span" in html_doc and "(직접 고친 풀이)" in html_doc and "이번 호 용어 사전" in html_doc and "시험용" not in html_doc
 
 
 def test_glossary_proposal_failure_is_listed_for_manual_input():
@@ -324,19 +324,21 @@ def test_more_candidates_carry_claim_and_evidence():
 
 # 파이프라인: 테마·머리띠 ---------------------------------------------------------------
 
-@pytest.mark.parametrize("theme", ["A", "B", "C"])
+@pytest.mark.parametrize("theme", ["A", "B", "C", "B3"])
 def test_pipeline_renders_selected_theme(tmp_path, theme):
     st = settings_mod.load(data_root=tmp_path)
     st.config["internal"]["newsletter_theme"] = theme
+    name = "MTC AX Tech Brief" if theme == "B3" else "FAB4 위클리"
+    st.config["internal"]["newsletter_name"] = name
     io = FakeIO(["1", "승인", "1"])
     assert Pipeline(st, Judge(FakeClient()), io).start(make_package(tmp_path, sample_records())) == 0
     html_doc = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
     from internal import render
     th = render.load_themes()[theme]
     assert th["bg"] in html_doc and "http" not in html_doc.lower() and "<a " not in html_doc.lower()
-    assert "FAB<span" in html_doc and "제1호" in html_doc and "공개 자료 6건을 검토해 3건을 골랐고" in html_doc
+    assert ("Tech Brief</span>" if theme == "B3" else "FAB<span") in html_doc and "제1호" in html_doc and "공개 자료 6건을 검토해 3건을 골랐고" in html_doc
     txt = (tmp_path / "out_internal" / WEEK / "newsletter.txt").read_text(encoding="utf-8")
-    assert "[이번 주 핵심]" in txt and "FAB4 위클리" in txt
+    assert "[이번 주 핵심]" in txt and name in txt
 
 
 def test_config_v3_keys():
@@ -344,8 +346,9 @@ def test_config_v3_keys():
     for gone in ("one_line_max", "abstract_chars", "hook_chars"):
         assert gone not in cfg
     assert cfg["summary_chars"] == [100, 170] and cfg["punch_chars"] == 120 and cfg["article_title_max"] == 36
-    assert cfg["newsletter_name"] == "FAB4 위클리" and cfg["newsletter_theme"] == "A" and "네 박자" in cfg["newsletter_tagline"]
-    assert settings_mod.load().config["config_version"] == "4"
+    assert cfg["newsletter_name"] == "MTC AX Tech Brief" and cfg["newsletter_theme"] == "B3" and "팹 AI 브리프" in cfg["newsletter_tagline"]
+    assert cfg["newsletter_team"].endswith("AX/PI팀")
+    assert settings_mod.load().config["config_version"] == "5"
 
 
 def test_step_prompts_carry_v3_rules():

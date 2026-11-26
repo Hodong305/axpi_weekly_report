@@ -956,7 +956,7 @@ def test_full_run_outputs(tmp_path):
     html = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
     assert "http" not in html.lower() and "<a " not in html.lower() and "<script" not in html.lower() and "<img" not in html.lower()
     assert "<style" not in html.lower() and 'style="' in html and "이번 주 헤드라인" in html and "한 줄 요약" in html and "출처 · " in html
-    assert html.index("이번 주 핵심") < html.index("⚡ 단신") < html.index("이 밖에 검토했으나")
+    assert html.index("이번 주 핵심") < html.index(">단신<") < html.index("이 밖에 검토했으나")
     assert "http" not in (tmp_path / "out_internal" / WEEK / "newsletter.txt").read_text(encoding="utf-8")
     # 대장
     led = [json.loads(l) for l in (tmp_path / "ledger" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -1174,7 +1174,7 @@ def test_fingerprint_change_warning(tmp_path):
     rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
     fp = rows[WEEK]
     assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.6" and fp["fp_internal_version"]
-    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "4"
+    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "5"
 
 
 def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):

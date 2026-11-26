@@ -81,3 +81,33 @@ C:
   punch_twist: "#4b5563"
   watch_bg: "#f1efff"
   watch_ink: "#3b2c8f"
+B3:
+  name: B3 · 민트 블록(꼭지 번호)
+  template: newsletter-b3.html       # 같은 렌더 경로에서 구조만 이 템플릿을 쓴다
+  hero_dark: true
+  name_em_words: 2                   # 이름 끝 두 단어(Tech Brief)를 강조색(name_em_color)으로
+  name_em_color: "#0b2b3c"
+  bg: "#eef7f6"
+  hero: "#00b3a4"
+  hero2: "#00b3a4"
+  hero_text: "#ffffff"
+  hero_sub: "#e3fffb"
+  accent: "#00b3a4"
+  ink: "#0b2b3c"
+  soft: "#f3fbfa"
+  card_border: "#d6ece9"
+  radius: 14px
+  topic:
+    T1: ["#1d5fd6", "#e8f0ff"]
+    T2: ["#00897b", "#dff5f2"]
+    T3: ["#7c4dcc", "#f1eaff"]
+    T4: ["#e46c12", "#fff0e2"]
+    B: ["#5a6475", "#eef0f3"]
+  punch_bg: "#0b2b3c"
+  punch_border: "#0b2b3c"
+  punch_big: "#00b3a4"
+  punch_label: "#00b3a4"
+  punch_text: "#ffffff"
+  punch_twist: "#bfe9e4"
+  watch_bg: "#f3fbfa"
+  watch_ink: "#00685f"
