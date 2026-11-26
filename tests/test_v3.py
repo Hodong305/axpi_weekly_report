@@ -47,9 +47,9 @@ def test_annotate_skips_when_parenthesis_follows_and_word_boundaries():
 
 
 def test_unknown_acronym_detection():
-    d = gdraft("PVTW와 XYZ-9 설비, SK하이닉스와 NVIDIA의 mmWave 그리고 TSMC 공정, DeepSeek와 GlobalFoundries.", "ADC도 AI도 MES도 EUV도 쓴다.")
+    d = gdraft("PVTW와 XYZ-9 설비, XQ사와 NVIDIA의 mmWave 그리고 TSMC 공정, DeepSeek와 GlobalFoundries.", "ADC도 AI도 MES도 EUV도 쓴다.")
     found = gl.find_unknown(d, TERMS, COMMON, ignore_words=["NVIDIA", "TSMC"])
-    assert "XYZ-9" in found and "SK" in found                                 # 2자 이상 대문자 약어
+    assert "XYZ-9" in found and "XQ" in found                                 # 2자 이상 대문자 약어
     assert not set(found) & {"PVTW", "ADC", "AI", "MES", "EUV", "NVIDIA", "TSMC", "mmWave", "DeepSeek", "GlobalFoundries"}   # glossary·공통어·발행처·긴 고유명사는 제외
     assert gl.find_unknown(gdraft("제목에만 ZZZ가 있다"), TERMS, COMMON) == ["ZZZ"]
     d = {"articles": [{"slot": "core", "title": "ZZZ 제목", "body": "본문", "watch": ""}], "more": []}
