@@ -26,7 +26,7 @@ def update_glossary(judge, draft, by_id, records, terms, common, warns=None):
     entries = glossary.build_glossary(draft, terms, previous)
     present = {g["term"] for g in entries}
     for g in previous:      # 풀이가 비어 있는 약어도 원고에 아직 있으면 목록에 남긴다
-        if g["term"] not in present and not g["meaning"] and any(glossary._pattern(g["term"]).search(x) for _, x in glossary.gloss_fields(draft)):
+        if g["term"] not in present and not g["meaning"] and any(glossary._pattern(g["term"]).search(x) for _, x in glossary.gloss_fields(draft, top=True)):
             entries.append(g)
     draft["glossary"] = entries
     if warns is not None:

@@ -21,10 +21,18 @@ def _pattern(term):
     return re.compile(re.escape(term))
 
 
-def gloss_fields(draft):
+def gloss_fields(draft, top=False):
     """풀이를 붙이는 자리(제목·헤드라인·총론·한 줄 핵심에는 붙이지 않는다), 문서 순서: 핵심 요점·본문·MTC가 볼 것 → 단신 본문 → 더 볼 거리.
-    반환: [(경로, 텍스트)]. 요점은 ("articles", i, "point_what") 등."""
+    반환: [(경로, 텍스트)]. 요점은 ("articles", i, "point_what") 등.
+    top=True(v4.7 B6·S4, 용어 찾기): 맨 위의 한 줄 요약과 30초 브리핑(핵심 기사의 한 줄 핵심)부터 풀이한다.
+    독자가 처음 만나는 곳에서 풀어 주기 위해서다(제목·헤드라인에는 여전히 붙이지 않는다)."""
     out = []
+    if top:
+        if draft.get("summary"):
+            out.append((("summary",), draft["summary"]))
+        for i, a in enumerate(draft.get("articles") or []):
+            if a.get("slot") == "core" and a.get("deck"):
+                out.append((("articles", i, "deck"), a["deck"]))
     for i, a in enumerate(draft.get("articles") or []):
         for k, v in (a.get("points") or {}).items():
             if v:
@@ -78,7 +86,7 @@ def build_glossary(draft, terms, previous=()):
     for g in prev.values():
         if g["source"] != "glossary" and g.get("meaning"):
             meanings[g["term"]] = g["meaning"]
-    _, used = annotate(gloss_fields(draft), meanings)
+    _, used = annotate(gloss_fields(draft, top=True), meanings)
     out = []
     for t in used:
         src = prev[t]["source"] if t in prev and prev[t]["source"] != "glossary" else "glossary" if t in terms else prev[t]["source"]
@@ -95,7 +103,7 @@ def find_unknown(draft, terms, common, ignore_words=()):
     words = {w for t in terms for w in re.findall(r"[A-Za-z0-9]+", t)}
     skip = set(common) | set(terms) | words | {w.casefold() for w in ignore_words}
     out = []
-    for _, text in gloss_fields(draft):
+    for _, text in gloss_fields(draft, top=True):
         for m in _TOKEN.finditer(text):
             tok = m.group()
             caps = sum(c.isupper() for c in tok)
@@ -143,8 +151,11 @@ def term_contexts(term, draft, events_by_id, records, limit=3):
     인용한 자료에 없으면 입력 전체에서 찾는다."""
     pat = _pattern(term)
     docs = []
-    for key, text in gloss_fields(draft):
+    for key, text in gloss_fields(draft, top=True):
         if pat.search(text):
+            if key == ("summary",):        # 총론: 근거가 따로 없으므로 게재 기사 전체의 근거에서 찾는다
+                docs += [e.split("/")[0] for a in draft.get("articles") or [] for e in a["evidence_ids"]]
+                break
             kind, idx, _ = key
             ids = (draft["articles"][idx] if kind == "articles" else draft["more"][idx])["evidence_ids"]
             docs += [e.split("/")[0] for e in ids]

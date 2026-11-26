@@ -1,14 +1,18 @@
-"""v4.7 요약층(설계서 9.6·9.8): 한 줄 핵심(deck)·요점 3줄(points)·30초 브리핑·확인 단계 막대·읽는 시간, B4·B5 레이아웃."""
+"""v4.7 요약층과 작성 수준(설계서 9.6·9.8): 한 줄 핵심(deck)·요점 4개(points)·숫자의 의미(why)·브리핑·숫자로 보는 이번 주·이번 호 구성,
+B6(브리핑 리포트)·S4(매거진) 후보 레이아웃과 이전 시안(B4·B5·E·S·S2·S3)."""
 import copy
+import re
 from pathlib import Path
 
 import yaml
 
 from internal import checks, draft as draftmod, render, review as rv, settings as settings_mod
+from internal.glossary import gloss_fields
 
 ROOT = Path(__file__).resolve().parent.parent
 CFG = settings_mod.load().internal
 SAMPLE = ROOT / "docs" / "samples" / "sample-draft-v4.7.yaml"
+CORE_BODY = "지금까지 결함 원인 분석은 엔지니어가"
 
 
 def sample():
@@ -22,124 +26,149 @@ def ctx(theme):
             "theme": theme, "issue_no": 1, "n_docs": 39, "read_chars_per_min": 500}
 
 
+def build(theme, d=None):
+    return render.build_all(d or sample(), ctx(theme))
+
+
+# 설정·견본 ---------------------------------------------------------------------------
+
 def test_config_v47_keys():
-    assert CFG["newsletter_theme"] == "B4" and CFG["deck_chars"] == 60 and CFG["point_chars"] == 90 and CFG["figure_why_chars"] == 40
-    assert CFG["core_chars"] == [200, 320] and CFG["brief_chars"] == [45, 75] and CFG["issue_body_max"] == 2800
+    assert CFG["newsletter_theme"] == "B6"
+    assert (CFG["deck_chars"], CFG["point_chars"], CFG["figure_why_chars"], CFG["watch_chars"]) == (120, 180, 80, 160)
+    assert CFG["core_chars"] == [400, 640] and CFG["brief_chars"] == [90, 150] and CFG["summary_chars"] == [140, 240]
+    assert CFG["more_line_chars"] == 120 and CFG["punch_chars"] == 320 and CFG["issue_body_max"] == 5600 and CFG["article_title_max"] == 50
     th = render.load_themes()
-    assert th["B4"]["template"] == "newsletter-b4.html" and th["B4"]["show_body"] is True
-    assert th["B5"]["template"] == "newsletter-b5.html" and th["B5"]["show_body"] is False
+    for t in ("B6", "S4"):
+        assert th[t]["gloss_top"] is True and th[t]["numbers_panel"] is True and th[t]["show_body"] is True
+    assert th["B5"]["show_body"] is False
 
 
-def test_sample_draft_passes_length_checks():
+def test_sample_draft_passes_length_checks_and_uses_four_full_sentence_points():
     d = sample()
     assert checks.length_violations(d, CFG, "정규호") == []
     assert checks.body_total(d) <= CFG["issue_body_max"]
+    for a in d["articles"]:
+        if a["slot"] == "core":
+            assert list(a["points"]) == ["what", "how_much", "why", "scope"]
+            for v in a["points"].values():
+                assert v.rstrip().endswith("다.") and len(v) >= 60        # 명사형 조각이 아닌 완결 문장
+            assert all(k.get("why") for k in a["key_figures"])
+        else:
+            assert len(re.findall(r"다\.", a["body"])) >= 2            # 단신은 2문장(무슨 일 + 왜 볼 만한지)
 
 
-def test_b4_has_three_layers_and_is_static():
-    out = render.build_all(sample(), ctx("B4"))
-    h = out["html_preview"]
-    render.verify_static(h)
-    # ① 30초 브리핑: 핵심은 한 줄 핵심(주체·사건·결과), 단신은 제목, 번호 01~06
-    assert "30초 브리핑" in h and "삼성전자, 웨이퍼 결함 원인 분석에 AI 에이전트 적용" in h and ">06<" in h
-    # ② 요약층: 라벨 3개와 한 줄 핵심, 성숙도·근거 꼬리표는 글자로(점 막대 없음)
-    for lab in ("무슨 일", "얼마나", "어디까지"):
-        assert f">{lab}</span>" in h
-    assert "●" not in h and "현장 실증·적용 · 운영사 발표" in h
-    # ③ 자세히(본문)와 MTC가 볼 것, 읽는 시간
-    assert "자세히" in h and "지금까지 결함 원인 분석은 엔지니어가" in h and "MTC가 볼 것" in h and "전체 약 " in h
-    # 약어 풀이는 요점의 첫 등장에 붙는다(본문의 두 번째 등장에는 붙지 않는다)
-    assert h.count("(근본 원인 분석)") == 1
-    t = out["text"]
-    assert t.index("[30초 브리핑]") < t.index("[이번 주 핵심]") and "\n▶ 삼성전자, 웨이퍼 결함 원인 분석에" in t and "\n· 얼마나: 엔지니어가 수 시간 걸려 하던 원인 분석이 수 분으로" in t and "🏭" not in t
+# 후보 레이아웃 B6 · S4 ----------------------------------------------------------------
 
-
-def test_b5_drops_core_body_but_keeps_summary_layer():
-    out = render.build_all(sample(), ctx("B5"))
+def test_b6_sections_in_reading_order_and_static():
+    out = build("B6")
     h, t = out["html_preview"], out["text"]
     render.verify_static(h)
-    assert "지금까지 결함 원인 분석은 엔지니어가" not in h and "지금까지 결함 원인 분석은 엔지니어가" not in t   # 핵심 본문 없음
-    assert "같은 공정 챔버끼리의 결과 차이를" in h                                                # 단신 본문은 그대로
-    assert "그래서 MTC는" in h and "한눈에" in h and "90,000+" in h and ">얼마나</b>" in h
+    order = ["이번 호 구성", "이번 주 헤드라인", "한 줄 요약", "이번 주 브리핑", "이번 주 가장 놀라운 숫자", "숫자로 보는 이번 주", "이번 주 핵심",
+             ">단신<", "더 볼 거리", "이번 호 용어 사전", "이 메일을 받는 이유"]
+    pos = [h.index(order[0])]
+    for x in order[1:]:                       # '이번 호 구성'에도 구역 이름이 나오므로 앞 구역 뒤에서 찾는다
+        pos.append(h.index(x, pos[-1] + 1))
+    assert pos == sorted(pos)
+    for lab in ("무슨 일", "얼마나", "왜 중요", "어디까지"):
+        assert f">{lab}</span>" in h
+    assert CORE_BODY in h and "MTC가 볼 것" in h and "●" not in h
+    # 이번 호 구성: 구역별 건수
+    assert re.search(r"이번 주 핵심 <b[^>]*>2</b>", h) and re.search(r"단신 <b[^>]*>4</b>", h) and re.search(r"숫자로 보는 이번 주 <b[^>]*>5</b>", h)
+    # 받은편지함 미리 보기 글(숨김)은 총론 첫 문장
+    assert 'display:none;max-height:0' in h and "이번 주에는 삼성전자가 웨이퍼 결함의" in h
+    # 텍스트본도 같은 순서, 숫자 구역 포함
+    assert t.index("[30초 브리핑]") < t.index("[숫자로 보는 이번 주]") < t.index("[이번 주 핵심]")
+    assert "- 99% 임무 성공률(≠ 이상 검출률) (기사 02) — 로봇이 멈추지 않고" in t
 
 
-def test_old_themes_still_render_with_v47_draft():
-    for th in ("A", "B", "C", "B3"):
-        h = render.build_all(sample(), ctx(th))["html_preview"]
+def test_b6_briefs_are_two_column_grid():
+    h = build("B6")["html_preview"]
+    assert h.count('<td width="50%" valign="top" style="padding:6px;">') == 4     # 단신 4건 → 2행 × 2칸
+
+
+def test_s4_number_tiles_and_core_cards():
+    h = build("S4")["html_preview"]
+    render.verify_static(h)
+    assert h.count("border-top:4px solid #ffd60a") == 5                          # 숫자 타일 5개(핵심 4 + 단신 1)
+    assert "기사 02 · Physical AI" in h and ">왜 중요</span>" in h and CORE_BODY in h
+    assert "이 기사의 숫자는 위 '숫자로 보는 이번 주'에 모았습니다" in h
+
+
+def test_jargon_is_explained_at_first_appearance_at_the_top():
+    """B6·S4: '서브팹'은 맨 위 한 줄 요약에서 처음 풀이하고, 아래에서는 되풀이하지 않는다. 제목에는 쉬운 수식어가 있다."""
+    for th in ("B6", "S4"):
+        h = build(th)["html_preview"]
+        first = h.index("(클린룸 아래층의 배관·전력·가스 설비 공간)")
+        assert first < h.index("이번 주 브리핑") and h.count("(클린룸 아래층의 배관·전력·가스 설비 공간)") == 1
+    assert "클린룸 아래 설비층 ‘서브팹’" in sample()["articles"][1]["title"]
+    # 이전 시안(B4)은 맨 위에서 풀이하지 않고 본문 첫 등장에서 풀이한다
+    h4 = build("B4")["html_preview"]
+    assert h4.index("(클린룸 아래층의") > h4.index("이번 주 핵심")
+
+
+def test_long_values_get_smaller_type():
+    assert render.value_size("99%") == 23 and render.value_size("90,000+") == 23 and render.value_size("수 시간 → 수 분") < 23
+
+
+# 이전 시안 ---------------------------------------------------------------------------
+
+def test_previous_drafts_still_render():
+    for th in ("A", "B", "C", "B3", "B4", "B5", "E", "S", "S2", "S3"):
+        h = build(th)["html_preview"]
         render.verify_static(h)
-        assert "지금까지 결함 원인 분석은 엔지니어가" in h
+        assert "결함은 에이전트가 쫓고" in h
+    assert CORE_BODY not in build("B5")["html_preview"]                             # B5는 핵심 본문을 싣지 않는다
 
 
-def test_read_minutes_counts_body_only_when_shown():
-    d = sample()
-    full_b4, skim = render.read_minutes(d, True, 500)
-    full_b5, skim5 = render.read_minutes(d, False, 500)
-    assert full_b4 >= full_b5 >= 1 and skim == skim5 and skim % 10 == 0 and skim >= 10
+# 검사·작성 --------------------------------------------------------------------------
 
-
-def test_deck_and_points_length_and_url_checks():
+def test_deck_points_and_figure_why_length_and_url_checks():
     d = sample()
     a = d["articles"][0]
-    a["deck"] = "가" * 65
-    a["points"]["scope"] = "나" * 95
+    a["deck"] = "가" * 125
+    a["points"]["why"] = "나" * 185
+    a["key_figures"][0]["why"] = "다" * 85
     msgs = [m for _, m in checks.length_violations(d, CFG, "정규호")]
-    assert any(m.startswith("한 줄 핵심 65자") for m in msgs) and any(m.startswith("요점(scope) 95자") for m in msgs)
+    assert any(m.startswith("한 줄 핵심 125자") for m in msgs) and any(m.startswith("요점(why) 185자") for m in msgs)
+    assert any("의미 85자" in m for m in msgs)
     d2 = sample()
     d2["articles"][0]["points"]["what"] = "자세한 내용은 example.com 참고"
+    d2["articles"][2]["figure"]["why"] = "example.com 참고"
     warns = checks.autofix(d2, {})
-    assert "example.com" not in d2["articles"][0]["points"]["what"] and any(w["kind"] == "URL" for w in warns)
+    assert "example.com" not in d2["articles"][0]["points"]["what"] + d2["articles"][2]["figure"]["why"]
+    assert len([w for w in warns if w["kind"] == "URL"]) == 2
+
+
+def test_points_without_why_still_work():
+    d = sample()
+    del d["articles"][0]["points"]["why"]
+    h = build("B6", d)["html_preview"]
+    assert h.count(">왜 중요</span>") == 1                                            # 두 번째 기사에만
 
 
 def test_fallback_deck_when_model_omits_summary_layer():
     body = "삼성전자가 결함 원인 분석 에이전트를 팹에 적용했다. 적용 범위는 비공개다."
     assert draftmod.fallback_deck(body, CFG) == "삼성전자가 결함 원인 분석 에이전트를 팹에 적용했다."
-    long = "가" * 90 + "다. 둘째 문장."
-    assert len(draftmod.fallback_deck(long, CFG)) == CFG["deck_chars"]
+    assert len(draftmod.fallback_deck("가" * 150 + "다. 둘째 문장.", CFG)) == CFG["deck_chars"]
 
 
 def test_review2_shows_deck_and_points():
     d = sample()
     d["articles"][0]["title_alternatives"] = ["대안 a", "대안 b"]
     text = rv.render_review2("2026-W48", d, [], CFG)
-    assert "      ▶ 삼성전자, 웨이퍼 결함 원인 분석에" in text and "      · 어디까지: 회사 발표 기준이며" in text
+    assert "      ▶ 삼성전자가 웨이퍼 결함의 원인 분석을" in text and "      · 왜 중요: 결함 원인 분석은" in text and "      · 어디까지: 회사 발표 기준이다." in text
 
 
-def test_glossary_annotates_points_first():
+def test_gloss_field_order():
     d = copy.deepcopy(sample())
-    from internal.glossary import gloss_fields
-    fields = [k for k, _ in gloss_fields(d)]
-    assert fields[:4] == [("articles", 0, "point_what"), ("articles", 0, "point_how_much"), ("articles", 0, "point_scope"), ("articles", 0, "body")]
+    plain = [k for k, _ in gloss_fields(d)]
+    assert plain[:5] == [("articles", 0, "point_what"), ("articles", 0, "point_how_much"), ("articles", 0, "point_why"),
+                         ("articles", 0, "point_scope"), ("articles", 0, "body")]
+    top = [k for k, _ in gloss_fields(d, top=True)]
+    assert top[:3] == [("summary",), ("articles", 0, "deck"), ("articles", 1, "deck")]
 
 
-def test_editorial_and_swiss_designs_render_three_layers():
-    for th in ("E", "S"):
-        out = render.build_all(sample(), ctx(th))
-        h = out["html_preview"]
-        render.verify_static(h)
-        assert "30초 브리핑" in h and "삼성전자, 웨이퍼 결함 원인 분석에 AI 에이전트 적용" in h and ">01<" in h and ">06<" in h
-        assert "지금까지 결함 원인 분석은 엔지니어가" in h and "MTC가 볼 것" in h and "●" not in h
-        assert ">무슨 일<" in h and "칩메이커" in h
-    assert "Myeongjo" in render.build_all(sample(), ctx("E"))["html_preview"]
-
-
-def test_figure_why_is_shown_checked_and_in_text():
-    out = render.build_all(sample(), ctx("B4"))
-    assert "일회성 시범이 아니라 상시 운영 규모" in out["html_preview"] and "(왜 중요: 일회성 시범이 아니라 상시 운영 규모)" in out["text"]
-    d = sample()
-    d["articles"][1]["key_figures"][0]["why"] = "가" * 45
-    assert any("의미 45자" in m for _, m in checks.length_violations(d, CFG, "정규호"))
-
-
-def test_points_are_full_sentences_in_sample():
-    for a in sample()["articles"]:
-        for v in (a.get("points") or {}).values():
-            assert v.endswith("다.") and len(v) >= 40         # 명사형 조각이 아닌 완결 문장
-
-
-def test_swiss_color_variants_share_structure():
-    th = render.load_themes()
-    assert th["S2"]["template"] == th["S3"]["template"] == "newsletter-s.html"
-    hs = {t: render.build_all(sample(), ctx(t))["html_preview"] for t in ("S", "S2", "S3")}
-    for t, h in hs.items():
-        render.verify_static(h)
-        assert th[t]["accent"] in h
+def test_prompt_requires_fuller_writing():
+    steps = (ROOT / "prompts" / "internal-steps.md").read_text(encoding="utf-8")
+    for must in ("points{what, how_much, why, scope}", "why(왜 중요)", "4~6문장", "단신은 2문장", "쉬운 수식어", "key_figures[{value, label, why}]"):
+        assert must in steps, must

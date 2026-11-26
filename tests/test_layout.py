@@ -108,7 +108,7 @@ def test_core_article_schema_requires_watch_and_figures_and_retries():
     ev = ev_mod.new_event("EVT-2026W49-01", "event", [d], d, "Lam Research", "t", "가제목", "T2_EQUIPMENT")
     ev.update(slot="core", score={"tiers": {"field_maturity": 20, "evidence_level": 20}, "claim": "c", "maturity": "m", "fact": [],
                                   "mtc_impact": "", "action_watch": "", "unresolved": [], "evidence": []})
-    good = {"event_id": ev["event_id"], "title": "제목", "title_alternatives": ["가", "나"], "body": fill("본문", 190),
+    good = {"event_id": ev["event_id"], "title": "제목", "title_alternatives": ["가", "나"], "body": fill("본문", 450),
             "watch": "확인할 지표", "key_figures": [{"value": "30%", "label": "최대 단축"}], "evidence_ids": [f"{d}/P1"]}
     bad = dict(good, key_figures=[{"value": "77%", "label": "근거에 없음"}])
     seq = iter([bad, good])
@@ -128,7 +128,7 @@ def test_core_article_schema_requires_watch_and_figures_and_retries():
 # 더 볼 거리 한 줄 · S7 ------------------------------------------------------------------
 
 def more_draft():
-    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 200))
+    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 500))
     draft["abstract"] = fill("요약", 260)
     draft["articles"][0].update(watch="후속 지표를 확인", key_figures=[], tags=[], evidence_ids=[f"{d}/P1"])
     ev = next(iter(by_id.values()))
@@ -154,15 +154,15 @@ def test_more_line_suffix_and_credit():
 
 def test_s7_checks_watch_key_figures_and_more():
     draft, by_id, recs, d = more_draft()
-    draft["articles"][0]["watch"] = "가" * 90                                           # 한도 80자 초과
-    draft["more"][0]["line"] = "나" * 65 + " (보도)"                                     # 한도 60자 초과(접미어 제외, v4.7)
+    draft["articles"][0]["watch"] = "가" * 170                                          # 한도 160자 초과
+    draft["more"][0]["line"] = "나" * 125 + " (보도)"                                    # 한도 120자 초과(접미어 제외, v4.7)
     v = checks.length_violations(draft, CFG, "정규호")
     assert any("MTC가 볼 것" in m for _, m in v) and any(t[0] == "more" for t, _ in v)
-    draft["more"][0]["line"] = "나" * 60 + " (보도)"
+    draft["more"][0]["line"] = "나" * 120 + " (보도)"
     assert not any(t[0] == "more" for t, _ in checks.length_violations(draft, CFG, "정규호"))
     # 합계: 핵심 본문 + watch (더 볼 거리는 넣지 않는다)
     draft["articles"][0]["watch"] = "다" * 50
-    assert checks.body_total(draft) == 200 + 50
+    assert checks.body_total(draft) == 500 + 50
     # URL 삭제
     draft["more"][0]["line"] = "자세히는 https://x.example.org/a 참조"
     draft["articles"][0]["watch"] = "www.example.com 확인"
@@ -182,7 +182,7 @@ def test_s7_checks_watch_key_figures_and_more():
 def test_s7_regenerates_overlong_more_line_once():
     draft, by_id, recs, d = more_draft()
     ev = next(iter(by_id.values()))
-    draft["more"][0]["line"] = "나" * 90
+    draft["more"][0]["line"] = "나" * 130
     calls = []
 
     def more(u):

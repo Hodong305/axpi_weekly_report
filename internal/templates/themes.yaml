@@ -301,3 +301,71 @@ S3:
   punch_twist: "#0d3b2e"
   watch_bg: "#f3f4f6"
   watch_ink: "#0d3b2e"
+B6:
+  name: B6 · 브리핑 리포트(v4.7 후보, B4 발전형)
+  template: newsletter-b6.html       # 보내는 곳 · 이번 호 구성 · 브리핑 · 숫자로 보는 이번 주 · 핵심(요점 4) · 단신 2열 · 더 볼 거리 · 용어 · 받는 이유
+  show_body: true
+  gloss_top: true                    # 한 줄 요약·브리핑의 첫 등장부터 용어 풀이
+  numbers_panel: true
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#0b2b3c"
+  bg: "#eef4f3"
+  hero: "#00a898"
+  hero2: "#00a898"
+  hero_text: "#ffffff"
+  hero_sub: "#dcfbf6"
+  hero_chip_bg: "#0b8f82"
+  accent: "#00897b"
+  ink: "#0f2733"
+  muted: "#7a8a94"
+  soft: "#f3faf9"
+  card_border: "#dbeceb"
+  radius: 16px
+  topic:
+    T1: ["#2563eb", "#e8f0ff"]
+    T2: ["#00897b", "#dff5f2"]
+    T3: ["#7c4dcc", "#f1eaff"]
+    T4: ["#e0640f", "#fff0e2"]
+    B: ["#5a6475", "#eef0f3"]
+  punch_bg: "#0f2733"
+  punch_border: "#0f2733"
+  punch_big: "#2fe0cc"
+  punch_label: "#2fe0cc"
+  punch_text: "#ffffff"
+  punch_twist: "#b9e6e0"
+  watch_bg: "#fff7e6"
+  watch_ink: "#7a4a00"
+S4:
+  name: S4 · 매거진(v4.7 후보, S 발전형)
+  template: newsletter-s4.html       # 검정·노랑, 큰 번호 · 이번 호 구성 · 브리핑 · 숫자 타일 2열 · 핵심(요점 4, 숫자는 타일로) · 단신 · 더 볼 거리 · 용어 · 받는 이유
+  show_body: true
+  gloss_top: true
+  numbers_panel: true
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#ffd60a"
+  bg: "#e6e6e6"
+  hero: "#111111"
+  hero2: "#111111"
+  hero_text: "#ffffff"
+  hero_sub: "#bdbdbd"
+  accent: "#ffd60a"
+  ink: "#111111"
+  soft: "#f4f4f4"
+  card_border: "#111111"
+  radius: 0px
+  topic:
+    T1: ["#111111", "#ffd60a"]
+    T2: ["#111111", "#ffd60a"]
+    T3: ["#111111", "#ffd60a"]
+    T4: ["#111111", "#ffd60a"]
+    B: ["#111111", "#ffd60a"]
+  punch_bg: "#ffd60a"
+  punch_border: "#111111"
+  punch_big: "#111111"
+  punch_label: "#111111"
+  punch_text: "#111111"
+  punch_twist: "#111111"
+  watch_bg: "#f4f4f4"
+  watch_ink: "#111111"

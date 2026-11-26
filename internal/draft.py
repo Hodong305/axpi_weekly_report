@@ -14,21 +14,25 @@ LANG_SUFFIX = {"ko": "", "en": "영문", "ja": "일문", "zh": "중문", "de": "
 FIGURE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["value", "label"],
                  "properties": {"value": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}}}
 
+WHY_FIGURE_SCHEMA = {       # 수치 + 왜 중요한지(why는 v4.7 추가, 선택: 이전 응답 호환)
+    "type": "object", "additionalProperties": False, "required": ["value", "label"],
+    "properties": {**FIGURE_SCHEMA["properties"], "why": {"type": "string"}}}
+
 ARTICLE_SCHEMA = {          # 단신(선택 항목 figure: 오른쪽 수치 배지 하나)
     "type": "object", "additionalProperties": False,
     "required": ["event_id", "title", "title_alternatives", "body", "evidence_ids"],
     "properties": {"event_id": {"type": "string"}, "title": {"type": "string", "minLength": 1},
                    "title_alternatives": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
-                   "body": {"type": "string", "minLength": 1}, "figure": {"anyOf": [{"type": "null"}, FIGURE_SCHEMA]},
+                   "body": {"type": "string", "minLength": 1}, "figure": {"anyOf": [{"type": "null"}, WHY_FIGURE_SCHEMA]},
                    "evidence_ids": {"type": "array", "items": {"type": "string"}}}}
 
 IMAGE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["media_ref", "caption"],
                 "properties": {"media_ref": {"type": "string"}, "caption": {"type": "string", "minLength": 1}}}
 
-POINTS_SCHEMA = {          # v4.7 핵심 요점 3줄: 무엇이 바뀌었나 · 얼마나 · 어디까지 확인됐나(라벨은 코드가 붙인다)
+POINTS_SCHEMA = {          # v4.7 핵심 요점: 무슨 일 · 얼마나 · 왜 중요 · 어디까지(라벨은 코드가 붙인다). why는 나중에 더해 선택
     "type": "object", "additionalProperties": False, "required": ["what", "how_much", "scope"],
-    "properties": {k: {"type": "string", "minLength": 1} for k in ("what", "how_much", "scope")}}
-POINT_LABELS = (("what", "무슨 일"), ("how_much", "얼마나"), ("scope", "어디까지"))
+    "properties": {k: {"type": "string", "minLength": 1} for k in ("what", "how_much", "why", "scope")}}
+POINT_LABELS = (("what", "무슨 일"), ("how_much", "얼마나"), ("why", "왜 중요"), ("scope", "어디까지"))
 
 CORE_FIGURE_SCHEMA = {      # 핵심 수치 카드: why(왜 중요한지)는 v4.7 추가, 선택(이전 응답 호환)
     "type": "object", "additionalProperties": False, "required": ["value", "label"],
@@ -43,7 +47,7 @@ CORE_ARTICLE_SCHEMA = {     # 핵심: 한 줄 핵심(deck) + 요점(points) + �
                    "image": {"anyOf": [{"type": "null"}, IMAGE_SCHEMA]}}}
 # deck·points는 v4.7에서 추가한 키다. 프롬프트는 항상 쓰라고 하지만 스키마에서는 선택으로 두고, 빠지면 코드가 본문으로 대신한다(fallback_deck).
 
-DECK_MAX, POINT_MAX, WHY_MAX = 60, 90, 40
+DECK_MAX, POINT_MAX, WHY_MAX = 120, 180, 80
 
 IMAGE_CAPTION_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["caption"],
                         "properties": {"caption": {"type": "string", "minLength": 1}}}
@@ -139,13 +143,13 @@ def _article_user(judge, ev, slot, records, cfg, feedback):
     lo, hi = cfg["core_chars"] if slot == "core" else cfg["brief_chars"]
     led = ev["ledger"]
     info = {"event_id": ev["event_id"], "slot": slot, "subject": ev["subject"], "site_task": ev["site_task"],
-            "제목_글자수_한도": cfg["article_title_max"], "본문_글자수_범위": [lo, hi]}
+            "제목_글자수_한도": cfg["article_title_max"], "본문_글자수_범위": [lo, hi],
+            "수치_why_글자수_한도": cfg.get("figure_why_chars", WHY_MAX)}
     if slot == "core":
         info["한줄핵심_글자수_한도"] = cfg.get("deck_chars", DECK_MAX)
         info["요점_한줄_글자수_한도"] = cfg.get("point_chars", POINT_MAX)
         info["watch_글자수_한도"] = cfg["watch_chars"]
         info["key_figures_최대"] = 3
-        info["수치_why_글자수_한도"] = cfg.get("figure_why_chars", WHY_MAX)
         if image_candidates(ev, records, cfg):
             info["이미지_설명_글자수_한도"] = cfg["image_caption_chars"]
     if led["verdict"] == "SAME_WITH_CHANGE":
@@ -203,14 +207,15 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
     if slot == "core":
         art["deck"] = (r.get("deck") or "").strip() or fallback_deck(art["body"], cfg)
         pts = r.get("points")
-        art["points"] = {k: pts[k].strip() for k, _ in POINT_LABELS} if pts else None
+        art["points"] = {k: pts[k].strip() for k, _ in POINT_LABELS if (pts.get(k) or "").strip()} if pts else None
         art["watch"] = r["watch"].strip()
         art["key_figures"] = [{"value": k["value"].strip(), "label": k["label"].strip(), **({"why": k["why"].strip()} if (k.get("why") or "").strip() else {})}
                               for k in r["key_figures"]]
         img = r.get("image")
         art["image"] = {"media_ref": img["media_ref"], "caption": img["caption"].strip()} if img else None
     elif r.get("figure"):
-        art["figure"] = {"value": r["figure"]["value"].strip(), "label": r["figure"]["label"].strip()}
+        art["figure"] = {"value": r["figure"]["value"].strip(), "label": r["figure"]["label"].strip(),
+                         **({"why": r["figure"]["why"].strip()} if (r["figure"].get("why") or "").strip() else {})}
     art["credits"] = build_credits(r["evidence_ids"], ev["rep_doc_id"], records)
     art["evidence_ids"] = list(r["evidence_ids"])
     return art, failed

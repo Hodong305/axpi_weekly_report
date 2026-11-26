@@ -141,6 +141,23 @@ def read_minutes(draft, show_body, cpm):
     return max(1, round(full / cpm)), max(10, round(skim / cpm * 60 / 10) * 10)
 
 
+def value_size(value, big=23):
+    """숫자 칸 글씨 크기: 짧은 수치는 크게, '수 시간 → 수 분' 같은 긴 말은 줄여 옆 칸을 침범하지 않게."""
+    n = len(value)
+    return big if n <= 7 else big - 5 if n <= 10 else big - 8
+
+
+def pairs(items):
+    """2열 격자용: [{"cells": [a, b]}, ...]. 홀수면 마지막 칸은 빈 칸({"filler": True})."""
+    rows = []
+    for k in range(0, len(items), 2):
+        cells = list(items[k:k + 2])
+        if len(cells) == 1:
+            cells.append({"filler": True})
+        rows.append({"cells": [dict(c, filler=c.get("filler", False)) for c in cells]})
+    return rows
+
+
 def chip(theme, code, size="12px"):
     fg, bg = theme["topic"][code]
     return (f'<span style="display:inline-block;background:{bg};color:{fg};font-weight:bold;padding:3px 10px;border-radius:999px;'
@@ -175,10 +192,10 @@ def name_html(name, accent, theme=None):
     return html.escape(name[:m.start()]) + f'<span style="color:{accent};">{m.group()}</span>' + html.escape(name[m.end():])
 
 
-def glossed(draft):
+def glossed(draft, top=False):
     """첫 등장에 풀이를 붙인 조각들. 반환: {칸 키: [(조각, 풀이 또는 None)]}  (제목·헤드라인·총론에는 붙이지 않는다)"""
     meanings = {g["term"]: g["meaning"] for g in draft.get("glossary") or [] if g.get("meaning")}
-    fields = [(k, _s(t)) for k, t in gloss_fields(draft)]
+    fields = [(k, _s(t)) for k, t in gloss_fields(draft, top)]
     segs, _ = annotate(fields, meanings)
     return segs
 
@@ -229,7 +246,7 @@ def _build(draft, ctx, imgs, mode):
     b3 = th.get("template") == "newsletter-b3.html"
     show_body = th.get("show_body", True)       # B5(스마트 브리핑)는 핵심 본문을 싣지 않고 요점으로 대신한다
     by_id = {e["event_id"]: e for e in ctx["events"]}
-    segs = glossed(draft)
+    segs = glossed(draft, th.get("gloss_top", False))
     note = ""
     if ctx["issue_type"] == "축약호":
         note = f"축약호: 최종 통과 문서 {ctx['counts']['pass_docs']}건, 게재 사건 {ctx['counts']['published']}건. {ctx['note']}"
@@ -261,19 +278,33 @@ def _build(draft, ctx, imgs, mode):
                 "tags": [{"text": t} for t in (a.get("tags") or [])[1:]], "body_html": to_html(segs[("articles", i, "body")]),
                 "watch_html": to_html(segs[("articles", i, "watch")]) if ("articles", i, "watch") in segs else "",
                 "credit": " / ".join(a["credits"]), "has_figures": bool(figs),
-                "figures": [{"value": k["value"], "label": k["label"], "why": k.get("why") or "", "w": w} for k in figs],
-                "fig_value": fig["value"] if fig else "", "fig_label": fig["label"] if fig else "",
+                "figures": [{"value": k["value"], "label": k["label"], "why": k.get("why") or "", "w": w, "vsize": value_size(k["value"])} for k in figs],
+                "fig_value": fig["value"] if fig else "", "fig_label": fig["label"] if fig else "", "fig_why": (fig or {}).get("why", ""),
                 "image_src": _img_src(imgs.get(i), mode), "image_caption": imgs[i]["caption"] if i in imgs else "",
                 "image_credit": imgs[i]["credit"] if i in imgs else ""}
     tldr = []
     for n, (i, a) in enumerate(core + brief, 1):
         code = code_of(a)
-        tldr.append({"num": f"{n:02d}", "fg": th["topic"][code][0], "pill_html": topic_pill(th, code),
-                     "line": (a.get("deck") or a["title"]) if a["slot"] == "core" else a["title"], "is_core": a["slot"] == "core"})
+        line = (a.get("deck") or a["title"]) if a["slot"] == "core" else a["title"]
+        key = ("articles", i, "deck")
+        line_html = to_html(segs[key]) if (a["slot"] == "core" and key in segs) else html.escape(_s(line))
+        tldr.append({"num": f"{n:02d}", "fg": th["topic"][code][0], "pill_html": topic_pill(th, code), "topic_name": B3_NAME[code],
+                     "line": line, "line_html": line_html, "is_core": a["slot"] == "core", "is_brief": a["slot"] != "core"})
     mins, secs = read_minutes(draft, show_body, ctx.get("read_chars_per_min", 500))
     core_ctx, brief_ctx = [art(i, a) for i, a in core], [art(i, a) for i, a in brief]
     for n, c in enumerate(core_ctx + brief_ctx, 1):       # 30초 브리핑과 같은 번호(E·S 디자인이 기사 앞에 쓴다)
         c["num"] = f"{n:02d}"
+    numbers = []      # v4.7 '숫자로 보는 이번 주': 게재 기사의 수치를 기사 번호와 함께 모은다(핵심 수치 카드 → 단신 수치)
+    for c, (i, a) in zip(core_ctx + brief_ctx, core + brief):
+        figs = list(a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else [])
+        for k in figs:
+            numbers.append({"num": c["num"], "value": k["value"], "label": k["label"], "why": k.get("why") or "", "vsize": value_size(k["value"]),
+                            "topic_name": c["topic_name"], "topic_fg": c["topic_fg"], "topic_bg": c["topic_bg"], "article_title": a["title"]})
+    summary_html = to_html(segs[("summary",)]) if ("summary",) in segs else html.escape(_s(draft["summary"]))
+    first = re.split(r"(?<=다\.)\s", _s(draft["summary"]), maxsplit=1)[0]
+    index = [{"name": n, "count": c} for n, c in (("브리핑", len(tldr)), ("숫자로 보는 이번 주", len(numbers)), ("이번 주 핵심", len(core)),
+                                                    ("단신", len(brief)), ("더 볼 거리", len(more)), ("용어", len([g for g in draft.get("glossary") or [] if g.get("meaning")])))
+             if c]
     groups = []
     for j, m in enumerate(more):
         code = TOPIC_CODE.get(m["topic"], "B")
@@ -286,8 +317,12 @@ def _build(draft, ctx, imgs, mode):
     corr = [f"{c.get('event_key', '')} 이전 표현 「{c['before']}」 → 수정 표현 「{c['after']}」 ({c.get('date', '')})" for c in ctx.get("corrections") or []]
     gl = [g for g in draft.get("glossary") or [] if g.get("meaning")]
     big = punch["big"] if punch else ""
-    t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark", "template", "name_em_words", "name_em_color", "show_body")},
-         "tldr": tldr, "has_tldr": bool(tldr), "read_min": mins, "skim_sec": secs,
+    t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark", "template", "name_em_words", "name_em_color", "show_body",
+                                                     "gloss_top", "numbers_panel")},
+         "tldr": tldr, "has_tldr": bool(tldr), "read_min": mins, "skim_sec": secs, "skim_min": max(1, round(secs / 60)),
+         "numbers": numbers, "has_numbers": bool(numbers), "summary_html": summary_html, "preheader": first,
+         "index": index, "n_core": len(core), "n_brief": len(brief),
+         "brief_rows": pairs(brief_ctx), "number_rows": pairs(numbers), "show_numbers": th.get("numbers_panel", False),
          "has_image": bool(imgs),
          "hero_dark": th["hero_dark"], "hero_light": not th["hero_dark"],
          "title_tag": f"{ctx['newsletter_name']} {ctx['issue_week']} {draft['issue_title']}", "name": ctx["newsletter_name"],
@@ -323,6 +358,9 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
     p = draft.get("punch")
     if p:
         L += [f"[{p['label']}]", f"{p['big']} — {p['text']}", p["twist"], ""]
+    if t.get("show_numbers") and t["numbers"]:
+        L.append("[숫자로 보는 이번 주]")
+        L += [f"- {x['value']} {x['label']} (기사 {x['num']})" + (f" — {x['why']}" if x["why"] else "") for x in t["numbers"]] + [""]
     if t["has_status"]:
         L.append("[네 분야 조사 결과]")
         L += [f"- {r['name']}: {r['result']}" for r in t["status_rows"]]

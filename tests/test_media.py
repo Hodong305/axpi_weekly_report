@@ -325,7 +325,7 @@ def test_core_image_selected_validated_and_rendered(tmp_path):
     assert len(cids) == len(related) == 1 and related[0]["Content-ID"] == f"<{cids[0]}>"
     assert len(related[0].get_content()) <= 300 * 1024
     assert "http" not in html_doc.lower() and "<a " not in html_doc.lower() and "<script" not in html_doc.lower()
-    assert 'width="624"' in html_doc and "max-width:100%" in html_doc and "이미지 · Lam Research" in html_doc
+    assert re.search(r'width="6[12]\d"', html_doc) and "max-width:100%" in html_doc and "이미지 · Lam Research" in html_doc
     assert html_doc.index("<img") > html_doc.index("핵심") and "기사의 핵심 장면을 보여 주는 도식" in html_doc
     preview = (out / "newsletter.html").read_text(encoding="utf-8")
     assert re.search(r'<img src="data:image/jpeg;base64,[A-Za-z0-9+/=]+"', preview) and "cid:" not in preview
@@ -374,11 +374,11 @@ def test_caption_checks_length_url_and_verbatim():
     ev["doc_ids"] = [lam["doc_id"]]
     ev.update(cap="core", slot="core")
     orig = lam["media"][1]["caption"]
-    art = {"event_id": ev["event_id"], "slot": "core", "title": "t", "title_alternatives": [], "body": fill("본문", 200), "watch": "w", "key_figures": [],
+    art = {"event_id": ev["event_id"], "slot": "core", "title": "t", "title_alternatives": [], "body": fill("본문", 500), "watch": "w", "key_figures": [],
            "evidence_ids": [f"{lam['doc_id']}/P1"], "credits": [],
            "image": {"media_ref": f"{lam['doc_id']}#M2", "caption": "가" * 41}}
-    draft = {"issue_week": WEEK, "issue_title": "제목", "summary": fill("총론", 100), "punch": None, "punch_candidates": [], "glossary": [],
-             "issue_title_candidates": ["제목"], "summary_candidates": [fill("총론", 100)], "articles": [art], "more": [], "excluded_count": 0, "review_log": []}
+    draft = {"issue_week": WEEK, "issue_title": "제목", "summary": fill("총론", 180), "punch": None, "punch_candidates": [], "glossary": [],
+             "issue_title_candidates": ["제목"], "summary_candidates": [fill("총론", 180)], "articles": [art], "more": [], "excluded_count": 0, "review_log": []}
     by_id = {ev["event_id"]: ev}
     assert any("이미지 설명 41자" in m for _, m in checks.length_violations(draft, CFG, "정규호"))
     art["image"]["caption"] = "자세히는 https://x.example.org/a 참조"

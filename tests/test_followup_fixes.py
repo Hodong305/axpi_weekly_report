@@ -96,21 +96,21 @@ def test_missing_qualifier_still_warns():
 
 # 4. 제목 대안 -------------------------------------------------------------------
 
-LONG_A = "삼성 Defect Agent, 혐의 공정 탐색 수 시간에서 수 분으로 줄였다"        # 한도(36자) 초과
-LONG_B = "Intel Foundry, AI 보조 공정 최적화 사례를 학회에서 처음으로 공개했다"   # 한도(36자) 초과
+LONG_A = "삼성 Defect Agent, 혐의 공정 탐색 수 시간에서 수 분으로 줄였다…팹 여러 곳으로 넓힌다"        # 한도(50자) 초과
+LONG_B = "Intel Foundry, AI 보조 공정 최적화 사례를 학회에서 처음으로 공개했다…다음은 양산 라인"   # 한도(50자) 초과
 
 
 def test_overlong_alternatives_are_kept_and_shown_with_reason():
     assert len(LONG_A) > 36 and len(LONG_B) > 36
-    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 200))
-    draft["summary"] = draft["summary_candidates"][0] = fill("총론", 100)
+    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 500))
+    draft["summary"] = draft["summary_candidates"][0] = fill("총론", 180)
     draft["articles"][0]["title"] = "Lam 제목"
     draft["articles"][0]["title_alternatives"] = [LONG_A, LONG_B]
     draft["articles"][0]["evidence_ids"] = [f"{d}/P1"]
     out, warns = run_s7(Judge(FakeClient()), draft, list(by_id.values()), recs, CFG, "정규호", {})
     assert out["articles"][0]["title_alternatives"] == [LONG_A, LONG_B]       # 조용히 빼지 않는다
     text = rv.render_review2(WEEK, out, [], CFG)
-    assert f"{LONG_A} [한도 초과 {len(LONG_A)}자>36]" in text and f"{LONG_B} [한도 초과 {len(LONG_B)}자>36]" in text
+    assert f"{LONG_A} [한도 초과 {len(LONG_A)}자>50]" in text and f"{LONG_B} [한도 초과 {len(LONG_B)}자>50]" in text
     with pytest.raises(rv.ReviewError, match="한도"):
         rv.validate_review2(rv.parse_review2("승인 D 핵심1=a"), out, [], CFG)
     rv.validate_review2(rv.parse_review2("승인"), out, [], CFG)

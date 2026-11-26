@@ -195,7 +195,7 @@ class FakeClient:
         info = json.loads(re.search(r"\[작성 지침\]\n(\{.*\})", user).group(1))
         doc = pick_doc(user)
         core = info["slot"] == "core"
-        body = fill("챔버 매칭 시간을 최대 30% 줄였다고 밝혔다." if "Lam" in user else "운영 범위를 넓혔다고 밝혔다.", 200 if core else 60)
+        body = fill("챔버 매칭 시간을 최대 30% 줄였다고 밝혔다." if "Lam" in user else "운영 범위를 넓혔다고 밝혔다.", 500 if core else 120)
         out = {"event_id": info["event_id"], "title": "제목 " + "가나다라마바"[int(info["event_id"][-2:]) - 1], "title_alternatives": ["대안 가", "대안 나"],
                "body": body, "evidence_ids": [f"{doc}/P1"]}
         if core:
@@ -215,11 +215,11 @@ class FakeClient:
 
     def r_s6_header(self, user):
         return {"issue_title_candidates": ["제조 현장 AI 확산 흐름", "현장 적용 범위 확대", "검증 단계 진입"],
-                "summary_candidates": [fill("이번 주에는 제조 현장에서 적용 범위를 넓힌 사례가 이어졌다.", 100), fill("적용 범위 확대 사례를 정리했다.", 90)],
+                "summary_candidates": [fill("이번 주에는 제조 현장에서 적용 범위를 넓힌 사례가 이어졌다.", 180), fill("적용 범위 확대 사례를 정리했다.", 160)],
                 "punch_candidates": []}
 
     def r_s6_summary(self, user):
-        return {"summary": fill("수정된 총론이다.", 100)}
+        return {"summary": fill("수정된 총론이다.", 180)}
 
     def r_s6_glossary(self, user):
         info = json.loads(re.search(r"\[작성 지침\]\n(\{.*\})", user).group(1))
@@ -887,25 +887,25 @@ def test_company_and_cap_and_credit_checks():
 
 def test_s7_regenerates_verbatim_once_then_warns():
     from internal.s7 import run_s7
-    draft, by_id, recs, d = articles_ctx(fill("x", 200))
+    draft, by_id, recs, d = articles_ctx(fill("x", 500))
     src_text = recs[d]["body"]["blocks"][0]["text"]
-    draft["articles"][0]["body"] = fill("보도: " + src_text[:60], 200)             # 원문 60자를 그대로 옮김
-    draft["issue_title_candidates"], draft["summary_candidates"] = ["제목"], [fill("총론", 100)]
+    draft["articles"][0]["body"] = fill("보도: " + src_text[:60], 500)             # 원문 60자를 그대로 옮김
+    draft["issue_title_candidates"], draft["summary_candidates"] = ["제목"], [fill("총론", 180)]
     draft["summary"] = draft["summary_candidates"][0]
     calls = []
 
     def article(u):
         calls.append(1)
-        return {"event_id": next(iter(by_id)), "title": "Lam 제목", "title_alternatives": ["가", "나"], "body": fill("새 본문입니다.", 200),
+        return {"event_id": next(iter(by_id)), "title": "Lam 제목", "title_alternatives": ["가", "나"], "body": fill("새 본문입니다.", 500),
                 "evidence_ids": [f"{d}/P1"], "watch": "후속 지표 확인", "key_figures": []}
     c = FakeClient({"s6_article": article})
     out, warns = run_s7(Judge(c), draft, list(by_id.values()), recs, CFG, "정규호", {})
     assert len(calls) == 1 and out["articles"][0]["body"].startswith("새 본문")
     assert not [w for w in warns if w["kind"] == "원문 연속 일치"]
     # 재생성도 원문을 옮기면 경고로 남는다
-    draft["articles"][0]["body"] = fill("보도: " + src_text[:60], 200)
+    draft["articles"][0]["body"] = fill("보도: " + src_text[:60], 500)
     c2 = FakeClient({"s6_article": lambda u: {"event_id": next(iter(by_id)), "title": "Lam 제목", "title_alternatives": ["가", "나"],
-                                              "body": fill("또 " + src_text[:60], 200), "evidence_ids": [f"{d}/P1"],
+                                              "body": fill("또 " + src_text[:60], 500), "evidence_ids": [f"{d}/P1"],
                                               "watch": "후속 지표 확인", "key_figures": []}})
     out, warns = run_s7(Judge(c2), draft, list(by_id.values()), recs, CFG, "정규호", {})
     assert [w for w in warns if w["kind"] == "원문 연속 일치"] and [w["id"] for w in warns] == [f"E{i}" for i in range(1, len(warns) + 1)]
@@ -913,11 +913,11 @@ def test_s7_regenerates_verbatim_once_then_warns():
 
 def test_s7_invalid_evidence_regenerates_then_drops():
     from internal.s7 import run_s7
-    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 200))
+    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 500))
     draft["articles"][0]["evidence_ids"] = [f"{d}/P1", f"{d}/P77"]
-    draft["summary"] = draft["summary_candidates"][0] = fill("총론", 100)
+    draft["summary"] = draft["summary_candidates"][0] = fill("총론", 180)
     c = FakeClient({"s6_article": lambda u: {"event_id": next(iter(by_id)), "title": "Lam 제목", "title_alternatives": ["가", "나"],
-                                              "body": fill("본문", 200), "evidence_ids": [f"{d}/P1"],
+                                              "body": fill("본문", 500), "evidence_ids": [f"{d}/P1"],
                                               "watch": "후속 지표 확인", "key_figures": []}})
     out, warns = run_s7(Judge(c), draft, list(by_id.values()), recs, CFG, "정규호", {})
     assert out["articles"][0]["evidence_ids"] == [f"{d}/P1"]
@@ -1174,7 +1174,7 @@ def test_fingerprint_change_warning(tmp_path):
     rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
     fp = rows[WEEK]
     assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.7" and fp["fp_internal_version"]
-    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "6"
+    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "7"
 
 
 def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):

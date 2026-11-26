@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{title_tag}}</title></head>
+<body style="margin:0;padding:0;background:{{bg}};">
+<div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:{{bg}};">{{preheader}}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{bg}};"><tr><td align="center" style="padding:24px 10px;">
+<table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#ffffff;font-family:'Pretendard','Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR','Helvetica Neue',Arial,sans-serif;color:{{ink}};">
+
+<!-- 머리띠 -->
+<tr><td style="background:{{ink}};padding:26px 30px 22px 30px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td valign="bottom">
+      <div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:{{accent}};">{{team}} 주간 소식지</div>
+      <div style="font-size:32px;font-weight:900;letter-spacing:-1.2px;line-height:1.1;color:#ffffff;margin-top:6px;">{{{name_html}}}</div>
+      <div style="font-size:13px;color:#bdbdbd;margin-top:8px;">{{tagline}}</div>
+    </td>
+    <td valign="bottom" align="right" width="110" style="font-size:44px;font-weight:900;letter-spacing:-2px;line-height:1;color:{{accent}};">{{issue_no}}<div style="font-size:11px;letter-spacing:1px;color:#bdbdbd;margin-top:4px;">ISSUE</div></td>
+  </tr></table>
+</td></tr>
+<tr><td style="background:{{accent}};padding:8px 30px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td style="font-size:13px;font-weight:900;color:{{ink}};">{{issue_week}} &nbsp;/&nbsp; {{period}}</td>
+    <td align="right" style="font-size:13px;font-weight:900;color:{{ink}};">전체 {{read_min}}분 · 브리핑 {{skim_sec}}초</td>
+  </tr></table>
+</td></tr>
+
+<!-- 이번 호 구성 -->
+<tr><td style="background:#f4f4f4;padding:11px 30px;font-size:13px;line-height:1.8;">
+  <b>이번 호 ▸</b>&nbsp;
+  <!--LOOP index--><span style="white-space:nowrap;margin-right:12px;">{{name}} <b style="background:{{ink}};color:{{accent}};padding:0 5px;">{{count}}</b></span><!--END index-->
+</td></tr>
+
+<!-- 헤드라인 -->
+<tr><td style="padding:28px 30px 6px 30px;">
+  <!--IF note--><div style="font-size:13px;color:#92400e;background:#fef3c7;padding:8px 12px;margin-bottom:12px;">{{note}}</div><!--END note-->
+  <div style="font-size:12px;font-weight:900;letter-spacing:1px;">이번 주 헤드라인</div>
+  <div style="font-size:32px;line-height:1.22;font-weight:900;letter-spacing:-1.3px;margin-top:6px;">{{issue_title}}</div>
+  <div style="font-size:15.5px;line-height:1.8;color:#333333;margin-top:14px;"><span style="background:{{accent}};font-size:12px;font-weight:900;padding:1px 5px;">한 줄 요약</span>&nbsp; {{{summary_html}}}</div>
+</td></tr>
+
+<!--IF has_tldr-->
+<!-- 브리핑 -->
+<tr><td style="padding:22px 30px 6px 30px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{ink}};"><tr><td style="padding:18px 22px 10px 22px;">
+    <div style="font-size:13px;font-weight:900;letter-spacing:1px;color:{{accent}};">이번 주 브리핑 <span style="font-weight:normal;letter-spacing:0;color:#a0a0a0;">· 바쁘면 여기까지만 · 약 {{skim_sec}}초</span></div>
+    <!--LOOP tldr-->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #3a3a3a;"><tr>
+      <td width="50" valign="top" style="font-size:24px;font-weight:900;letter-spacing:-1px;color:{{accent}};padding:10px 0;">{{num}}</td>
+      <td valign="top" style="font-size:14.5px;line-height:1.65;color:#ffffff;padding:11px 0;"><!--IF is_core--><b><!--END is_core-->{{{line_html}}}<!--IF is_core--></b><!--END is_core--><!--IF is_brief--> <span style="font-size:12px;color:#a0a0a0;">· 단신</span><!--END is_brief--></td>
+    </tr></table>
+    <!--END tldr-->
+  </td></tr></table>
+</td></tr>
+<!--END has_tldr-->
+
+<!--IF punch-->
+<tr><td style="padding:16px 30px 6px 30px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{accent}};"><tr>
+    <td width="150" valign="middle" style="padding:18px 0 18px 22px;font-size:{{punch_big_size}}px;font-weight:900;letter-spacing:-2px;color:{{ink}};">{{punch_big_text}}</td>
+    <td valign="middle" style="padding:18px 22px 18px 10px;font-size:14.5px;line-height:1.65;color:{{ink}};">
+      <div style="font-size:12px;font-weight:900;letter-spacing:1px;">{{punch_label_text}}</div>
+      <div style="font-weight:bold;margin-top:3px;">{{punch_text_body}}</div>
+      <div style="margin-top:3px;">{{punch_twist_body}}</div></td>
+  </tr></table>
+</td></tr>
+<!--END punch-->
+
+<!--IF has_numbers-->
+<!-- 숫자로 보는 이번 주: 2열 타일 -->
+<tr><td style="padding:24px 30px 4px 30px;">
+  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;">숫자로 보는 이번 주 <span style="font-weight:normal;font-size:12.5px;color:#777777;">· 무엇을 잰 숫자이고 왜 중요한지</span></div>
+</td></tr>
+<tr><td style="padding:4px 24px 4px 24px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <!--LOOP number_rows-->
+    <tr>
+      <!--LOOP cells-->
+      <td width="50%" valign="top" style="padding:6px;">
+        <!--IF value-->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;border-top:4px solid {{accent}};"><tr><td style="padding:12px 14px;">
+          <div style="font-size:30px;font-weight:900;letter-spacing:-1.2px;line-height:1.1;">{{value}}</div>
+          <div style="font-size:13.5px;font-weight:bold;margin-top:4px;">{{label}}</div>
+          <!--IF why--><div style="font-size:13px;line-height:1.6;color:#444444;margin-top:4px;">{{why}}</div><!--END why-->
+          <div style="font-size:11.5px;color:#888888;margin-top:6px;">기사 {{num}} · {{topic_name}}</div>
+        </td></tr></table>
+        <!--END value-->
+      </td>
+      <!--END cells-->
+    </tr>
+    <!--END number_rows-->
+  </table>
+</td></tr>
+<!--END has_numbers-->
+
+<!--IF has_status-->
+<tr><td style="padding:16px 30px 0 30px;font-size:14px;font-weight:900;">네 분야 조사 결과</td></tr>
+<tr><td style="padding:8px 30px 4px 30px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
+    <!--LOOP status_rows-->
+    <tr><td style="border-bottom:2px solid {{ink}};padding:6px 0;width:40%;">{{name}}</td><td style="border-bottom:2px solid {{ink}};padding:6px 0;">{{result}}</td></tr>
+    <!--END status_rows-->
+  </table>
+  <div style="font-size:14px;margin-top:8px;">0건 사유: {{status_note}}</div>
+</td></tr>
+<!--END has_status-->
+
+<!--IF has_core-->
+<!--LOOP core-->
+<tr><td style="padding:28px 30px 6px 30px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:6px solid {{ink}};"><tr>
+    <td width="80" valign="top" style="font-size:50px;font-weight:900;letter-spacing:-3px;line-height:1;padding-top:10px;">{{num}}</td>
+    <td valign="top" style="padding-top:12px;">
+      <span style="display:inline-block;background:{{ink}};color:{{accent}};font-size:11.5px;font-weight:900;letter-spacing:0.5px;padding:3px 8px;">{{topic_name}}</span>
+      <!--IF tags_text--><span style="font-size:12px;color:#777777;">&nbsp;{{tags_text}}</span><!--END tags_text-->
+      <!--IF followup--><span style="font-size:12px;color:#777777;">&nbsp;· ↻ {{followup}}</span><!--END followup-->
+      <div style="font-size:23px;font-weight:900;line-height:1.32;letter-spacing:-0.7px;margin-top:8px;">{{title}}</div>
+    </td>
+  </tr></table>
+  <!--IF image_src-->
+  <img src="{{{image_src}}}" width="620" alt="{{image_caption}}" style="display:block;width:620px;max-width:100%;height:auto;border:0;margin-top:14px;">
+  <div style="font-size:12px;color:#777777;margin-top:5px;">{{image_caption}} · 이미지 · {{image_credit}}</div>
+  <!--END image_src-->
+  <!--IF deck--><div style="font-size:16px;font-weight:bold;line-height:1.75;margin-top:14px;"><span style="background:{{accent}};padding:1px 3px;">{{deck}}</span></div><!--END deck-->
+  <!--IF has_points-->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">
+    <!--LOOP points-->
+    <tr><td width="80" valign="top" style="padding:0 0 10px 0;"><span style="display:inline-block;background:{{ink}};color:#ffffff;font-size:12px;font-weight:900;padding:3px 8px;white-space:nowrap;">{{label}}</span></td>
+        <td valign="top" style="font-size:14.5px;line-height:1.7;padding:1px 0 10px 0;">{{{text_html}}}</td></tr>
+    <!--END points-->
+  </table>
+  <!--END has_points-->
+  <!--IF show_body-->
+  <div style="font-size:12px;font-weight:900;letter-spacing:1px;margin-top:6px;">자세히</div>
+  <div style="font-size:14.5px;line-height:1.85;color:#444444;margin-top:4px;">{{{body_html}}}</div>
+  <!--END show_body-->
+  <!--IF watch_html-->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;"><tr>
+    <td style="background:#f4f4f4;border-left:6px solid {{accent}};padding:12px 14px;font-size:14px;line-height:1.7;"><b>MTC가 볼 것 →</b> {{{watch_html}}}</td>
+  </tr></table>
+  <!--END watch_html-->
+  <div style="font-size:12px;color:#888888;margin-top:10px;">출처 · {{credit}} &nbsp;·&nbsp; 이 기사의 숫자는 위 '숫자로 보는 이번 주'에 모았습니다</div>
+</td></tr>
+<!--END core-->
+<!--END has_core-->
+
+<!--IF has_brief-->
+<tr><td style="padding:30px 30px 0 30px;">
+  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;"><span>단신</span> <span style="font-weight:normal;font-size:12.5px;color:#777777;">· 무슨 일이고 왜 볼 만한지 두 문장으로</span></div>
+</td></tr>
+<tr><td style="padding:0 30px;">
+  <!--LOOP brief-->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:2px solid {{ink}};"><tr>
+    <td width="56" valign="top" style="font-size:28px;font-weight:900;letter-spacing:-1.5px;padding:12px 0;">{{num}}</td>
+    <td valign="top" style="padding:13px 0;">
+      <div style="font-size:16.5px;font-weight:900;line-height:1.4;letter-spacing:-0.3px;">{{title}}</div>
+      <div style="font-size:14px;line-height:1.7;color:#444444;margin-top:4px;">{{{body_html}}}</div>
+      <!--IF fig_value--><div style="font-size:13px;line-height:1.55;margin-top:6px;"><span style="background:{{accent}};font-weight:900;padding:1px 5px;">{{fig_value}}</span> <b>{{fig_label}}</b><!--IF fig_why--> — {{fig_why}}<!--END fig_why--></div><!--END fig_value-->
+      <div style="font-size:11.5px;color:#888888;margin-top:5px;"><b style="color:{{ink}};">{{topic_name}}</b> · 출처 · {{credit}}<!--IF followup--> · ↻ {{followup}}<!--END followup--></div>
+    </td>
+  </tr></table>
+  <!--END brief-->
+</td></tr>
+<!--END has_brief-->
+
+<!--IF has_more-->
+<tr><td style="padding:28px 30px 4px 30px;">
+  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;">더 볼 거리 <span style="font-weight:normal;font-size:12.5px;color:#777777;">· 싣지는 않았지만 관심 있는 분께</span></div>
+  <!--LOOP more-->
+  <div style="font-size:12px;font-weight:900;margin-top:12px;"><span style="background:{{accent}};padding:1px 5px;">{{heading}}</span></div>
+  <!--LOOP items-->
+  <div style="font-size:14px;line-height:1.65;margin-top:5px;">■ {{{line_html}}} <span style="font-size:11.5px;color:#888888;">— {{credit}}</span></div>
+  <!--END items-->
+  <!--END more-->
+</td></tr>
+<!--END has_more-->
+
+<!--IF has_gloss-->
+<tr><td style="padding:20px 30px 4px 30px;">
+  <div style="font-size:13px;font-weight:900;letter-spacing:1px;">이번 호 용어</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px;">
+    <!--LOOP glossary-->
+    <tr><td width="96" valign="top" style="font-size:13px;font-weight:900;padding:4px 10px 4px 0;border-top:1px solid #dddddd;">{{term}}</td><td style="font-size:13px;color:#555555;padding:4px 0;border-top:1px solid #dddddd;">{{meaning}}</td></tr>
+    <!--END glossary-->
+  </table>
+</td></tr>
+<!--END has_gloss-->
+
+<!--IF has_corr-->
+<tr><td style="padding:14px 30px 0 30px;font-size:14px;font-weight:900;">정정</td></tr>
+<tr><td style="padding:6px 30px 0 30px;">
+  <!--LOOP corrections--><div style="font-size:13px;margin:4px 0;">{{text}}</div><!--END corrections-->
+</td></tr>
+<!--END has_corr-->
+
+<tr><td style="padding:22px 30px 0 30px;"><div style="border-top:6px solid {{ink}};"></div></td></tr>
+<tr><td style="padding:12px 30px 28px 30px;font-size:12.5px;line-height:1.75;color:#666666;">
+    <b style="color:{{ink}};">이 메일을 받는 이유</b> · {{name}}는 {{team}}이 MTC 임직원께 매주 화요일 보내는 제조 AI 동향 소식지입니다.<br>
+    <b style="color:{{ink}};">만드는 방식</b> · 이번 호는 공개 자료 {{n_docs}}건을 검토해 {{n_pub}}건을 골랐습니다. 사내 AI가 초안을 쓰고 편집자가 사실과 표현을 검토했습니다. 이 밖에 검토했으나 싣지 않은 자료는 {{excluded_count}}건입니다.<br>
+    <b style="color:{{ink}};">링크가 없는 이유</b> · 사내 보안 정책상 외부 링크를 싣지 않습니다. 출처의 발행처·제목으로 검색해 보세요.<!--IF has_image--> 이미지는 각 발행처의 공개 자료이며 저작권은 발행처에 있습니다.<!--END has_image--><br>
+    <b style="color:{{ink}};">의견·제보</b> · 이 메일에 회신해 주세요. 다뤄 줬으면 하는 주제도 환영합니다.
+</td></tr>
+
+</table>
+</td></tr></table>
+</body></html>
