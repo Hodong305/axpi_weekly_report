@@ -5,6 +5,7 @@ out/{issue_week}/에 merged·intake·report(r1)를 써서 `python -m collector p
 원문을 다시 가져오지 않는다: 본문은 v4.2 수집기(LLM) 산출물이며 원문 바이트와 대조되지 않았다."""
 import argparse
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -127,6 +128,10 @@ def body_len(r):
     return sum(len(b.get("text", "")) for b in r.get("body", {}).get("blocks", []))
 
 
+def _body_text(r):
+    return "\n\n".join(b.get("text", "") for b in r.get("body", {}).get("blocks", []))
+
+
 def merge_inputs(olds):
     """같은 doc_id는 하나로: 본문이 더 긴 쪽을 쓰고 attempts를 합친다. 반환: (레코드 목록, doc_id별 병합 메모)"""
     by, notes = {}, {}
@@ -139,7 +144,7 @@ def merge_inputs(olds):
                 continue
             cur = by[did]
             notes[did].append(f"입력 {fi + 1}")
-            if (cur.get("body", {}).get("sha256") != r.get("body", {}).get("sha256")):
+            if _body_text(cur) != _body_text(r):
                 keep_new = body_len(r) > body_len(cur)
                 notes[did].append(f"본문이 달라 {'입력 ' + str(fi + 1) if keep_new else '먼저 읽은 쪽'}의 더 긴 본문을 씀"
                                   f"({body_len(cur)}자 vs {body_len(r)}자)")
@@ -211,7 +216,7 @@ def fidelity_flags(settings, rec):
     title = (rec["title"] or "").casefold()
     for s in settings.sources:
         name = s.get("publisher") or ""
-        if len(name) >= 4 and name.casefold() in title and name != rec["publisher"] and (not reg or reg["id"] != s["id"]):
+        if len(name) >= 4 and re.search(r"(?<![a-z])" + re.escape(name.casefold()) + r"(?![a-z])", title) and name != rec["publisher"] and (not reg or reg["id"] != s["id"]):
             src.append(f"제목에 다른 발행처 '{name}'가 나옴 — 제3자 사이트 게재 가능성")
             break
     return body, src

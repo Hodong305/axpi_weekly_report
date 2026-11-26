@@ -58,3 +58,47 @@ def test_migrate_rules():
     assert [t["topic"] for t in rs["topics_checked"]] == ["T1_CHIPMAKER", "T2_EQUIPMENT", "T3_SOLUTION", "T4_PHYSICAL_AI"]
     assert rs["topics_checked"][0]["method"] == "v4.2 기록" and rs["topics_checked"][0]["result"] == "칩"
     assert mg.render_report([old], "2026-W48", merged, intake, rows, [], extra)
+
+
+def _doc(records, revision=1):
+    return {"schema_version": "4.2", "phase": "intake", "revision": revision, "paid_excluded": 0, "records": records}
+
+
+def test_multi_input_merge_alias_and_flags():
+    st = load_settings()
+    a = old_rec("https://x.example.org/p", "같은 문서", "2026-11-18", publisher="P1")
+    b = old_rec("https://x.example.org/p", "같은 문서", "2026-11-18", publisher="P1")
+    b["attempts"] = [{"collector": "gemini", "at": "2026-11-26T10:00:00+09:00", "url": b["normalized_url"], "observation": "두 번째", "pass": 1}]
+    longer = old_rec("https://x.example.org/q", "본문 다름", "2026-11-18", publisher="P1")
+    shorter = old_rec("https://x.example.org/q", "본문 다름", "2026-11-18", publisher="P1",
+                      blocks=[{"id": "P1", "kind": "paragraph", "text": "짧은 본문 " + "다" * 150, "page": None}])
+    # 별칭: 같은 발행처·같은 본문, 한쪽은 쿼리가 붙은 URL / 해시가 다르면 중복 의심
+    s1 = old_rec("https://news.syn.example.com/2026-syn", "Syn at SC", "2026-11-16", publisher="Syn")
+    s2 = old_rec("https://news.syn.example.com/2026-syn?asPDF=1", "Syn at SC", "2026-11-16", publisher="Syn")
+    for r in (s1, s2):
+        r["body"]["blocks"] = [{"id": "P1", "kind": "paragraph", "text": "동일 본문입니다. " + "라" * 250, "page": None}]
+    d1 = old_rec("https://y.example.org/a", "중복 의심 제목", "2026-11-17", publisher="Q", blocks=[{"id": "P1", "kind": "paragraph", "text": "하나 " + "마" * 250, "page": None}])
+    d2 = old_rec("https://y.example.org/a?x=1", "중복 의심 제목", "2026-11-17", publisher="Q", blocks=[{"id": "P1", "kind": "paragraph", "text": "둘 " + "바" * 250, "page": None}])
+    pdf = old_rec("https://z.example.org/files/report.pdf", "PDF 요약", "2026-11-18", publisher="Z", blocks=[{"id": "P1", "kind": "paragraph", "text": "요약 " + "사" * 600, "page": None}])
+    tp = old_rec("https://third.example.org/n", "Lam Research 소식을 전한 제3자", "2026-11-18", publisher="CASRAI")
+    olds = [_doc([a, longer, s1, d1, pdf, tp], 1), _doc([b, shorter, s2, d2], 5)]
+    merged, intake, rows, aborted, extra = mg.migrate(olds, "2026-W48", st, now="2026-11-26T10:00:00+09:00")
+    for doc in (merged, intake):
+        assert check(doc, 40, 10)[0] == []
+    urls = [r["source_url"] for r in merged["records"]]
+    assert urls.count("https://x.example.org/p") == 1 and len(merged["records"]) == 7      # 같은 doc_id는 하나
+    p = next(r for r in merged["records"] if r["source_url"].endswith("/p"))
+    assert sorted(x["observation"][:20] for x in p["attempts"] if "두 번째" in x["observation"]) and len(p["attempts"]) == 3
+    q = next(r for r in merged["records"] if r["source_url"].endswith("/q"))
+    assert q["body"]["blocks"][0]["text"].startswith("첫 문단입니다") and any("본문이 달라" in n for r in rows for n in r["merge_notes"])
+    syn = [r for r in merged["records"] if "syn.example.com" in r["source_url"]]
+    assert len(syn) == 1 and syn[0]["source_url"] == "https://news.syn.example.com/2026-syn"      # 짧은 URL이 대표
+    assert any("asPDF=1" in x["url"] or "별칭 URL:" in x["observation"] for x in syn[0]["attempts"])
+    assert len(extra["alias_notes"]) == 1 and extra["suspects"] and "y.example.org/a" in extra["suspects"][0][0] + extra["suspects"][0][1]
+    flags = {r["title"]: (b, sr) for r, b, sr in extra["fidelity"]}
+    assert flags["PDF 요약"][0] and any("PDF" in x for x in flags["PDF 요약"][0])
+    assert any("본문" in x for x in flags["Syn at SC"][0]) or flags["Syn at SC"][0] == []
+    assert any("other" in x for x in flags["PDF 요약"][1])
+    text = mg.render_report(olds, "2026-W48", merged, intake, rows, [], extra)
+    for h in ("## 본문 충실도 점검", "## 별칭 통합(4.4)", "## 중복 의심", "## 출처 확인 필요", "## 입력 병합(doc_id)"):
+        assert h in text
