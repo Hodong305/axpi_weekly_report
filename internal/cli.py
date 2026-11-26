@@ -22,7 +22,7 @@ def build_parser():
     rs = sub.add_parser("resume", parents=[common], help="중단된 진행을 이어서 실행")
     rs.add_argument("--issue-week")
     rs.add_argument("--llm-backend", choices=["http", "file"], help="모델 백엔드(기본: config.yaml의 internal.llm.backend)")
-    rs.add_argument("--answer", help="대기 중인 검토 요청에 줄 응답(표준입력이 터미널이 아닐 때 쓴다)")
+    rs.add_argument("--answer", action="append", help="대기 중인 검토 요청에 줄 응답(표준입력이 터미널이 아닐 때 쓴다). 여러 번 쓰면 질문 순서대로 쓴다(상한 확인 등 이어지는 질문)")
     rs.add_argument("--fresh", action="store_true", help="저장된 모델 응답을 쓰지 않고 새로 호출")
     st = sub.add_parser("status", parents=[common], help="진행 상태 보기")
     st.add_argument("--issue-week")
@@ -48,7 +48,7 @@ def main(argv=None, judge=None, io=None):
         else:
             judge = Judge(LLMClient.from_config(s.llm_cfg))
     answer = getattr(args, "answer", None)
-    pipe = Pipeline(s, judge, io or ConsoleIO([answer] if answer is not None else None), fresh=args.fresh)
+    pipe = Pipeline(s, judge, io or ConsoleIO(answer), fresh=args.fresh)
     if args.cmd == "run":
         return pipe.start(args.package, args.issue_week, args.restart)
     return pipe.resume(args.issue_week)

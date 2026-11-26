@@ -55,13 +55,19 @@ def verbatim_hit(text, source_norm, run):
 
 _NUM = re.compile(r"\d[\d,]*(?:\.\d+)?")
 _EN_NUM = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}
-_QUAL = {  # 그룹: (숫자 앞에 붙는 말, 뒤에 붙는 말, 원고에 넣을 한글 한정어)
-    "max": (["up to", "as much as", "최대", "최고"], ["이하"], "최대"),
-    "min": (["at least", "최소"], ["이상"], "최소"),
-    "approx": (["about", "approximately", "around", "nearly", "roughly", "약", "대략"], [], "약"),
-    "over": (["over", "more than", "초과"], ["초과"], None),
-    "under": (["less than", "under"], ["미만"], None),
+# 한정어 그룹: 근거(영문·한글)에서 찾는 말(앞·뒤)과, 원고에서 같은 뜻으로 인정하는 말(앞·뒤), 수정안에 넣을 한글 한정어.
+# 원고의 한정어는 숫자 앞뒤 어느 쪽에 있어도 된다(한국어는 "90,000건 넘게"처럼 뒤에 붙는 경우가 많다).
+_OVER_OK = (["more than", "over", "at least", "최소", "초과"], ["넘게", "넘는", "넘어", "이상", "초과"])
+_QUAL = {  # 그룹: (근거 앞, 근거 뒤, 원고 앞, 원고 뒤, 수정안 한정어)
+    "max": (["up to", "as much as", "최대", "최고"], ["이하", "까지"],
+            ["up to", "as much as", "최대", "최고"], ["까지", "이하"], "최대"),
+    "min": (["at least", "최소"], ["이상"], *_OVER_OK, "최소"),
+    "over": (["over", "more than", "greater than", "초과"], ["초과"], *_OVER_OK, None),
+    "approx": (["about", "approximately", "around", "nearly", "roughly", "약", "대략"], ["가량", "정도", "안팎"],
+               ["about", "approximately", "around", "nearly", "roughly", "약", "대략", "거의"], ["가량", "정도", "안팎", "거의", "가까이"], "약"),
+    "under": (["less than", "under"], ["미만"], ["less than", "under", "미만"], ["미만", "이하"], None),
 }
+_AFTER_YEO = re.compile(r"\s*[%％]?\s*여(?![가-힣])")     # "30여 건"의 '여'(한 글자라 따로 검사)
 
 
 def _numval(tok):
@@ -91,7 +97,7 @@ def _qual_in_source(tok, text):
         before = flat[max(0, m.start() - 14):m.start()].lower()
         after = flat[m.end():m.end() + 10]
         unit = after[:1] if after[:1] in ("%", "％") else ""
-        for g, (bef, aft, _) in _QUAL.items():
+        for g, (bef, aft, *_rest) in _QUAL.items():
             for w in bef:
                 if _word_before(w, before):
                     return g, f"{w} {v}{unit}"
@@ -102,10 +108,13 @@ def _qual_in_source(tok, text):
 
 
 def _qual_in_draft(group, text, start, end):
-    bef, aft, _ = _QUAL[group]
+    """원고의 숫자 앞 8자·뒤 10자에 같은 뜻의 한정어가 있는지 본다."""
+    _, _, bef, aft, _ = _QUAL[group]
     before = text[max(0, start - 8):start].lower()
-    after = text[end:end + 8]
-    return any(_word_before(w, before) for w in bef) or any(w in after for w in aft)
+    after = text[end:end + 10]
+    if any(_word_before(w, before) for w in bef) or any(w in after for w in aft):
+        return True
+    return group == "approx" and bool(_AFTER_YEO.match(after))
 
 
 def number_warnings(field_text, pairs, target, scope):
@@ -129,7 +138,7 @@ def number_warnings(field_text, pairs, target, scope):
             continue
         q = _qual_in_source(tok, joined)
         if q and not _qual_in_draft(q[0], field_text, m.start(), m.end()):
-            word = _QUAL[q[0]][2]
+            word = _QUAL[q[0]][4]
             fix = {"target": target, "old": old, "new": f"{word} {old}"} if word and field_text.count(old) == 1 else None
             eid = next((e for e, t in pairs if _num_re(tok).search(t.replace(",", ""))), first_id)
             out.append({"scope": scope, "quote": old, "kind": "숫자",

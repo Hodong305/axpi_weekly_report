@@ -199,7 +199,7 @@ class Pipeline:
             except Restart:
                 self.log.write(kind="restart", review="-")
                 self.state.update(stage="S1", fit={}, events=[], warnings=[], metrics={}, review_log=[], failed_gen=[],
-                                  issue_type=None)
+                                  issue_type=None, pending_review=None)
                 self.save()
 
     def step_header(self, stage, note=""):
@@ -328,27 +328,37 @@ class Pipeline:
             if parsed["approve"]:
                 return {"events": self.state["events"], "stats": {"changed": 0, "lifted": 0, "lowered": 0, "ledger_changes": 0},
                         "approved": True, "text": text}
-            answers = {}
-            while True:
-                new, violations, stats = rv.apply_review1(self.state["events"], parsed["ops"], answers)
-                if not violations:
-                    break
-                v = violations[0]
-                self.request("R1-cap", rv.render_cap_check(v["label"], v["reason"]))
-                while True:
-                    ans = self.ask()
-                    try:
-                        answers[v["event_id"]] = {1: "keep", 2: "override"}[rv.parse_choice(ans)]
-                        self.respond("R1-cap", ans, True)
-                        break
-                    except ReviewError as e:
-                        self.respond("R1-cap", ans, False, str(e))
-                        self.io.write(f"오류: {e}")
-                        self.request("R1-cap", rv.render_cap_check(v["label"], v["reason"]))
-            return {"events": new, "stats": stats, "approved": False, "text": text}
+            return self.r1_apply(text, {})
 
-        result = self.loop_review("R1", render_fn, handle)
+        pend = self.state.get("pending_review")
+        if pend and pend["review"] == "R1":      # 상한 확인에서 끊긴 검토 요청 ①: 처음부터 묻지 않고 그 질문에 이어서 답한다
+            result = self.r1_apply(pend["text"], pend["answers"])
+        else:
+            result = self.loop_review("R1", render_fn, handle)
+        self.state["pending_review"] = None
         self.finish_r1(result)
+
+    def r1_apply(self, text, answers):
+        """검토 요청 ①의 '바꿔서 승인' 응답을 적용한다. 상한 확인이 필요하면 진행 상황을 state에 남기고 한 건씩 묻는다."""
+        parsed = rv.parse_review1(text)
+        while True:
+            new, violations, stats = rv.apply_review1(self.state["events"], parsed["ops"], answers)
+            if not violations:
+                break
+            v = violations[0]
+            self.state["pending_review"] = {"review": "R1", "text": text, "answers": dict(answers), "asking": v["event_id"]}
+            self.request("R1-cap", rv.render_cap_check(v["label"], v["reason"]))
+            while True:
+                ans = self.ask()
+                try:
+                    answers[v["event_id"]] = {1: "keep", 2: "override"}[rv.parse_choice(ans)]
+                    self.respond("R1-cap", ans, True)
+                    break
+                except ReviewError as e:
+                    self.respond("R1-cap", ans, False, str(e))
+                    self.io.write(f"오류: {e}")
+                    self.request("R1-cap", rv.render_cap_check(v["label"], v["reason"]))
+        return {"events": new, "stats": stats, "approved": False, "text": text}
 
     def finish_r1(self, result):
         if result is not None:
@@ -431,37 +441,42 @@ class Pipeline:
         warns = self.state["warnings"]
 
         def render_fn():
-            return rv.render_review2(self.week, d, warns)
+            return rv.render_review2(self.week, d, warns, self.cfg)
 
         def handle(text):
             res = rv.parse_review2(text)
             rv.validate_review2(res, d, warns, self.cfg)
             return res, text
 
-        res, text = self.loop_review("R2", render_fn, handle)
-        stats = rv.apply_review2(d, res, warns)
-        c_rev = 0
-        if res["C"][0] == "text":
-            instruction = res["C"][1]
+        pend = self.state.get("pending_review")
+        if pend and pend["review"] == "R2":      # C 재수정 확인에서 끊김: ② 응답은 이미 적용돼 있으므로 그 질문에 이어서 답한다
+            text, stats, instruction, c_rev = pend["text"], pend["stats"], pend["instruction"], pend["c_rev"]
+        else:
+            res, text = self.loop_review("R2", render_fn, handle)
+            stats = rv.apply_review2(d, res, warns)
+            instruction, c_rev = (res["C"][1] if res["C"][0] == "text" else None), 0
+            save_draft(self.s.draft_path(self.week), d)
+        while instruction is not None:
+            self.state["pending_review"] = {"review": "R2", "text": text, "stats": stats, "instruction": instruction, "c_rev": c_rev}
+            new = self.rewrite_abstract(d, instruction)
+            self.request("R2-C", rv.render_c_confirm(new))
             while True:
-                c_rev += 1
-                new = self.rewrite_abstract(d, instruction)
-                self.request("R2-C", rv.render_c_confirm(new))
-                done = False
-                while True:
-                    ans = self.ask()
-                    try:
-                        kind, val = rv.parse_c_confirm(ans)
-                        self.respond("R2-C", ans, True)
-                        break
-                    except ReviewError as e:
-                        self.respond("R2-C", ans, False, str(e))
-                        self.io.write(f"오류: {e}")
-                        self.request("R2-C", rv.render_c_confirm(new))
-                d["abstract"] = new
-                if kind == "approve":
+                ans = self.ask()
+                try:
+                    kind, val = rv.parse_c_confirm(ans)
+                    self.respond("R2-C", ans, True)
                     break
-                instruction = val
+                except ReviewError as e:
+                    self.respond("R2-C", ans, False, str(e))
+                    self.io.write(f"오류: {e}")
+                    self.request("R2-C", rv.render_c_confirm(new))
+            c_rev += 1
+            d["abstract"] = new
+            instruction = None if kind == "approve" else val
+            self.state["pending_review"] = None if instruction is None else {
+                "review": "R2", "text": text, "stats": stats, "instruction": instruction, "c_rev": c_rev}
+            save_draft(self.s.draft_path(self.week), d)
+        self.state["pending_review"] = None
         self.state["warnings"] = self.final_warnings(d)
         prev = self.state["metrics"].get("r2")
         merged = {**stats, "c_revisions": c_rev}

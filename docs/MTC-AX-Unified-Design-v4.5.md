@@ -627,6 +627,7 @@ def lead_ids(blocks, lead_min_chars):
 - `MARKET_ONLY`: 주가·루머만 다룸
 - `ROBOT_OUTSIDE_FAB`: 반도체 제조와 연관된 근거 없음
 - `NO_WEEKLY_CHANGE`: 재전재·새 변화 없음(7.2의 SAME_NO_CHANGE 포함)
+- `NO_AI_OPS`: 본문을 읽었지만 네 분야의 AI·자동화·운영 변화가 없음(장비 공정 기술 해설, 연구 거점·투자·협력 소식 등). 본문 전체 재분류에서만 붙이며 키워드로 정하지 않는다
 
 B 경로의 전이 가설은 `WATCH_TRANSFER`로 보관한다. 출처가 충돌하면 운영사와 공급사의 주장·발표일을 함께 적고, 해소되지 않은 수치는 원고에서 뺀다.
 
@@ -771,7 +772,7 @@ review_log: []             # 검토 요청 응답과 적용 결과
 | 파일·명령 | 내용 |
 |---|---|
 | `python -m internal run --package DIR [--issue-week W] [--restart] [--fresh] [--llm-backend http|file]` | 사외 `package/`를 반입해 S1~S8을 진행한다. 검토 요청에서 멈추고 응답을 기다린다(`중단`·`처음부터` 입력 가능) |
-| `python -m internal resume [--issue-week W] [--fresh] [--llm-backend file] [--answer 응답]` / `status` | `review/{issue_week}-state.json`에서 이어서 실행 / 진행 상태 보기 |
+| `python -m internal resume [--issue-week W] [--fresh] [--llm-backend file] [--answer 응답 ...]` / `status` | `review/{issue_week}-state.json`에서 이어서 실행 / 진행 상태 보기 |
 | `internal/llm.py`, `prompts/internal-steps.md` | 모델 클라이언트(json_schema 응답, 거부 시 일반 JSON, 검증 실패 시 1회 재시도)와 단계 프롬프트. `s2_fit`·`s4_score`는 9.3·9.4 문구 그대로 |
 | `internal/intake.py` | S1: manifest 해시 확인 후 `collector.validate.check` 실행 |
 | `internal/fit.py`, `events.py`, `score.py`, `select.py` | S2 적합도, S3 사건 묶음·대장 대조(대장 읽기·갱신 포함), S4 중요도·상한, S5 편성(`review/{issue_week}-selection.csv`) |

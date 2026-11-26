@@ -244,20 +244,27 @@ def article_labels(draft):
     return out
 
 
-def _cands(prefix, cands):
-    return " / ".join(f"{prefix}{i} {c}" + (" (권장)" if i == 1 else "") for i, c in enumerate(cands, 1))
+def over_note(text, limit):
+    """글자 수 한도를 넘는 후보에 붙이는 짧은 사유(조용히 빼지 않고 이유와 함께 보인다)."""
+    return f" [한도 초과 {len(text)}자>{limit}]" if limit and len(text) > limit else ""
 
 
-def render_review2(issue_week, draft, warnings):
+def _cands(prefix, cands, limit=None):
+    return " / ".join(f"{prefix}{i} {c}{over_note(c, limit)}" + (" (권장)" if i == 1 else "") for i, c in enumerate(cands, 1))
+
+
+def render_review2(issue_week, draft, warnings, cfg=None):
+    cfg = cfg or {}
     lines = [f"{BAR} 검토 요청 ② 머리부·제목 · {issue_week} {BAR}",
-             "[A 호 타이틀]   " + _cands("A", draft["issue_title_candidates"]),
-             "[B 한 줄 요약]  " + _cands("B", draft["one_line_candidates"]),
+             "[A 호 타이틀]   " + _cands("A", draft["issue_title_candidates"], cfg.get("issue_title_max")),
+             "[B 한 줄 요약]  " + _cands("B", draft["one_line_candidates"], cfg.get("one_line_max")),
              "[C 주간 요약 초안]"]
     lines += ["  " + ln for ln in draft["abstract"].strip().splitlines()]
     lines.append("[D 기사 제목]   (현재 제목 | 대안 a | 대안 b)")
     for lab, i in article_labels(draft).items():
         a = draft["articles"][i]
-        lines.append(f"  {lab}  " + " | ".join([a["title"]] + list(a["title_alternatives"][:2])))
+        mx = cfg.get("article_title_max")
+        lines.append(f"  {lab}  " + " | ".join(t + over_note(t, mx) for t in [a["title"]] + list(a["title_alternatives"][:2])))
     lines.append("[E 자동 검사 경고]")
     if not warnings:
         lines.append("  (없음)")
@@ -356,6 +363,8 @@ def validate_review2(res, draft, warnings, cfg):
         kind, val = res[key][0], res[key][1] if len(res[key]) > 1 else None
         if kind == "pick" and not 1 <= val <= len(cands):
             raise ReviewError(f"{key}{val}은(는) 없습니다. {key}1~{key}{len(cands)} 중에서 고르세요.")
+        if kind == "pick" and len(cands[val - 1]) > mx:
+            raise ReviewError(f"{key}{val}은(는) {len(cands[val - 1])}자로 {name} 한도 {mx}자를 넘습니다. 다른 후보나 직접 입력을 쓰세요.")
         if kind == "text" and not 1 <= len(val.strip()) <= mx:
             raise ReviewError(f"{key} 직접 입력({name})은 {mx}자 이내로 쓰세요(현재 {len(val.strip())}자).")
     labels = article_labels(draft)
@@ -365,6 +374,8 @@ def validate_review2(res, draft, warnings, cfg):
         a = draft["articles"][labels[lab]]
         if kind == "pick" and ("ab".index(val) >= len(a["title_alternatives"])):
             raise ReviewError(f"D {lab}={val}: 해당 대안이 없습니다.")
+        if kind == "pick" and len(a["title_alternatives"]["ab".index(val)]) > cfg["article_title_max"]:
+            raise ReviewError(f"D {lab}={val}: 대안이 {len(a['title_alternatives']['ab'.index(val)])}자로 한도 {cfg['article_title_max']}자를 넘습니다.")
         if kind == "text" and not 1 <= len(val.strip()) <= cfg["article_title_max"]:
             raise ReviewError(f"D {lab} 직접 입력은 {cfg['article_title_max']}자 이내로 쓰세요(현재 {len(val.strip())}자).")
     ids = {w["id"] for w in warnings}

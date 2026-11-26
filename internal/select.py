@@ -40,7 +40,7 @@ def select(events, cfg):
         core = pool[:3]
     # 단신: 남은 brief_min 이상 중 최대 3건(핵심 3건이면 2건). 산업 배경은 최대 1건.
     max_brief = 3 if len(core) < 3 else 2
-    brief, background = [], 0
+    brief, background, bg_skipped = [], 0, set()
     for e in cands:
         if e in core:
             continue
@@ -48,6 +48,7 @@ def select(events, cfg):
             break
         if e["score"]["tiers"]["fab_relevance"] == 10:
             if background >= 1:
+                bg_skipped.add(e["event_id"])      # 산업 배경 1건 한도에 걸려 건너뜀
                 continue
             background += 1
         brief.append(e)
@@ -55,7 +56,7 @@ def select(events, cfg):
     for e in cands:
         if e not in chosen:
             e["slot"], e["rank"] = "out", None
-            e["note"] = "편성 한도 초과(산업 배경은 1건)" if e["score"]["tiers"]["fab_relevance"] == 10 else "편성 한도 초과"
+            e["note"] = "편성 한도 초과(산업 배경은 1건)" if e["event_id"] in bg_skipped else "편성 한도 초과"
     for i, e in enumerate(core, 1):
         e["slot"], e["rank"] = "core", i
     for i, e in enumerate(brief, len(core) + 1):

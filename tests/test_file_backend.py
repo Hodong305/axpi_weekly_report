@@ -104,7 +104,7 @@ def test_cli_backend_flag_and_answer_option():
     a = build_parser().parse_args(["run", "--package", "x", "--llm-backend", "file"])
     assert a.llm_backend == "file"
     a = build_parser().parse_args(["resume", "--llm-backend", "file", "--answer", "1"])
-    assert a.llm_backend == "file" and a.answer == "1"
+    assert a.llm_backend == "file" and a.answer == ["1"]
     assert settings_mod.load().llm_cfg["backend"] == "http"
 
 

@@ -8,7 +8,7 @@ MTC AX/PI팀의 제조 AI관련 주간 소식지 발간을 위한 리포
 - `collector/` — 사외 수집기, `config.yaml`·`sources.yaml`·`queries.yaml` — 설정
 - `prompts/` — LLM 후보 탐색 프롬프트, 사내 운영·단계 프롬프트
 - `tools/compare_runs.py` — 이전 수집 결과와 새 수집 결과 비교(`python tools/compare_runs.py OLD.json NEW.json --out report.md`)
-- `internal/` — 사내 파이프라인(`python -m internal run --package DIR`, 설계서 9장). `--llm-backend file`이면 요청·응답 파일로 사람·에이전트가 모델 역할을 하고(종료 코드 3), `resume --answer "1"`로 검토 요청에 비대화형으로 답한다(종료 코드 4)
+- `internal/` — 사내 파이프라인(`python -m internal run --package DIR`, 설계서 9장). `--llm-backend file`이면 요청·응답 파일로 사람·에이전트가 모델 역할을 하고(종료 코드 3), `resume --answer "1"`로 검토 요청에 비대화형으로 답한다(종료 코드 4). `--answer`를 여러 번 쓰면 상한 확인·C 재수정 확인 같은 이어지는 질문에 차례로 답하고, 질문에서 멈추면 다음 `resume --answer`가 그 질문에 이어서 답한다
 - `tools/migrate_v42.py` — v4.2 수집 결과를 v4.5로 이관(`python tools/migrate_v42.py OLD.json --issue-week 2026-W48`)
 - `tests/` — 오프라인 통합 시험
 - `docs/archive/` — 이전 버전 설계서

@@ -3,7 +3,8 @@ from .llm import AutoJudgeFailed
 from .settings import TOPICS
 
 FIT_VALUES = ["2", "1", "0", "U"]
-EXCLUSION_CODES = ["DESIGN_ONLY", "MARKET_ONLY", "ROBOT_OUTSIDE_FAB", "NO_WEEKLY_CHANGE"]
+EXCLUSION_CODES = ["DESIGN_ONLY", "MARKET_ONLY", "ROBOT_OUTSIDE_FAB", "NO_WEEKLY_CHANGE", "NO_AI_OPS"]
+STAGE2_ONLY_CODES = {"NO_AI_OPS"}     # 본문 전체 재분류(2단계)에서만 붙일 수 있다. 1단계(제목·첫 문단)나 키워드로는 붙이지 않는다
 ROUTES = ["REVIEW", "EXCLUDE_CANDIDATE", "WATCH_TRANSFER"]
 
 FIT_SCHEMA = {
@@ -47,12 +48,14 @@ def _normalize(obj):
     return obj
 
 
-def _validator(rec, allowed_blocks, records):
+def _validator(rec, allowed_blocks, records, stage2=False):
     ids = {f"{rec['doc_id']}/{b}" for b in allowed_blocks}
 
     def validate(obj):
         _normalize(obj)
         errs = []
+        if not stage2 and obj.get("exclusion_code") in STAGE2_ONLY_CODES:
+            errs.append(f"{obj['exclusion_code']}는 본문 전체 재분류에서만 쓸 수 있음")
         if obj.get("doc_id") != rec["doc_id"]:
             errs.append(f"doc_id가 입력과 다름: {obj.get('doc_id')}")
         bad = [e for e in obj.get("evidence_ids", []) if e not in ids]
@@ -86,7 +89,7 @@ def classify_doc(judge, rec, records):
         return out
     all_ids = [b["id"] for b in rec["body"]["blocks"]]
     try:
-        s2 = judge.ask("s2_reclassify", judge.source(rec), FIT_SCHEMA, _validator(rec, all_ids, records))
+        s2 = judge.ask("s2_reclassify", judge.source(rec), FIT_SCHEMA, _validator(rec, all_ids, records, stage2=True))
     except AutoJudgeFailed:
         out.update(decision="HOLD", flags=["자동 판정 실패"], note="자동 판정 실패")
         return out

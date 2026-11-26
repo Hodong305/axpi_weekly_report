@@ -39,12 +39,12 @@ def run_s7(judge, draft, events, records, cfg, issue_type, counts, failed_gen=()
                       "message": "재생성 후에도 실재하지 않는 근거 ID를 삭제함", "fix": None})
     warns += checks.autofix(draft, records)
     labels = {i: lab for lab, i in article_labels(draft).items()}
-    for k, mx in (("issue_title_candidates", cfg["issue_title_max"]), ("one_line_candidates", cfg["one_line_max"])):
+    # 글자 수 한도를 넘는 후보·대안은 빼지 않고 남긴다. 검토 요청 ②가 사유와 함께 보여 주고, 고를 수 없게 한다.
+    for k in ("issue_title_candidates", "one_line_candidates"):
+        mx = cfg["issue_title_max"] if k.startswith("issue") else cfg["one_line_max"]
         ok = [c for c in draft[k] if len(c) <= mx]
-        if ok and len(ok) != len(draft[k]):
-            draft[k] = ok
-    for a in draft["articles"]:
-        a["title_alternatives"] = [t for t in a["title_alternatives"] if len(t) <= cfg["article_title_max"]]
+        if ok and draft[k][0] not in ok:       # 추천안(첫째)이 한도를 넘으면 한도 안의 후보를 앞에 둔다
+            draft[k] = ok + [c for c in draft[k] if c not in ok]
     if draft["issue_title_candidates"][0] != draft["issue_title"]:
         draft["issue_title"] = draft["issue_title_candidates"][0]
     if draft["one_line_candidates"][0] != draft["one_line"]:
