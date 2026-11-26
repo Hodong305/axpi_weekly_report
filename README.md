@@ -14,7 +14,7 @@ MTC AX/PI팀의 제조 AI관련 주간 소식지 발간을 위한 리포
 ## 빠른 시작(사외)
 ```
 pip install -r requirements.txt
-python -m collector check-sources          # 처음 한 번: 발행처 점검
+python -m collector check-sources          # 선택: 발행처 피드 접속 점검
 python -m collector window                 # 이번 주차·기간 확인
 python -m collector prompt                 # LLM 탐색 프롬프트 5개 생성 → 결과를 candidates/에 저장
 python -m collector run                    # 수집·추출·검증·리포트

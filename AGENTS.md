@@ -16,7 +16,8 @@
 
 0. 준비(처음 한 번): `python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt`
    - 선택: `pip install playwright && playwright install chromium` (봇 차단·자바스크립트 페이지 재시도)
-   - 처음 한 번 `python -m collector check-sources`로 발행처를 점검하고, 정상인 항목은 `sources.yaml`에서 `verified: true`로 바꾼다.
+   - (선택) `python -m collector check-sources`로 발행처 피드 접속을 점검할 수 있다. 하지 않아도 수집에는 문제가 없다:
+     `verified: false`인 발행처는 LLM 프롬프트의 '우선 확인 발행처'에도 들어가 중복으로 확인되고, 순회 실패는 매주 리포트의 '레지스트리 순회' 표에 나온다.
 1. 기간 확인: `python -m collector window` → 출력된 `issue_week`를 이후 명령에 쓴다.
 2. 프롬프트 생성: `python -m collector prompt --issue-week YYYY-Www`
    → `work/YYYY-Www/prompts/` 에 `T1.txt T2.txt T3.txt T4.txt B.txt` 생성
