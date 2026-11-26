@@ -65,10 +65,11 @@ def _waiting_line(events):
     return "  ".join(parts) if parts else "(없음)"
 
 
-def render_review1(issue_week, counts, events):
+def render_review1(issue_week, counts, events, notice=None):
     """counts: pass_docs, events, candidates, core_eligible"""
     return "\n".join([
         f"{BAR} 검토 요청 ① 선정 · {issue_week} {BAR}",
+        *([notice] if notice else []),
         f"통과 문서 {counts['pass_docs']}건 → 사건 {counts['events']}건 → 게재 후보 {counts['candidates']}건"
         f"(핵심 자격 {counts['core_eligible']}건)",
         "",

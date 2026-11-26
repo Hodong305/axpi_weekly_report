@@ -1,0 +1,66 @@
+{
+  "_설명": "설계서 11장의 회귀 사례 5종. 고정 입력(docs, ledger)과 모델 응답(llm)만으로 판정·편성·대장 결과가 정해진다. 결과는 expected.json과 비교한다.",
+  "cases": {
+    "1_late_evidence": {
+      "설명": "후반 문단에만 운영 실적이 있는 사례: 1단계는 U, 본문 재분류에서 직접 해당으로 올라온다",
+      "docs": [{"key": "a", "url": "https://fab.example.org/news/late-evidence", "title": "Fab operator shares AI update", "publisher": "Fab Operator",
+                "date": "2026-11-24", "source_type": "company_official", "tier": "primary",
+                "paras": ["The company shared an update about its artificial intelligence program for the coming year in a short note.",
+                          "It described general plans for expanding data platforms across several internal groups over time.",
+                          "In the production fab, the yield analysis model has run on every lot of the memory line since September."]}],
+      "ledger": [],
+      "llm": {"a": {"stage1": {"fit": {"T1": "U", "T2": "U", "T3": "U", "T4": "U"}},
+                    "stage2": {"fit": {"T1": "2", "T2": "0", "T3": "0", "T4": "0"}, "evidence": "P3"},
+                    "score": {"tiers": [30, 20, 15, 10, 10], "evidence": ["P3"], "types": ["실측"], "maturity": "양산·상시 운영"}}}
+    },
+    "2_design_manufacturing_mixed": {
+      "설명": "설계와 제조가 섞인 사례: 재분류 후에도 어느 분야도 직접 해당이 아니고 제외 사유도 불명확 → 판단 보류",
+      "docs": [{"key": "a", "url": "https://eda.example.org/news/mixed", "title": "Design flow update touches fab data", "publisher": "Design Vendor",
+                "date": "2026-11-24", "source_type": "company_official", "tier": "primary",
+                "paras": ["The vendor released a design flow update that also reads measurement data exported from a manufacturing line.",
+                          "The release notes say the layout checker can import wafer map files, without naming any customer or site.",
+                          "A roadmap slide lists a pilot with an unnamed partner but gives no scope or schedule for the work."]}],
+      "ledger": [],
+      "llm": {"a": {"stage1": {"fit": {"T1": "1", "T2": "0", "T3": "1", "T4": "0"}},
+                    "stage2": {"fit": {"T1": "1", "T2": "0", "T3": "1", "T4": "0"}}}}
+    },
+    "3_operating_and_future": {
+      "설명": "운영 중인 제품과 향후 시험할 제품이 한 발표에 있는 사례: 대표 주장은 운영 중인 것 하나, 계획은 계획 유형으로 따로 기록",
+      "docs": [{"key": "a", "url": "https://equip.example.org/news/operating-future", "title": "Equipment maker reports monitoring results", "publisher": "Equip Maker",
+                "date": "2026-11-25", "source_type": "company_official", "tier": "primary",
+                "paras": ["The equipment maker said its monitoring software now runs on deployed etch tools at customer sites in production.",
+                          "Operators use the alerts to schedule maintenance before drift grows beyond the limits set for each recipe.",
+                          "The company also plans to test a second product next year, and no results from that test exist yet."]}],
+      "ledger": [],
+      "llm": {"a": {"stage1": {"fit": {"T1": "0", "T2": "2", "T3": "0", "T4": "0"}},
+                    "score": {"tiers": [30, 20, 15, 5, 10], "evidence": ["P1", "P3"], "types": ["실측", "계획"], "maturity": "양산·상시 운영"}}}
+    },
+    "4_rerun_no_change": {
+      "설명": "전주 발표의 단순 재전재(SAME_NO_CHANGE): 게재하지 않고 근거 doc_id만 대장에 추가",
+      "docs": [{"key": "a", "url": "https://wire.example.org/news/rerun", "title": "Wire repeats equipment maker announcement", "publisher": "Equip Maker",
+                "date": "2026-11-24", "source_type": "company_official", "tier": "primary",
+                "paras": ["The equipment maker announced that its monitoring software runs on deployed etch tools at customer sites.",
+                          "The announcement repeats the figures already shared the week before without any new scope or numbers.",
+                          "A translated version of the same notice was posted on the regional site of the company this week."]}],
+      "ledger": [{"event_key": "EVT-2026W47-01", "subject": "Equip Maker", "site_task": "고객 팹 / 모니터링", "primary_topic": "T2_EQUIPMENT",
+                  "stage": "양산·상시 운영", "claim": "이전 주장", "key_facts": ["이전 수치"], "doc_ids": ["url1_prev"], "placement": "core",
+                  "issues": ["2026-W47"], "open_questions": [], "corrections": []}],
+      "llm": {"a": {"stage1": {"fit": {"T1": "0", "T2": "2", "T3": "0", "T4": "0"}},
+                    "ledger": {"verdict": "SAME_NO_CHANGE", "matched_event_key": "EVT-2026W47-01"}}}
+    },
+    "5_stage_change": {
+      "설명": "같은 사건의 단계 변경(SAME_WITH_CHANGE): 후속 기사로 채점하고 대장의 stage·claim·issues를 갱신",
+      "docs": [{"key": "a", "url": "https://robot.example.org/news/stage-change", "title": "Operator moves patrol robot to routine operation", "publisher": "Robot Fab",
+                "date": "2026-11-26", "source_type": "company_official", "tier": "primary",
+                "paras": ["The operator said its sub-fab patrol robot has moved from a pilot on one line to routine operation on all lines.",
+                          "Maintenance staff now receive inspection requests from the robot every shift without a manual hand-off.",
+                          "The company will publish the alert conversion rate next quarter, and it has not shared that figure yet."]}],
+      "ledger": [{"event_key": "EVT-2026W47-02", "subject": "Robot Fab", "site_task": "서브팹 / 순찰", "primary_topic": "T4_PHYSICAL_AI",
+                  "stage": "실증", "claim": "이전 주장", "key_facts": ["1개 라인"], "doc_ids": ["url1_prev2"], "placement": "brief",
+                  "issues": ["2026-W47"], "open_questions": [], "corrections": []}],
+      "llm": {"a": {"stage1": {"fit": {"T1": "0", "T2": "0", "T3": "0", "T4": "2"}},
+                    "ledger": {"verdict": "SAME_WITH_CHANGE", "matched_event_key": "EVT-2026W47-02", "changes": ["전 라인 상시 운영"]},
+                    "score": {"tiers": [30, 25, 20, 15, 10], "evidence": ["P1"], "types": ["기관 결정"], "maturity": "양산·상시 운영"}}}
+    }
+  }
+}

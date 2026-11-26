@@ -4,7 +4,7 @@ import json
 import yaml
 
 from .common import evidence_errors, short_week, trunc
-from .llm import AutoJudgeFailed, source_block
+from .llm import AutoJudgeFailed
 
 LANG_SUFFIX = {"ko": "", "en": "영문", "ja": "일문", "zh": "중문", "de": "독문", "fr": "불문", "es": "서문",
                "ru": "러문", "it": "이문", "nl": "네문", "pt": "포문"}
@@ -56,7 +56,7 @@ def build_credits(evidence_ids, rep_doc_id, records):
 
 # 생성 ------------------------------------------------------------------------
 
-def _article_user(ev, slot, records, cfg, feedback):
+def _article_user(judge, ev, slot, records, cfg, feedback):
     lo, hi = cfg["core_chars"] if slot == "core" else cfg["brief_chars"]
     led = ev["ledger"]
     info = {"event_id": ev["event_id"], "slot": slot, "subject": ev["subject"], "site_task": ev["site_task"],
@@ -67,10 +67,10 @@ def _article_user(ev, slot, records, cfg, feedback):
     sc = ev.get("score")
     parts.append("[채점 결과]\n" + (json.dumps({k: sc[k] for k in ("claim", "maturity", "fact", "mtc_impact", "action_watch",
                                                                   "unresolved", "evidence")}, ensure_ascii=False)
-                                  if sc else "(자동 채점 없음 — 편집자가 올린 사건이다. 근거 자료만으로 쓴다.)"))
-    parts += [source_block(records[d]) for d in ev["doc_ids"]]
+                                  if sc else "(자동 채점 없음)"))
+    parts += [judge.source(records[d]) for d in ev["doc_ids"]]
     if feedback:
-        parts.append("[재생성 요청] 이전 원고가 다음 검사에 걸렸다. 고쳐서 다시 써라.\n" + feedback)
+        parts.append(judge.phrase("x_regen") + "\n" + feedback)
     return "\n".join(parts)
 
 
@@ -87,7 +87,7 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
             errs.append("근거 ID가 없음")
         return errs
     try:
-        r = judge.ask("s6_article", _article_user(ev, slot, records, cfg, feedback), ARTICLE_SCHEMA, validate)
+        r = judge.ask("s6_article", _article_user(judge, ev, slot, records, cfg, feedback), ARTICLE_SCHEMA, validate)
         failed = False
     except AutoJudgeFailed:
         sc = ev.get("score")
@@ -101,16 +101,15 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
             "evidence_ids": list(r["evidence_ids"])}, failed
 
 
-def _header_user(draft_articles, events_by_id, issue_type, counts, cfg, feedback, ids):
+def _header_user(judge, draft_articles, events_by_id, issue_type, counts, cfg, feedback):
     info = {"issue_type": issue_type, "호_타이틀_한도": cfg["issue_title_max"], "한_줄_요약_한도": cfg["one_line_max"],
             "주간_요약_글자수_범위": cfg["abstract_chars"], "팹_판단_한_컷_한도": cfg["hook_chars"], "통계": counts}
     parts = ["[작성 지침]\n" + json.dumps(info, ensure_ascii=False)]
     for a in draft_articles:
         parts.append("[기사] " + json.dumps({"slot": a["slot"], "title": a["title"], "body": a["body"],
                                            "evidence_ids": a["evidence_ids"]}, ensure_ascii=False))
-    parts.append("hook의 evidence_id로 쓸 수 있는 근거 ID는 위 기사의 evidence_ids에 있는 것뿐이다.")
     if feedback:
-        parts.append("[재생성 요청] 이전 머리부가 다음 검사에 걸렸다. 고쳐서 다시 써라.\n" + feedback)
+        parts.append(judge.phrase("x_regen") + "\n" + feedback)
     return "\n".join(parts)
 
 
@@ -123,7 +122,7 @@ def gen_header(judge, articles, events_by_id, records, issue_type, counts, cfg, 
             return [f"hook 근거 ID가 기사 근거에 없음: {h['evidence_id']}"]
         return []
     try:
-        return judge.ask("s6_header", _header_user(articles, events_by_id, issue_type, counts, cfg, feedback, allowed),
+        return judge.ask("s6_header", _header_user(judge, articles, events_by_id, issue_type, counts, cfg, feedback),
                          HEADER_SCHEMA, validate), False
     except AutoJudgeFailed:
         first = articles[0]["title"] if articles else "이번 주 소식"

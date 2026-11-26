@@ -753,13 +753,15 @@ review_log: []             # 검토 요청 응답과 적용 결과
 
 | 파일·명령 | 내용 |
 |---|---|
-| `python -m internal run --package DIR [--issue-week W] [--restart]` | 사외 `package/`를 반입해 S1~S8을 진행한다. 검토 요청에서 멈추고 응답을 기다린다(`중단`·`처음부터` 입력 가능) |
-| `python -m internal resume [--issue-week W]` / `status` | `review/{issue_week}-state.json`에서 이어서 실행 / 진행 상태 보기 |
+| `python -m internal run --package DIR [--issue-week W] [--restart] [--fresh]` | 사외 `package/`를 반입해 S1~S8을 진행한다. 검토 요청에서 멈추고 응답을 기다린다(`중단`·`처음부터` 입력 가능) |
+| `python -m internal resume [--issue-week W] [--fresh]` / `status` | `review/{issue_week}-state.json`에서 이어서 실행 / 진행 상태 보기 |
 | `internal/llm.py`, `prompts/internal-steps.md` | 모델 클라이언트(json_schema 응답, 거부 시 일반 JSON, 검증 실패 시 1회 재시도)와 단계 프롬프트. `s2_fit`·`s4_score`는 9.3·9.4 문구 그대로 |
 | `internal/intake.py` | S1: manifest 해시 확인 후 `collector.validate.check` 실행 |
 | `internal/fit.py`, `events.py`, `score.py`, `select.py` | S2 적합도, S3 사건 묶음·대장 대조(대장 읽기·갱신 포함), S4 중요도·상한, S5 편성(`review/{issue_week}-selection.csv`) |
 | `internal/review.py`, `reviewlog.py` | 검토 요청 ①·상한 확인·②·C 재수정 확인·③의 출력 형식, 응답 문법 해석, 적용. 요청·응답은 `review/{issue_week}-review-log.jsonl`에 시각과 함께 기록 |
 | `internal/draft.py`, `checks.py`, `s7.py` | S6 원고·머리부(`review/{issue_week}-draft.yaml`), S7 검사(URL 삭제, 출처 형식 보정, 숫자·기업명·원문 연속 일치, 재생성 1회) |
+| `internal/fingerprint.py`, `llm.py`의 `ResponseCache` | 9.11: 실행 지문(직전 호와 비교), 응답 저장(`review/{issue_week}-llm-cache.jsonl`) |
+| `tests/regression/`, `tests/test_regression.py` | 11장 회귀 사례 5종의 고정 입력·모델 응답·기대 결과. `python tests/regression/run.py`로 비교(`--update`로 갱신) |
 | `internal/render.py`, `metrics.py`, `pipeline.py` | S8 정적 HTML·텍스트(`out_internal/{issue_week}/`), 시범 지표(`log/pilot.csv`), 상태 기계 |
 | `ledger/events.jsonl` | 사건 대장(7.2). S8에서만 갱신 |
 
@@ -850,10 +852,10 @@ review_log: []             # 검토 요청 응답과 적용 결과
 |---|---|
 | 고정 프롬프트 | 모델에게 주는 문구는 `prompts/internal-operator.md`와 `prompts/internal-steps.md`뿐이다. 실행 중에 문구를 만들어 붙이지 않는다. 두 파일의 SHA-256을 실행 지문에 남긴다 |
 | 결정적 호출 | temperature 0, `internal.llm.seed` 고정(서버가 지원하면 전달). 입력 문서는 doc_id 순, 사건은 `event_key` 순으로 넣는다 |
-| 입력 길이 | 문서 하나의 블록 합계가 `internal.llm.max_input_chars`를 넘으면 문서 순서대로 한도까지만 넣고 끝에 `(이하 생략)`을 붙인다. 그 사건에는 '본문 일부만 판정' 표시를 붙여 검토 요청 ①에 보인다 |
+| 입력 길이 | 문서 하나의 블록 합계가 `internal.llm.max_input_chars`를 넘으면 문서 순서대로 한도까지만 넣고 끝에 `(이하 생략)`을 붙인다. 한도에 걸린 마지막 블록은 앞부분만 글자 단위로 넣는다. 그 사건에는 '본문 일부만 판정' 표시를 붙여 검토 요청 ①에 보인다 |
 | 응답 저장 | 모든 모델 응답을 `review/{issue_week}-llm-cache.jsonl`에 (단계, 프롬프트 해시, 입력 해시) 키로 저장한다. 같은 주를 다시 실행하거나 재개하면 저장된 응답을 그대로 쓴다. `--restart`는 저장을 지우지 않으며, `--fresh`만 저장을 무시한다 |
 | 실행 지문 | 매 실행의 서버가 응답한 모델 이름, 두 프롬프트 파일 해시, `config_version`, 설계서 버전, 수집기·사내 코드 버전을 `log/pilot.csv`와 state에 기록한다. 직전 호와 하나라도 다르면 S1에서 '실행 조건 변경' 경고를 내고, 검토 요청 ①의 머리에 표시한다 |
-| 회귀 시험 | 모델·프롬프트·설정을 바꾸기 전에 11장의 회귀 사례 5종을 `tests/regression/`의 고정 입력으로 돌려 이전 결과와 비교한다. 판정(status·slot·ledger)이 바뀐 사례는 바꾼 이유를 시범 로그에 남긴다 |
+| 회귀 시험 | 모델·프롬프트·설정을 바꾸기 전에 11장의 회귀 사례 5종을 `tests/regression/`의 고정 입력으로 돌려 이전 결과와 비교한다. 비교는 `python tests/regression/run.py`로 한다. 판정(status·slot·ledger)이 바뀐 사례가 있으면, `--update`로 `expected.json`을 갱신하는 커밋의 메시지에 사례 이름과 바꾼 이유를 적는다 |
 
 ---
 

@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 from .common import add_flag, evidence_errors, representative, short_week, trunc, week_tag
-from .llm import AutoJudgeFailed, source_block
+from .llm import AutoJudgeFailed
 from .settings import TOPICS
 
 LEDGER_FIELDS = ["event_key", "subject", "site_task", "primary_topic", "stage", "claim", "key_facts",
@@ -58,7 +58,7 @@ def ledger_candidates(entries, subject, doc_ids, issue_week, lookback):
     recent = set(issues[-lookback:]) if lookback else set()
     subj = _norm(subject)
     out = []
-    for e in entries:
+    for e in sorted(entries, key=lambda x: x["event_key"]):
         if not recent & set(e.get("issues") or []):
             continue
         if (subj and _norm(e.get("subject")) == subj) or set(e.get("doc_ids") or []) & set(doc_ids):
@@ -94,7 +94,7 @@ def propose_groups(judge, recs, title_max):
     ids = [r["doc_id"] for r in recs]
     if not recs:
         return [], False
-    user = "\n".join(source_block(r, set(r["body"]["lead_ids"])) for r in recs)
+    user = "\n".join(judge.source(r, set(r["body"]["lead_ids"])) for r in recs)
     try:
         obj = judge.ask("s3_group", user, GROUP_SCHEMA, _group_validator(ids))
         groups = obj["groups"]
@@ -122,34 +122,33 @@ def build_events(judge, records, fit, issue_week, title_max):
     """ADVANCE 문서를 사건으로 묶고, 판단 보류·제외 문서는 대장에 남길 개별 항목으로 만든다."""
     advanced = [records[d] for d, f in sorted(fit.items()) if f["decision"] == "ADVANCE"]
     groups, ok = propose_groups(judge, advanced, title_max)
-    prepared = []
+    from .common import pub_sort_key
+    items = []      # (대표 자료, 종류, 묶음)
     for g in groups:
         recs = [records[d] for d in g["doc_ids"]]
-        rep = representative(recs)
-        prepared.append((rep, g, recs))
-    from .common import pub_sort_key
-    prepared.sort(key=lambda t: (pub_sort_key(t[0]), t[0]["doc_id"]))
-    events, n = [], 0
-    for rep, g, recs in prepared:
-        n += 1
-        topic = g["primary_topic"] or next((t for t in TOPICS if fit[rep["doc_id"]]["stage1"]["fit"].get(t) == "2"), TOPICS[0])
-        events.append(new_event(f"EVT-{week_tag(issue_week)}-{n:02d}", "event", g["doc_ids"], rep["doc_id"],
-                                g["subject"], g["site_task"], g["title_draft"], topic))
-        if not ok:
-            add_flag(events[-1], "묶음 자동 판정 실패")
+        items.append((representative(recs), "event", g))
     for d, f in sorted(fit.items()):
-        if f["decision"] == "ADVANCE":
-            continue
-        rec = records[d]
-        n += 1
-        held = f["decision"] == "HOLD"
-        ev = new_event(f"EVT-{week_tag(issue_week)}-{n:02d}", "hold_doc" if held else "excluded_doc", [d], d,
-                       rec["publisher"], trunc(rec["title"], 40), trunc(rec["title"], title_max), None)
-        ev["status"] = "HOLD" if held else "EXCLUDE"
-        ev["slot"] = "hold" if held else "out"
-        ev["note"] = f.get("note", "")
-        for fl in f.get("flags", []):
-            add_flag(ev, fl)
+        if f["decision"] != "ADVANCE":
+            items.append((records[d], "hold_doc" if f["decision"] == "HOLD" else "excluded_doc", f))
+    # event_key 번호: 사건 대표 자료의 (발행 시각, doc_id) 순(9.10). 보류·제외 사건도 같은 순서로 번호를 받는다.
+    items.sort(key=lambda t: (pub_sort_key(t[0]), t[0]["doc_id"]))
+    events = []
+    for n, (rep, kind, g) in enumerate(items, 1):
+        eid = f"EVT-{week_tag(issue_week)}-{n:02d}"
+        if kind == "event":
+            topic = g["primary_topic"] or next((t for t in TOPICS if fit[rep["doc_id"]]["stage1"]["fit"].get(t) == "2"), TOPICS[0])
+            ev = new_event(eid, "event", g["doc_ids"], rep["doc_id"], g["subject"], g["site_task"], g["title_draft"], topic)
+            if not ok:
+                add_flag(ev, "묶음 자동 판정 실패")
+        else:
+            held = kind == "hold_doc"
+            ev = new_event(eid, kind, [rep["doc_id"]], rep["doc_id"], rep["publisher"], trunc(rep["title"], 40),
+                           trunc(rep["title"], title_max), None)
+            ev["status"] = "HOLD" if held else "EXCLUDE"
+            ev["slot"] = "hold" if held else "out"
+            ev["note"] = g.get("note", "")
+            for fl in g.get("flags", []):
+                add_flag(ev, fl)
         events.append(ev)
     return events
 
@@ -176,7 +175,7 @@ def judge_ledger(judge, event, cands, records):
     user = ("[이번 주 사건]\n" + json.dumps({"event_id": event["event_id"], "subject": event["subject"],
                                            "site_task": event["site_task"]}, ensure_ascii=False)
             + "\n[대장 후보 항목]\n" + json.dumps([{k: c.get(k) for k in LEDGER_FIELDS} for c in cands], ensure_ascii=False)
-            + "\n" + "\n".join(source_block(_rec(records, d)) for d in event["doc_ids"]))
+            + "\n" + "\n".join(judge.source(_rec(records, d)) for d in event["doc_ids"]))
     try:
         r = judge.ask("s3_ledger", user, LEDGER_SCHEMA, _ledger_validator(event, keys, records))
     except AutoJudgeFailed:
@@ -251,8 +250,7 @@ def update_ledger(entries, events, issue_week, corrections=()):
             if led["verdict"] == "SAME_WITH_CHANGE":
                 ent["issues"] = sorted(set(ent["issues"]) | {issue_week})
                 if published and sc:
-                    ent.update(stage=sc["maturity"], claim=sc["claim"], key_facts=sc["fact"], placement=ev["slot"],
-                               open_questions=sc["unresolved"])
+                    ent.update(stage=sc["maturity"], claim=sc["claim"], key_facts=sc["fact"], placement=ev["slot"])
             continue
         entry = {"event_key": ev["event_id"], "subject": ev["subject"], "site_task": ev["site_task"],
                  "primary_topic": ev["primary_topic"], "stage": sc["maturity"] if sc else "미확인",

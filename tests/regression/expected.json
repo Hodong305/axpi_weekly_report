@@ -1,0 +1,150 @@
+{
+ "1_late_evidence": {
+  "events": [
+   {
+    "cap": "core",
+    "evidence_types": [
+     "실측"
+    ],
+    "flags": [],
+    "kind": "event",
+    "ledger": "NEW",
+    "rank": 1,
+    "slot": "core",
+    "status": "PASS",
+    "total": 85
+   }
+  ],
+  "exit": 0,
+  "issue_type": "축약호",
+  "ledger_after": [
+   {
+    "event_key": "EVT-2026W49-01",
+    "issues": [
+     "2026-W49"
+    ],
+    "n_docs": 1,
+    "placement": "core",
+    "stage": "양산·상시 운영"
+   }
+  ]
+ },
+ "2_design_manufacturing_mixed": {
+  "events": [
+   {
+    "cap": null,
+    "evidence_types": [],
+    "flags": [],
+    "kind": "hold_doc",
+    "ledger": "NEW",
+    "rank": null,
+    "slot": "hold",
+    "status": "HOLD",
+    "total": null
+   }
+  ],
+  "exit": 0,
+  "issue_type": "현황호",
+  "ledger_after": [
+   {
+    "event_key": "EVT-2026W49-01",
+    "issues": [
+     "2026-W49"
+    ],
+    "n_docs": 1,
+    "placement": "hold",
+    "stage": "미확인"
+   }
+  ]
+ },
+ "3_operating_and_future": {
+  "events": [
+   {
+    "cap": "core",
+    "evidence_types": [
+     "실측",
+     "계획"
+    ],
+    "flags": [],
+    "kind": "event",
+    "ledger": "NEW",
+    "rank": 1,
+    "slot": "core",
+    "status": "PASS",
+    "total": 80
+   }
+  ],
+  "exit": 0,
+  "issue_type": "축약호",
+  "ledger_after": [
+   {
+    "event_key": "EVT-2026W49-01",
+    "issues": [
+     "2026-W49"
+    ],
+    "n_docs": 1,
+    "placement": "core",
+    "stage": "양산·상시 운영"
+   }
+  ]
+ },
+ "4_rerun_no_change": {
+  "events": [
+   {
+    "cap": null,
+    "evidence_types": [],
+    "flags": [],
+    "kind": "event",
+    "ledger": "SAME_NO_CHANGE",
+    "rank": null,
+    "slot": "out",
+    "status": "EXCLUDE",
+    "total": null
+   }
+  ],
+  "exit": 0,
+  "issue_type": "현황호",
+  "ledger_after": [
+   {
+    "event_key": "EVT-2026W47-01",
+    "issues": [
+     "2026-W47"
+    ],
+    "n_docs": 2,
+    "placement": "core",
+    "stage": "양산·상시 운영"
+   }
+  ]
+ },
+ "5_stage_change": {
+  "events": [
+   {
+    "cap": "core",
+    "evidence_types": [
+     "기관 결정"
+    ],
+    "flags": [],
+    "kind": "event",
+    "ledger": "SAME_WITH_CHANGE",
+    "rank": 1,
+    "slot": "core",
+    "status": "PASS",
+    "total": 100
+   }
+  ],
+  "exit": 0,
+  "issue_type": "축약호",
+  "ledger_after": [
+   {
+    "event_key": "EVT-2026W47-02",
+    "issues": [
+     "2026-W47",
+     "2026-W49"
+    ],
+    "n_docs": 2,
+    "placement": "core",
+    "stage": "양산·상시 운영"
+   }
+  ]
+ }
+}

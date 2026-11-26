@@ -7,12 +7,12 @@ import copy
 import json
 from datetime import datetime
 
-from . import checks, draft as draftmod, events as ev_mod, fit as fit_mod, metrics, render, review as rv, score as sc_mod
+from . import checks, draft as draftmod, fingerprint, events as ev_mod, fit as fit_mod, metrics, render, review as rv, score as sc_mod
 from . import select as sel
 from .common import add_flag
 from .draft import ABSTRACT_SCHEMA, load_draft, save_draft
 from .intake import IntakeError, load_package
-from .llm import AutoJudgeFailed
+from .llm import AutoJudgeFailed, ResponseCache, is_truncated
 from .review import ReviewError
 from .reviewlog import ReviewLog, now_iso
 from .s7 import run_s7
@@ -45,10 +45,13 @@ class ConsoleIO:
 
 
 class Pipeline:
-    def __init__(self, settings, judge, io=None, clock=None):
+    def __init__(self, settings, judge, io=None, clock=None, fresh=False):
+        self.fresh = fresh
         self.s = settings
         self.cfg = settings.internal
         self.judge = judge
+        if judge is not None and settings.llm_cfg.get("max_input_chars"):
+            judge.max_input_chars = settings.llm_cfg["max_input_chars"]
         self.io = io or ConsoleIO()
         self.clock = clock or now_iso
         self.state = None
@@ -75,12 +78,14 @@ class Pipeline:
             return 1
         self.week, self.pkg = week, pkg
         self.log = ReviewLog(self.s.review_log_path(week), self.clock)
+        self.attach_cache()
         if restart and path.exists():
             self.log.write(kind="restart", review="-")
         self.state = {"version": 1, "issue_week": week, "package_dir": str(pkg.directory), "stage": "S1",
                       "created_at": self.clock(), "updated_at": self.clock(), "issue_type": None, "fit": {}, "events": [],
                       "counts": {"pass_docs": 0, "events": 0, "candidates": 0, "core_eligible": 0}, "warnings": [],
-                      "failed_gen": [], "metrics": {}, "review_log": [], "intake_warnings": pkg.warnings}
+                      "failed_gen": [], "metrics": {}, "review_log": [], "intake_warnings": pkg.warnings,
+                      "fingerprint": {}, "fp_changes": []}
         return self._run()
 
     def resume(self, issue_week=None):
@@ -103,7 +108,21 @@ class Pipeline:
             self.io.write(str(e))
             return 1
         self.log = ReviewLog(self.s.review_log_path(week), self.clock)
+        self.attach_cache()
+        self.refresh_fingerprint()
         return self._run()
+
+    def attach_cache(self):
+        """모델 응답 저장(9.11). --fresh이면 저장된 응답을 읽지 않는다. --restart는 저장을 지우지 않는다."""
+        if self.judge is not None:
+            self.judge.cache = ResponseCache(self.s.review_path(self.week, "llm-cache.jsonl"), read=not self.fresh)
+
+    def refresh_fingerprint(self):
+        """실행 지문을 갱신하고 직전 호와 비교한다. 모델 이름은 첫 호출 뒤에야 알 수 있어 S5에서 다시 비교한다."""
+        old = self.state.get("fingerprint") or {}
+        fp = fingerprint.current(self.s, old.get("model"))
+        self.state["fingerprint"] = fp
+        self.state["fp_changes"] = fingerprint.changed(fingerprint.previous(self.s.pilot_csv, self.week), fp)
 
     def latest_unfinished(self):
         best = None
@@ -161,6 +180,9 @@ class Pipeline:
 
     def step_S1(self):
         self.step_header("S1")
+        self.refresh_fingerprint()
+        if self.state["fp_changes"]:
+            self.io.write(fingerprint.notice(self.state["fp_changes"]))
         self.goto("S2")
 
     def step_S2(self):
@@ -197,6 +219,13 @@ class Pipeline:
                 e.update(status="HOLD", note="채점 누락")
         self.goto("S5")
 
+    def refresh_fingerprint_model(self):
+        model = self.judge.served_model if self.judge is not None else None
+        if model:
+            self.state["fingerprint"]["model"] = model
+            prev = fingerprint.previous(self.s.pilot_csv, self.week)
+            self.state["fp_changes"] = fingerprint.changed(prev, self.state["fingerprint"])
+
     def counts(self):
         evs = self.state["events"]
         return {"pass_docs": sum(1 for f in self.state["fit"].values() if f["decision"] == "ADVANCE"),
@@ -207,6 +236,11 @@ class Pipeline:
     def step_S5(self):
         self.step_header("S5")
         evs = self.state["events"]
+        self.refresh_fingerprint_model()
+        limit = self.s.llm_cfg.get("max_input_chars")
+        for e in evs:     # 입력이 잘린 문서가 있는 사건은 표시한다(9.11)
+            if any(is_truncated(self.records[d], limit) for d in e["doc_ids"]):
+                add_flag(e, "본문 일부만 판정")
         if evs:
             sel.select(evs, self.cfg)
         for e in evs:
@@ -257,7 +291,8 @@ class Pipeline:
             return
 
         def render_fn():
-            return rv.render_review1(self.week, self.state["counts"], self.state["events"])
+            return rv.render_review1(self.week, self.state["counts"], self.state["events"],
+                                     fingerprint.notice(self.state["fp_changes"]))
 
         def handle(text):
             parsed = rv.parse_review1(text)
@@ -488,6 +523,7 @@ class Pipeline:
         entries = ev_mod.load_ledger(self.s.ledger_path)
         ev_mod.save_ledger(self.s.ledger_path, ev_mod.update_ledger(entries, self.state["events"], self.week, corrections))
         row = metrics.build_row(self.state, self.pkg.doc, self.log, str(self.s.config.get("config_version", "")))
+        row.update({"fp_" + k: v for k, v in self.state["fingerprint"].items()})
         metrics.upsert_row(self.s.pilot_csv, row)
         self.goto("DONE")
         self.io.write(f"발송본: {out / 'newsletter.html'}")

@@ -1022,3 +1022,120 @@ def test_ctrl_commands_and_main_status(tmp_path, capsys):
     p2 = Pipeline(settings_mod.load(data_root=tmp_path), Judge(client), io2)
     assert p2.resume() == 0
     assert any(l.startswith("S1 ") for l in io2.out) is True
+
+
+# 재현성 장치(9.11) ----------------------------------------------------------------------
+
+def test_client_seed_fallback_and_served_model():
+    resp = {"model": "served-x", "choices": [{"message": {"content": '{"a": 1}'}}]}
+    s = FakeSession([FakeResp(400, text="unknown parameter: seed"), FakeResp(200, resp), FakeResp(200, resp)])
+    c = LLMClient("http://x:8000/v1", "m", session=s, seed=42)
+    schema = {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}
+    c.chat([{"role": "user", "content": "u"}], schema)
+    r0, r1 = s.requests[0]["json"], s.requests[1]["json"]
+    assert s.requests[0]["url"] == "http://x:8000/v1/chat/completions"
+    assert r0["seed"] == 42 and "seed" not in r1 and "response_format" in r1      # seed만 빼고 다시 요청
+    c.chat([{"role": "user", "content": "u"}], schema)
+    assert "seed" not in s.requests[2]["json"] and c.served_model == "served-x"   # 거부는 기억한다
+    # seed와 response_format을 모두 거부하는 서버
+    s = FakeSession([FakeResp(400, text="bad request"), FakeResp(400, text="bad request"), ok_resp('{"a": 1}')])
+    c = LLMClient("http://x", "m", session=s, seed=1)
+    c.chat([{"role": "user", "content": "u"}], schema)
+    q = [r["json"] for r in s.requests]       # 어느 항목 탓인지 모르면 response_format을 먼저, 그다음 seed를 뺀다
+    assert "seed" in q[0] and "response_format" in q[0] and "response_format" not in q[1] and "seed" in q[1] and "seed" not in q[2]
+
+
+def test_source_truncation():
+    rec = make_record("https://t.example.org/a", "긴 문서", "발행처", "2026-11-24", ["가" * 100, "나" * 100, "다" * 100])
+    full = source_block(rec)
+    assert "(이하 생략)" not in full
+    cut = source_block(rec, None, 250)
+    assert cut.count("가") == 100 and cut.count("나") == 100 and cut.count("다") == 50 and "(이하 생략)" in cut and cut.count("</source>") == 1
+    from internal.llm import is_truncated
+    assert is_truncated(rec, 250) and not is_truncated(rec, 300) and not is_truncated(rec, None)
+
+
+def test_truncated_event_is_flagged_in_review1(tmp_path):
+    st = settings_mod.load(data_root=tmp_path)
+    st.config["internal"]["llm"]["max_input_chars"] = 200
+    client = FakeClient()
+    io = FakeIO(["1", "승인", "1"])
+    pipe = Pipeline(st, Judge(client), io)
+    assert pipe.start(make_package(tmp_path, sample_records())) == 0
+    assert "본문 일부만 판정" in "\n".join(l for l in io.out if "Lam," in l or "예시반도체," in l)
+    assert any("(이하 생략)" in u for n, u in client.calls if n == "s4_score")
+
+
+def test_response_cache_reuse_restart_and_fresh(tmp_path):
+    st = settings_mod.load(data_root=tmp_path)
+    pkg = make_package(tmp_path, sample_records())
+    c1 = FakeClient()
+    assert Pipeline(st, Judge(c1), FakeIO([])).start(pkg) == 2          # ①에서 중단
+    cache = tmp_path / "review" / f"{WEEK}-llm-cache.jsonl"
+    n = len(cache.read_text(encoding="utf-8").splitlines())
+    assert n == len(c1.calls) > 0
+    c2 = FakeClient()                                                   # --restart: 저장된 응답을 그대로 쓴다
+    assert Pipeline(st, Judge(c2), FakeIO([])).start(pkg, restart=True) == 2
+    assert c2.calls == [] and len(cache.read_text(encoding="utf-8").splitlines()) == n
+    c3 = FakeClient()                                                   # --fresh: 저장을 무시하고 다시 호출
+    assert Pipeline(st, Judge(c3), FakeIO([]), fresh=True).start(pkg, restart=True) == 2
+    assert len(c3.calls) == len(c1.calls)
+
+
+def test_cli_has_fresh_flag():
+    from internal.cli import build_parser
+    assert build_parser().parse_args(["run", "--package", "x", "--fresh", "--restart"]).fresh
+    assert build_parser().parse_args(["resume", "--fresh"]).fresh
+
+
+def write_prev_pilot(tmp_path, **override):
+    from internal import fingerprint
+    cur = fingerprint.current(settings_mod.load(data_root=tmp_path), "served-x")
+    cur.update(override)
+    row = {k: "" for k in metrics.COLUMNS}
+    row.update(issue_week="2026-W48", config_version=cur["config_version"], **{"fp_" + k: v for k, v in cur.items() if k != "config_version"})
+    metrics.upsert_row(tmp_path / "log" / "pilot.csv", row)
+
+
+def test_fingerprint_change_warning(tmp_path):
+    write_prev_pilot(tmp_path, steps_sha256="0" * 64, design_version="v4.4")
+    pipe, client, io, pkg = make_pipeline(tmp_path, inputs=["1", "승인", "1"])
+    assert pipe.start(pkg) == 0
+    assert any(l.startswith("※ 실행 조건 변경: ") and "단계 프롬프트" in l and "설계서 버전" in l for l in io.out)      # S1 경고
+    r1 = next(l for l in io.out if l.startswith("━━ 검토 요청 ① 선정")).splitlines()
+    assert r1[1].startswith("※ 실행 조건 변경")                              # 검토 요청 ①의 머리에 표시
+    state = json.loads((tmp_path / "review" / f"{WEEK}-state.json").read_text(encoding="utf-8"))
+    assert sorted(state["fp_changes"]) == ["design_version", "steps_sha256"]
+    rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
+    fp = rows[WEEK]
+    assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.5" and fp["fp_internal_version"]
+    assert fp["fp_collector_version"] == "0.1.0" and fp["config_version"] == "1"
+
+
+def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):
+    pipe, client, io, pkg = make_pipeline(tmp_path / "a", inputs=["1", "승인", "1"])
+    assert pipe.start(pkg) == 0 and "실행 조건 변경" not in io.text         # 첫 호: 비교 대상 없음
+    write_prev_pilot(tmp_path / "b")
+    pipe, client, io, pkg = make_pipeline(tmp_path / "b", inputs=["1", "승인", "1"])
+    assert pipe.start(pkg) == 0 and "실행 조건 변경" not in io.text
+
+
+def test_fingerprint_model_change_detected_after_first_call(tmp_path):
+    write_prev_pilot(tmp_path, model="old-model")
+
+    class Served(FakeClient):
+        served_model = "new-model"
+    pipe, client, io, pkg = make_pipeline(tmp_path, client=Served(), inputs=["1", "승인", "1"])
+    assert pipe.start(pkg) == 0
+    assert "※ 실행 조건 변경: 모델 이름" in next(l for l in io.out if l.startswith("━━ 검토 요청 ① 선정"))
+
+
+def test_event_key_numbering_by_representative_date_then_doc_id(tmp_path):
+    st = settings_mod.load(data_root=tmp_path)
+    pipe, client, io, pkg = make_pipeline(tmp_path, inputs=[])
+    pipe.start(pkg)
+    state = json.loads((tmp_path / "review" / f"{WEEK}-state.json").read_text(encoding="utf-8"))
+    recs = {r["doc_id"]: r for r in sample_records()}
+    keys = [(e["event_id"], recs[e["rep_doc_id"]]["published_date"], e["rep_doc_id"]) for e in state["events"]]
+    assert [k[0] for k in keys] == [f"EVT-2026W49-{i:02d}" for i in range(1, len(keys) + 1)]
+    assert [(k[1], k[2]) for k in keys] == sorted((k[1], k[2]) for k in keys)     # 보류·제외 사건도 같은 순서로 번호를 받는다

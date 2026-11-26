@@ -2,7 +2,7 @@
 import json
 
 from .common import add_flag, evidence_errors
-from .llm import AutoJudgeFailed, source_block
+from .llm import AutoJudgeFailed
 from .settings import TOPICS
 
 METRICS = ["fab_relevance", "evidence_level", "field_maturity", "weekly_change", "actionability"]
@@ -95,7 +95,7 @@ def _validator(event, records):
     return validate
 
 
-def _user(event, fit, records):
+def _user(judge, event, fit, records):
     led = event["ledger"]
     parts = ["[사건]\n" + json.dumps({"event_id": event["event_id"], "subject": event["subject"],
                                       "site_task": event["site_task"]}, ensure_ascii=False)]
@@ -105,7 +105,7 @@ def _user(event, fit, records):
                                                     "changes": led["changes"]}, ensure_ascii=False))
     if led["verdict"] == "SAME_WITH_CHANGE":
         parts.append("[해당 대장 항목]\n" + json.dumps(led.get("entry"), ensure_ascii=False))
-    parts += [source_block(records[d]) for d in event["doc_ids"]]
+    parts += [judge.source(records[d]) for d in event["doc_ids"]]
     return "\n".join(parts)
 
 
@@ -122,9 +122,6 @@ def apply_result(event, res, records, fit):
             add_flag(event, "근거 미확인")
     recs = [records[d] for d in event["doc_ids"]]
     cap, reasons = compute_cap(event, recs, tiers, res["placement_cap"], res["primary_topic"])
-    if any(fit[d].get("route") == "WATCH_TRANSFER" for d in event["doc_ids"]) and "B 경로 전이 사례" not in reasons:
-        reasons.append("B 경로 전이 사례")
-        cap = "brief"
     event["primary_topic"] = res["primary_topic"]
     event["status"] = status
     event["cap"], event["cap_reasons"] = cap, reasons
@@ -146,7 +143,7 @@ def score_events(judge, events, records, fit):
         if ev["kind"] != "event" or ev["status"] != "PENDING":
             continue
         try:
-            res = judge.ask("s4_score", _user(ev, fit, records), SCORE_SCHEMA, _validator(ev, records))
+            res = judge.ask("s4_score", _user(judge, ev, fit, records), SCORE_SCHEMA, _validator(ev, records))
         except AutoJudgeFailed as e:
             ev.update(status="HOLD", note="자동 판정 실패")
             add_flag(ev, "자동 판정 실패")

@@ -55,3 +55,5 @@ internal:
     model: "served-model"
     api_key_env: "INTERNAL_LLM_API_KEY"   # 환경변수 이름. 비어 있거나 변수가 없으면 인증 헤더를 보내지 않는다
     timeout_sec: 300
+    seed: 42                              # 서버가 지원하면 요청에 실어 보낸다(9.11)
+    max_input_chars: 60000                # 문서 하나의 본문 블록 합계 상한. 넘으면 끝을 "(이하 생략)"으로 자른다(9.11)

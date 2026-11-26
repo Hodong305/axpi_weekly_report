@@ -9,7 +9,9 @@ COLUMNS = (["issue_week", "issue_type", "config_version", "collected", "intake_c
             "r1_ledger_changes", "r1_invalid_responses", "r2_A_custom", "r2_B_custom", "r2_C_revisions", "r2_d_changed",
             "r2_d_total", "r2_title_replace_rate", "warnings_total", "warnings_fix_chosen", "review1_sec", "review2_sec",
             "review3_sec", "review_sec_total"]
-           + [f"agent_{a}_{k}" for a in AGENTS for k in ("complete", "unique")])
+           + [f"agent_{a}_{k}" for a in AGENTS for k in ("complete", "unique")]
+           + ["fp_model", "fp_operator_sha256", "fp_steps_sha256", "fp_design_version", "fp_collector_version",
+              "fp_internal_version"])
 
 
 def discovery_stats(doc):

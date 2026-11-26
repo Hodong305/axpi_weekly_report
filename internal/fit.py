@@ -1,5 +1,5 @@
 """S2 1단계 적합도(설계서 9.3). 다음 처리는 코드가 정한다."""
-from .llm import AutoJudgeFailed, source_block
+from .llm import AutoJudgeFailed
 from .settings import TOPICS
 
 FIT_VALUES = ["2", "1", "0", "U"]
@@ -68,7 +68,7 @@ def classify_doc(judge, rec, records):
     out = {"doc_id": rec["doc_id"], "stage1": None, "stage2": None, "decision": None, "flags": [],
            "exclusion_code": None, "route": None}
     lead = rec["body"]["lead_ids"]
-    user = source_block(rec, set(lead))
+    user = judge.source(rec, set(lead))
     try:
         s1 = judge.ask("s2_fit", user, FIT_SCHEMA, _validator(rec, lead, records))
     except AutoJudgeFailed:
@@ -82,7 +82,7 @@ def classify_doc(judge, rec, records):
         return out
     all_ids = [b["id"] for b in rec["body"]["blocks"]]
     try:
-        s2 = judge.ask("s2_reclassify", source_block(rec), FIT_SCHEMA, _validator(rec, all_ids, records))
+        s2 = judge.ask("s2_reclassify", judge.source(rec), FIT_SCHEMA, _validator(rec, all_ids, records))
     except AutoJudgeFailed:
         out.update(decision="HOLD", flags=["자동 판정 실패"], note="자동 판정 실패")
         return out
