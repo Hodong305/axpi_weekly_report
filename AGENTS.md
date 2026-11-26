@@ -41,8 +41,11 @@
    2) 처리 후 재실행: 안내된 파일 저장·overrides.yaml 작성 → run 재실행
    ```
    실패 건은 다음 주에 다시 시도하지 않는다. 이번 실행에서 처리하지 않으면 그대로 끝난다.
-8. 패키징: `python -m collector package --issue-week YYYY-Www`
-   → `out/YYYY-Www/package/` 의 `intake ….json.gz`, `report ….md`, `manifest ….json` 세 파일을 사내 메일로 보낸다.
+8. 패키징·발송: `python -m collector package --issue-week YYYY-Www --send`
+   → `out/YYYY-Www/package/`에 압축 intake, 원본 intake, 리포트, manifest를 만들고 `mail.local.yaml`의 사내 주소로 바로 보낸다.
+   - 처음 한 번: `mail.local.example.yaml`을 `mail.local.yaml`로 복사해 채우고, 비밀번호는 환경변수(기본 `MTCAX_SMTP_PASSWORD`)에 넣는다.
+   - 첫 주는 `python -m collector send --issue-week YYYY-Www --dry-run`으로 먼저 확인한다.
+   - 이미 보낸 revision은 다시 보내지 않는다. 재발송은 사용자가 요청할 때만 `--resend`.
 
 ## 지난주를 건너뛴 경우(사용자 요청 시에만)
 

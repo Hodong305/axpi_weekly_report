@@ -51,7 +51,7 @@
 
 | 시점 | 장소 | 작업 | 사람 개입 |
 |---|---|---|---|
-| 일요일(00:00 이후) | 사외 | `AGENTS.md` 절차: 프롬프트 생성 → LLM 후보 탐색 → `run` → 리포트 → 패키징 → 사내 메일로 발송 | 재조사·수동 보완 여부 선택(해당할 때만) |
+| 일요일(00:00 이후) | 사외 | `AGENTS.md` 절차: 프롬프트 생성 → LLM 후보 탐색 → `run` → 리포트 → 패키징과 사내 메일 자동 발송(`package --send`) | 재조사·수동 보완 여부 선택(해당할 때만) |
 | 월요일 | 사내 | S1~S5 자동 → **검토 요청 ① 선정** | 선택 |
 | 월요일 | 사내 | S6~S7 자동 → **검토 요청 ② 머리부·제목** | 선택·머리부 확정 |
 | 화요일 오전 | 사내 | **발송 확인** → 발송 → 사건 대장 갱신 | 선택 |
@@ -151,7 +151,7 @@ HBM·EUV·EDA·패키징 등은 검색 단서다. 공급사 공식 자료는 제
 | R 자동 보완(pass2) | 수집기 | `run`에 포함 | partial만 대상: `manual/`에 저장 파일이 있으면 그것으로 추출, `FETCH_FAILED`는 재조회, `ACCESS_BLOCKED`·`BODY_*`·`TABLE_MISSING`은 헤드리스 브라우저 렌더링(playwright 설치 시) |
 | V 병합·검증 | 수집기 | `run`에 포함 | 별칭 통합, 같은 주 이전 revision과 병합(7.1), 코드 검사(7.3), 리포트 |
 | S 재조사 | 사람 선택 → LLM → 수집기 | `prompt --resurvey` → `run` | complete < `intake_min`일 때(8장) |
-| P 패키징 | 수집기 | `package` | intake 검증 후 발송 파일 생성(4.7) |
+| P 패키징·발송 | 수집기 | `package --send` | intake 검증 후 발송 파일 생성, 사내 메일 발송(4.7) |
 
 파일 이름은 `mtc-ax-{issue_week에서 - 제거}-{phase}-r{revision}.json` 형식이다(예: `mtc-ax-2026W49-intake-r1.json`). phase는 `pass1`·`pass2`·`merged`·`intake`이며 리포트는 `report-r{n}.md`다. 같은 주에 `run`을 다시 실행하면 revision이 오른다. 이전 revision에서 complete·drop이 된 레코드는 다시 조회하지 않고, partial만 다시 시도한다.
 
@@ -251,16 +251,33 @@ pass2 뒤에도 partial로 남은 건은 리포트의 **수동 보완 큐**에 `
 
 ### 4.7 패키징과 사내 발송
 
-- `package`는 최신 revision의 intake를 검증(7.3)한다. 오류가 있으면 패키징하지 않는다.
-- 발송 파일(`out/{issue_week}/package/`)은 세 개다.
-  - `…-intake-r{n}.json.gz`
-  - `…-report-r{n}.md`
-  - `…-manifest-r{n}.json`(파일별 바이트 수·SHA-256, summary, 경고)
-- 리포트 내용:
-  - summary 건수, 분야별 complete 수, 발견 주체(모델)별 기여
-  - LLM 후보 파일 파싱 결과, 레지스트리 순회 결과
-  - 수동 보완 큐, 제외 목록, 추출 표본 3건, complete 목록
-- 메일 첨부 용량을 넘으면 zip 분할 압축으로 보낸다. 사내에서는 manifest 해시가 맞아야 처리를 시작한다.
+**패키징.** `package`는 최신 revision의 intake를 검증(7.3)하고, 오류가 있으면 패키징하지 않는다. 발송 파일(`out/{issue_week}/package/`)은 네 개다.
+
+| 파일 | 내용 |
+|---|---|
+| `…-intake-r{n}.json.gz` | 사내 처리용 수집 결과(압축) |
+| `…-intake-r{n}.json` | 같은 내용의 원본(압축을 받지 못하는 메일 환경 대비) |
+| `…-report-r{n}.md` | 수집 리포트 |
+| `…-manifest-r{n}.json` | 위 세 파일의 바이트 수·SHA-256, summary, 경고 |
+
+리포트에는 다음이 들어간다.
+- summary 건수, 분야별 complete 수, 발견 주체(모델)별 기여
+- LLM 후보 파일 파싱 결과, 레지스트리 순회 결과
+- 수동 보완 큐, 제외 목록, 추출 표본 3건, complete 목록
+
+**메일 발송.** `package --send`(또는 패키징 뒤 `send`)가 위 네 파일을 사내 메일 주소로 바로 보낸다. 이것으로 사외 작업이 끝난다.
+
+| 항목 | 규칙 |
+|---|---|
+| 설정 위치 | `mail.local.yaml`(저장소에 올리지 않음, `.gitignore`). 항목: `smtp_host`, `smtp_port`, `security`(`starttls` / `ssl`), `username`, `from_addr`, `to_addrs`(목록), `password_env`(비밀번호를 담은 환경변수 이름, 기본 `MTCAX_SMTP_PASSWORD`), `max_total_mb`(기본 20). 견본은 `mail.local.example.yaml` |
+| 비밀번호 | 파일에 쓰지 않는다. 환경변수로만 읽고 로그·리포트에 남기지 않는다. Gmail 등은 계정 비밀번호 대신 앱 비밀번호를 쓴다 |
+| 첨부 | 압축 intake, 원본 intake, 리포트, manifest 네 개를 모두 붙인다. 합계가 `max_total_mb`를 넘으면 원본 intake만 빼고 보내며 본문에 그 사실을 적는다. 그래도 넘으면 보내지 않고 사유를 출력한다 |
+| 제목 | `[MTC-AX] {issue_week} 사외 수집 r{n} · complete {N}건` |
+| 본문 | 기간, summary, 경고, 첨부 파일별 바이트 수·SHA-256, 사내 처리 명령(`python -m internal run --package …`) |
+| 중복 발송 방지 | 보낸 뒤 `package/sent-r{n}.json`(발송 시각, 수신자 수, Message-ID, 첨부 목록)을 남긴다. 같은 revision을 다시 보내려면 `--resend`가 필요하다 |
+| 시험 | `send --dry-run`은 메일을 만들어 크기·첨부만 출력하고 보내지 않는다 |
+
+사내 메일이 외부 첨부(`.gz`·`.json`)를 막을 수 있으므로, 첫 주에는 `--dry-run` 뒤 실제 발송을 한 번 해 보고 사내에서 네 파일이 모두 들어왔는지 확인한다. 사내에서는 manifest 해시가 맞아야 처리를 시작한다(S1). 원본만 받았으면 원본 intake로 처리해도 된다.
 
 ---
 
