@@ -3,7 +3,7 @@
 # common: 풀이 없이 쓰는 공통어(약어 검사에서 제외)
 glossary_version: "2026-11-26.1"
 
-common: [AI, IT, CEO, CTO, R&D, IR, PC, GPU, CPU, USB, OK, EU, US, AX, DX]
+common: [AI, IT, CEO, CTO, R&D, IR, PC, GPU, CPU, USB, OK, EU, US, AX, DX, SK, FAB, MTC]
 
 terms:
   # 제조·공정
@@ -35,7 +35,7 @@ terms:
   EMIB: Intel의 칩 연결 패키징 기술
   # AI·디지털
   LLM: 대규모 언어 모델
-  Physical AI: 현실 공간에서 보고 판단해 움직이는 AI(로봇 등)
+  Physical AI: 현실 공간에서 보고 판단해 움직이는 로봇형 AI
   AAS: 자산관리셸, 설비 데이터 표준 틀
   PINN: 물리 법칙을 반영해 학습하는 신경망
   디지털 트윈: 실제 설비·공장을 가상 공간에 복제한 모델
