@@ -325,7 +325,7 @@ class Pipeline:
 
         def render_fn():
             return rv.render_review1(self.week, self.state["counts"], self.state["events"],
-                                     fingerprint.notice(self.state["fp_changes"]))
+                                     fingerprint.notice(self.state["fp_changes"]), self.cfg)
 
         def handle(text):
             parsed = rv.parse_review1(text)

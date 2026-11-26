@@ -155,18 +155,23 @@ def comp(ev, subject="SK하이닉스"):
     return ev
 
 
-def test_config_v8_keys():
-    assert settings_mod.load().config["config_version"] == "8"
-    assert (CFG["core_max"], CFG["competitor_core_min"], CFG["brief_max"], CFG["search_terms_max"], CFG["issue_body_max"]) == (4, 2, 4, 3, 9000)
+def test_config_v9_keys():
+    assert settings_mod.load().config["config_version"] == "9"
+    assert (CFG["core_gap"], CFG["core_min_count"], CFG["core_alert_count"], CFG["competitor_core_min"], CFG["brief_max"],
+            CFG["search_terms_max"], CFG["issue_body_max"]) == (10, 2, 8, 2, 4, 3, 9000)
+    assert "core_max" not in CFG
     assert "core3_min_score" not in CFG and {c["name"] for c in CFG["competitors"]} == {c["name"] for c in COMPANIES}
 
 
-def test_competitor_gets_core_minimum_before_higher_scores():
-    evs = [mk("a", 95), mk("b", 94), mk("c", 93), mk("d", 92), comp(mk("k1", 83), "SK hynix"), comp(mk("k2", 81), "tsmc")]
+def test_competitor_below_cut_is_added_to_core_minimum():
+    evs = [mk("a", 95), mk("b", 94), mk("c", 93), mk("d", 92), comp(mk("k1", 82), "SK hynix"), comp(mk("k2", 81), "tsmc"), mk("x", 80)]
     sel.select(evs, CFG)
     s = {e["event_id"]: e["slot"] for e in evs}
-    assert s["k1"] == s["k2"] == "core" and s["a"] == s["b"] == "core" and s["c"] == s["d"] == "brief"      # 경쟁사 2건 먼저, 남은 2자리는 점수순
-    assert [e["event_id"] for e in sorted(evs, key=lambda e: e["rank"] or 99) if e["slot"] == "core"] == ["a", "b", "k1", "k2"]
+    assert [s[k] for k in ("a", "b", "c", "d", "k1", "k2")] == ["core"] * 6 and s["x"] == "brief"           # 컷(92→82) 아래 경쟁사 2건을 더한다
+    assert [e["event_id"] for e in sorted(evs, key=lambda e: e["rank"] or 99) if e["slot"] == "core"] == ["a", "b", "c", "d", "k1", "k2"]
+    evs = [mk("a", 99), mk("b", 98), comp(mk("k1", 97), "SK hynix"), mk("c", 87), comp(mk("k2", 86), "tsmc")]
+    sel.select(evs, CFG)
+    assert _core(evs) == ["a", "b", "k1", "k2"] and {e["event_id"]: e["slot"] for e in evs}["c"] == "brief"   # 컷 안 경쟁사 1건 + 아래 1건
 
 
 def test_competitor_below_core_min_is_not_forced_and_one_competitor_only():
@@ -177,7 +182,11 @@ def test_competitor_below_core_min_is_not_forced_and_one_competitor_only():
     evs = [mk("a", 95), mk("b", 94), mk("c", 93), mk("d", 92), comp(mk("k1", 82), "Micron")]
     sel.select(evs, CFG)
     s = {e["event_id"]: e["slot"] for e in evs}
-    assert s["k1"] == "core" and sum(v == "core" for v in s.values()) == 4 and s["d"] == "brief"             # 최소 2건 중 자격 있는 1건만 배정
+    assert s["k1"] == "core" and sum(v == "core" for v in s.values()) == 5 and s["d"] == "core"              # 최소 2건 중 자격 있는 1건만 더한다
+
+
+def _core(evs):
+    return [e["event_id"] for e in sorted(evs, key=lambda e: e["rank"] or 99) if e["slot"] == "core"]
 
 
 def test_core_and_brief_maximums_and_brief_cap_events_never_core():
@@ -185,7 +194,7 @@ def test_core_and_brief_maximums_and_brief_cap_events_never_core():
     for i, e in enumerate(evs[:6]):                                # 같은 주체 한도(2)를 피하려고 서로 다른 경쟁사로 나눈다
         e["subject"] = ["Kioxia", "SanDisk", "CXMT", "YMTC", "Nanya", "Winbond"][i]
     sel.select(evs, CFG)
-    assert sum(e["slot"] == "core" for e in evs) == 4 and sum(e["slot"] == "brief" for e in evs) == 4
+    assert sum(e["slot"] == "core" for e in evs) == 6 and sum(e["slot"] == "brief" for e in evs) == 4      # 핵심은 낙차가 없으면 상한 없이 전부, 단신은 최대 4
     capped = [comp(mk("c1", 95, cap="brief"), "TSMC"), comp(mk("c2", 90, cap="brief"), "UMC")]
     sel.select(capped, CFG)
     assert all(e["slot"] == "brief" for e in capped)

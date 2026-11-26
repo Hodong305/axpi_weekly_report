@@ -20,7 +20,7 @@
 | **주 목적** | 네 분야 동향 전달 | **경쟁 칩메이커의 AX·AI 동향 센싱이 가장 주된 콘텐츠**(1장). 탐색 프롬프트 전체에 최우선 목표로 넣고 회사별 확인 목록·확인 결과(`coverage`)를 받는다(4.5). 핵심 편성에서 경쟁사 사건을 우선한다(9.5) |
 | 편성 | 핵심 2~3, 단신 최대 6 | **핵심은 점수 낙차 컷(상한 없음, 10점 이상 떨어지는 지점에서 자름, 최소 2건), 단신 최대 4**(9.5) |
 | 기술 이름·검색어 | 없음 | 기술·제품·시스템의 원문 이름을 괄호로(예: `결함 원인 분석 AI 에이전트(Defect Agent)`), 적용 범위(업무 흐름의 어디부터 어디까지)를 함께 쓴다. 기사마다 원문 표기 **검색어**(`search_terms`)를 붙여 링크 없이도 원문을 찾게 한다(9.6, 9.8) |
-| 설정 | `config_version` 5 | 8: `deck_chars`, `point_chars`, `figure_why_chars`, `read_chars_per_min`, `core_gap`, `core_min_count`, `core_alert_count`, `competitor_core_min`, `search_terms_max`, `internal.competitors` 추가, 분량 키 조정, `newsletter_theme: B6`. 사외 `queries.yaml`에 `competitors`(회사별 검색어) 추가 |
+| 설정 | `config_version` 5 | 9: `deck_chars`, `point_chars`, `figure_why_chars`, `read_chars_per_min`, `core_gap`, `core_min_count`, `core_alert_count`, `competitor_core_min`, `search_terms_max`, `internal.competitors` 추가, 분량 키 조정, `newsletter_theme: B6`. 사외 `queries.yaml`에 `competitors`(회사별 검색어) 추가 |
 
 견본: `docs/samples/sample-draft-v4.7.yaml`을 `python tools/render_sample.py --png`로 B3·B4·B5 각각 만들어 비교한다(`out_internal/samples/`).
 
@@ -739,7 +739,7 @@ evidence_ids, maturity, score_tiers, placement_cap, fact, mtc_impact, action_wat
 ### 9.5 자동 편성 규칙
 
 - 핵심(v4.7, **점수 낙차 컷**): 핵심 자격 사건(`core_min_score` 이상, 게재 상한이 단신이 아닌 사건)을 점수 순(동점은 아래 동점 규칙)으로 놓고, **바로 앞 사건보다 `core_gap`점(10) 이상 떨어지는 첫 지점에서 자른다.** 그 앞까지가 핵심이다. 상한은 두지 않는다. 단 핵심 자격 사건이 있으면 최소 `core_min_count`건(2)은 핵심으로 한다(첫 사건 바로 뒤에서 낙차가 나도 2건까지는 싣는다). 낙차가 없으면 자격 사건 전부가 핵심이다. 핵심이 `core_alert_count`건(8)을 넘으면 검토 요청 ①에 "핵심이 N건입니다. 줄이려면 순위를 조정하세요"를 표시한다.
-  - 예: 95·90·90·85·85·70·65 → 85와 70 사이 낙차 15 → 핵심 5건. 95·85·80·80 → 낙차 10 미만 → 4건 모두. 95·80·80 → 95와 80 사이 낙차 15지만 최소 2건 → 95·80 두 건(나머지 80은 단신 후보).
+  - 예: 95·90·90·85·85·70·65 → 85와 70 사이 낙차 15 → 핵심 5건. 95·90·85·80 → 어디서도 낙차가 10 미만 → 4건 모두. 95·85·80·80 → 95와 85 사이 낙차가 정확히 10 → 2건(95·85). 95·80·80 → 95와 80 사이 낙차 15지만 최소 2건 → 95·80 두 건(나머지 80은 단신 후보).
 - **경쟁사 우선**: 핵심 자격(`core_min_score` 이상)이 있는 경쟁 칩메이커 사건(주체가 `internal.competitors`에 있거나, 주 분류와 무관하게 경쟁사 팹에서의 적용인 사건)이 있는데 낙차 컷으로 정한 핵심에 경쟁사 사건이 `competitor_core_min`건(2)보다 적으면, 컷 아래의 핵심 자격 경쟁사 사건을 점수 순으로 더해 그 수를 채운다(경쟁사 사건도 1단계 적합도와 3장 분야 기준을 통과한 제조 AX·AI 사건이어야 한다. 설계·개발 사건은 경쟁사여도 우선하지 않는다). 같은 주체 한도(`same_subject_max`)는 그대로 적용한다. (v4.6의 "상위 2건 + 3위가 `core3_min_score` 이상이면 3건" 규칙과 v4.7 초안의 `core_max` 상한은 없앤다.)
 - 단신: 남은 `brief_min_score` 이상 중 최대 `brief_max`건(4). 경쟁사 사건을 점수가 같으면 먼저 넣는다. 산업 배경은 최대 1건.
 - 같은 주체: 핵심과 단신을 합쳐 같은 주체(`subject`)는 최대 `same_subject_max`건이다. 넘는 사건은 점수가 낮은 쪽부터 '더 볼 거리'로 보내고 사유를 '같은 주체 한도'로 남긴다.

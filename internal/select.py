@@ -39,7 +39,8 @@ def sort_candidates(events):
 def select(events, cfg, records=None):
     """사건의 slot·rank·flags를 정한다(제자리 수정). 반환: 요약 dict. records는 경쟁사 판정에 대표 자료 발행처·제목을 쓰려고 받는다."""
     core_min, brief_min = cfg["core_min_score"], cfg["brief_min_score"]
-    core_max, comp_min = cfg.get("core_max", 4), cfg.get("competitor_core_min", 2)
+    comp_min = cfg.get("competitor_core_min", 2)
+    core_gap, core_min_count = cfg.get("core_gap", 10), cfg.get("core_min_count", 2)
     for ev in events:
         ev["competitor"] = detect_competitor(ev, records, cfg)
     for ev in events:
@@ -53,10 +54,10 @@ def select(events, cfg, records=None):
             e["slot"], e["rank"], e["note"] = "out", None, f"점수 미달({e['score']['total']}<{brief_min})"
     cands = sort_candidates([e for e in cands if e["score"]["total"] >= brief_min])
 
-    # 핵심(v4.7): 게재 상한이 단신인 사건은 점수와 관계없이 뺀다. core_min 이상 중 최대 core_max건.
+    # 핵심(v4.7): 게재 상한이 단신인 사건은 점수와 관계없이 뺀다. core_min 이상을 점수 낙차(core_gap)에서 자른다(상한 없음).
     # 경쟁사 사건도 1단계 적합도·점수 판정을 통과한 제조 AX·AI 사건(PASS)만 여기에 온다. 설계·개발 사건은 경쟁사여도 우선하지 않는다.
-    # 핵심 자격이 있는 경쟁사 사건을 먼저 competitor_core_min건 배정하고, 남은 자리를 점수 순으로 채운다.
-    # 같은 주체는 핵심+단신을 합쳐 same_subject_max건까지이며, 넘는 사건은 점수가 낮은 쪽부터 빠진다(점수순으로 채우므로 자연히 낮은 쪽이 빠짐).
+    # 컷 안에 경쟁사 사건이 competitor_core_min건보다 적으면 컷 아래 자격 경쟁사 사건을 점수 순으로 더한다.
+    # 같은 주체는 핵심+단신을 합쳐 same_subject_max건까지이며, 넘는 사건은 점수가 낮은 쪽부터 빠진다(점수순으로 훑으므로 자연히 낮은 쪽이 빠짐).
     limit = cfg.get("same_subject_max") or 99
     count, subj_skipped = {}, set()
 
@@ -72,13 +73,23 @@ def select(events, cfg, records=None):
         count[k] = count.get(k, 0) + 1
 
     pool = [e for e in cands if e["cap"] != "brief" and e["score"]["total"] >= core_min]
+    # 낙차 컷: 바로 앞 사건보다 core_gap점 이상 낮아지는 첫 지점에서 자른다. 자격 사건이 있으면 최소 core_min_count건은 핵심.
+    cut = len(pool)
+    for i in range(1, len(pool)):
+        if pool[i - 1]["score"]["total"] - pool[i]["score"]["total"] >= core_gap:
+            cut = i
+            break
+    cut = min(len(pool), max(cut, core_min_count))
     core = []
-    for phase_comp in (True, False):
-        for e in pool:
-            if len(core) >= (min(comp_min, core_max) if phase_comp else core_max):
-                break
-            if e in core or (phase_comp and not e["competitor"]) or not room(e):
-                continue
+    for e in pool[:cut]:
+        if room(e):
+            core.append(e)
+            take(e)
+    # 경쟁사 최소: 컷 아래의 자격 경쟁사 사건을 점수 순으로 더해 competitor_core_min건을 채운다.
+    for e in pool[cut:]:
+        if sum(1 for c in core if c["competitor"]) >= comp_min:
+            break
+        if e["competitor"] and room(e):
             core.append(e)
             take(e)
     core = [e for e in pool if e in core]          # 핵심 안의 순서는 점수 순(같으면 경쟁사 먼저)

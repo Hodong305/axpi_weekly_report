@@ -467,19 +467,78 @@ def test_selection_core_up_to_four_and_brief_three():
     evs = [mk("a", 88), mk("b", 85), mk("c", 84), mk("d", 70), mk("e", 65), mk("f", 61), mk("g", 59)]
     sel.select(evs, CFG3)
     s = slots(evs)
-    assert [s[k][0] for k in "abc"] == ["core"] * 3 and s["a"] == ("core", 1)          # 80점 이상은 최대 core_max(4)건까지 핵심
+    assert [s[k][0] for k in "abc"] == ["core"] * 3 and s["a"] == ("core", 1)          # 80점 이상을 낙차(10점)에서 자른다: 84→70에서 컷
     assert [s[k][0] for k in "def"] == ["brief"] * 3 and s["g"][0] == "out"            # 단신 최대 3(CFG3), 59점은 brief_min 미만
 
 
-def test_selection_core_max_is_four_without_core3_rule():
-    assert "core3_min_score" not in CFG and CFG["core_max"] == 4 and CFG["brief_max"] == 4
-    evs = [mk("a", 95), mk("b", 92), mk("c", 90), mk("d", 89), mk("e", 88), mk("f", 70)]
+def _core_ids(evs):
+    return [e["event_id"] for e in sorted(evs, key=lambda e: e["rank"] or 99) if e["slot"] == "core"]
+
+
+def test_selection_core_gap_cut_keys_and_no_upper_limit():
+    assert "core3_min_score" not in CFG and "core_max" not in CFG and CFG["brief_max"] == 4
+    assert (CFG["core_gap"], CFG["core_min_count"], CFG["core_alert_count"]) == (10, 2, 8)
+    evs = [mk("a", 95), mk("b", 92), mk("c", 90), mk("d", 89), mk("e", 88), mk("f", 87), mk("g", 70)]
     sel.select(evs, CFG)
     s = slots(evs)
-    assert [s[k][0] for k in "abcd"] == ["core"] * 4 and s["e"][0] == "brief" and s["f"][0] == "brief"      # 핵심은 4건에서 멈추고 단신은 줄지 않는다
+    assert [s[k][0] for k in "abcdef"] == ["core"] * 6 and s["g"][0] == "brief"                              # 상한 없이 낙차(88→70 아님, 87→70)까지 전부 핵심
     evs = [mk("a", 95), mk("b", 92), mk("c", 79)]
     sel.select(evs, CFG)
     assert slots(evs)["c"][0] == "brief"                                                                    # core_min_score(80) 미만은 단신
+
+
+def test_selection_core_gap_doc_examples():
+    for scores, n in (([95, 90, 90, 85, 85, 70, 65], 5), ([95, 86, 80, 80], 4), ([95, 80, 80], 2)):
+        evs = [mk(f"e{i}", t) for i, t in enumerate(scores)]
+        sel.select(evs, CFG)
+        assert len(_core_ids(evs)) == n, scores
+    evs = [mk(f"e{i}", t) for i, t in enumerate([95, 80, 80])]
+    sel.select(evs, CFG)
+    assert slots(evs)["e2"][0] == "brief"                                                                   # 최소 2건 뒤의 80점은 단신 후보
+
+
+def test_selection_core_gap_exactly_ten_cuts_nine_does_not():
+    evs = [mk("a", 95), mk("b", 94), mk("c", 84)]
+    sel.select(evs, CFG)
+    assert _core_ids(evs) == ["a", "b"]
+    evs = [mk("a", 95), mk("b", 94), mk("c", 85)]
+    sel.select(evs, CFG)
+    assert _core_ids(evs) == ["a", "b", "c"]
+
+
+def test_selection_core_min_count_even_when_drop_after_first():
+    evs = [mk("a", 99), mk("b", 82), mk("c", 81)]
+    sel.select(evs, CFG)
+    assert _core_ids(evs) == ["a", "b"] and slots(evs)["c"][0] == "brief"
+    evs = [mk("a", 99)]
+    sel.select(evs, CFG)
+    assert _core_ids(evs) == ["a"]                                                                          # 자격 사건이 1건뿐이면 1건
+
+
+def test_selection_core_no_eligible_events():
+    evs = [mk("a", 79), mk("b", 70), mk("c", 95, cap="brief")]
+    sel.select(evs, CFG)
+    assert _core_ids(evs) == [] and all(e["slot"] == "brief" for e in evs)
+
+
+def test_selection_core_same_subject_limit_inside_cut():
+    evs = [mk("a", 95), mk("b", 94), mk("c", 93), mk("d", 92)]
+    for e in evs[:3]:
+        e["subject"] = "S사"
+    sel.select(evs, dict(CFG, same_subject_max=2))
+    assert _core_ids(evs) == ["a", "b", "d"] and slots(evs)["c"][0] == "out"
+
+
+def test_review1_alert_when_core_over_alert_count():
+    from internal import review as rv
+    counts = {"pass_docs": 9, "events": 9, "candidates": 9, "core_eligible": 9}
+    evs = [mk(f"e{i}", 95 - i) for i in range(9)]
+    sel.select(evs, CFG)
+    assert "핵심이 9건입니다. 줄이려면 순위를 조정하세요" in rv.render_review1(WEEK, counts, evs, None, CFG)
+    evs = [mk(f"e{i}", 95 - i) for i in range(8)]
+    sel.select(evs, CFG)
+    assert "줄이려면 순위를 조정하세요" not in rv.render_review1(WEEK, counts, evs, None, CFG)
+    assert "줄이려면" not in rv.render_review1(WEEK, counts, evs)
 
 
 def test_selection_brief_cap_and_background():
@@ -1174,7 +1233,7 @@ def test_fingerprint_change_warning(tmp_path):
     rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
     fp = rows[WEEK]
     assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.7" and fp["fp_internal_version"]
-    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "8"
+    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "9"
 
 
 def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):

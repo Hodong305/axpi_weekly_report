@@ -66,11 +66,21 @@ def _waiting_line(events):
     return "  ".join(parts) if parts else "(없음)"
 
 
-def render_review1(issue_week, counts, events, notice=None):
+def core_alert(events, cfg):
+    """핵심이 core_alert_count건을 넘으면 알림 문구, 아니면 None(9.5)."""
+    n = sum(1 for e in events if e["slot"] == "core")
+    if cfg and n > cfg.get("core_alert_count", 8):
+        return f"핵심이 {n}건입니다. 줄이려면 순위를 조정하세요"
+    return None
+
+
+def render_review1(issue_week, counts, events, notice=None, cfg=None):
     """counts: pass_docs, events, candidates, core_eligible"""
+    alert = core_alert(events, cfg)
     return "\n".join([
         f"{BAR} 검토 요청 ① 선정 · {issue_week} {BAR}",
         *([notice] if notice else []),
+        *([alert] if alert else []),
         f"통과 문서 {counts['pass_docs']}건 → 사건 {counts['events']}건 → 게재 후보 {counts['candidates']}건"
         f"(핵심 자격 {counts['core_eligible']}건)",
         "",
