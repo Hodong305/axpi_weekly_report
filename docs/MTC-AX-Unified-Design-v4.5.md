@@ -269,9 +269,9 @@ pass2 뒤에도 partial로 남은 건은 리포트의 **수동 보완 큐**에 `
 
 | 항목 | 규칙 |
 |---|---|
-| 설정 위치 | `mail.local.yaml`(저장소에 올리지 않음, `.gitignore`). 항목: `smtp_host`, `smtp_port`, `security`(`starttls` / `ssl`), `username`, `from_addr`, `to_addrs`(목록), `password_env`(비밀번호를 담은 환경변수 이름, 기본 `MTCAX_SMTP_PASSWORD`), `max_total_mb`(기본 20). 견본은 `mail.local.example.yaml` |
+| 설정 위치 | `mail.local.yaml`(저장소에 올리지 않음, `.gitignore`). 항목: `smtp_host`, `smtp_port`, `security`(`starttls` / `ssl`), `username`, `from_addr`, `to_addrs`(목록), `password_env`(비밀번호를 담은 환경변수 이름, 기본 `MTCAX_SMTP_PASSWORD`), `max_total_mb`(기본 18). 견본은 `mail.local.example.yaml` |
 | 비밀번호 | 파일에 쓰지 않는다. 환경변수로만 읽고 로그·리포트에 남기지 않는다. Gmail 등은 계정 비밀번호 대신 앱 비밀번호를 쓴다 |
-| 첨부 | 압축 intake, 원본 intake, 리포트, manifest 네 개를 모두 붙인다. 합계가 `max_total_mb`를 넘으면 원본 intake만 빼고 보내며 본문에 그 사실을 적는다. 그래도 넘으면 보내지 않고 사유를 출력한다 |
+| 첨부 | 압축 intake, 원본 intake, 리포트, manifest 네 개를 모두 붙인다. 합계는 첨부 파일 원본 바이트로 잰다(메일은 base64 인코딩으로 약 1.37배 커지므로 기본 18MB는 약 25MB 메일이 된다). 합계가 `max_total_mb`를 넘으면 원본 intake만 빼고 보내며 본문에 그 사실을 적는다. 그래도 넘으면 보내지 않고 사유를 출력한다 |
 | 제목 | `[MTC-AX] {issue_week} 사외 수집 r{n} · complete {N}건` |
 | 본문 | 기간, summary, 경고, 첨부 파일별 바이트 수·SHA-256, 사내 처리 명령(`python -m internal run --package …`) |
 | 중복 발송 방지 | 보낸 뒤 `package/sent-r{n}.json`(발송 시각, 수신자 수, Message-ID, 첨부 목록)을 남긴다. 같은 revision을 다시 보내려면 `--resend`가 필요하다 |
@@ -960,7 +960,8 @@ review_log: []             # 검토 요청 응답과 적용 결과
 | `docs/MTC-AX-Unified-Design-v4.5.md` | 이 문서 |
 | `schema/MTC-AX-collection-v4.5.schema.json` | 사외 수집 JSON 스키마 |
 | `AGENTS.md` (`CLAUDE.md`·`GEMINI.md`가 참조) | 사외 수집 운영 절차 |
-| `collector/` | 수집기(`python -m collector window·prompt·run·package·validate·check-sources`) |
+| `mail.local.example.yaml` | 사내 메일 발송 설정 견본(실제 `mail.local.yaml`은 저장소에 올리지 않음) |
+| `collector/` | 수집기(`python -m collector window·prompt·run·package·send·validate·check-sources`) |
 | `config.yaml`, `sources.yaml`, `queries.yaml` | 설정, 발행처 레지스트리, 분야 정의·검색어 |
 | `prompts/discovery.md`, `prompts/internal-operator.md` | LLM 후보 탐색 프롬프트, 사내 운영 프롬프트 |
 | `prompts/internal-steps.md` | 사내 단계 프롬프트(9.3·9.4 그대로 + 구현 보강 6종) |

@@ -23,6 +23,16 @@ def _week(s):
     return s
 
 
+def _send(st, week, a):
+    from .mailer import MailError, send
+    try:
+        send(st, week, a.mail_config, dry_run=a.dry_run, resend=a.resend)
+    except MailError as e:
+        print(f"발송 실패: {e}")
+        return 1
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m collector", description="MTC AX/PI 위클리 사외 수집기")
     ap.add_argument("--root", help="저장소 루트(기본: 이 패키지의 상위 폴더)")
@@ -40,7 +50,14 @@ def main(argv=None):
     p = sub.add_parser("run", help="수집 실행(pass1→pass2→병합→검증→리포트)"); week_args(p)
     p.add_argument("--force", action="store_true", help="기간 종료 전 실행(시험용)")
     p.add_argument("--skip-registry", action="store_true", help="레지스트리 순회 생략(시험용)")
-    p = sub.add_parser("package", help="사내 발송 파일 생성"); week_args(p)
+    def mail_args(p):
+        p.add_argument("--mail-config", help="메일 설정 파일(기본: 저장소 루트의 mail.local.yaml)")
+        p.add_argument("--resend", action="store_true", help="이미 보낸 revision을 다시 보냄(사용자가 요청할 때만)")
+        p.add_argument("--dry-run", action="store_true", help="메일을 만들어 크기·첨부만 출력하고 보내지 않음")
+
+    p = sub.add_parser("package", help="사내 발송 파일 생성(--send: 사내 메일로 발송)"); week_args(p); mail_args(p)
+    p.add_argument("--send", action="store_true", help="패키징 뒤 바로 사내 메일로 발송")
+    p = sub.add_parser("send", help="package/의 네 파일을 사내 메일로 발송"); week_args(p); mail_args(p)
     p = sub.add_parser("validate", help="JSON 파일 검증(K1~K11)")
     p.add_argument("files", nargs="+")
     p = sub.add_parser("check-sources", help="sources.yaml 발행처 접속 점검")
@@ -84,7 +101,12 @@ def main(argv=None):
             print(f)
         for w in warns:
             print("⚠", w)
+        if a.send:   # 패키징은 이미 끝났으므로 발송이 실패해도 패키징 결과는 남고 종료 코드만 1이 된다
+            return _send(st, week, a)
         return 0
+
+    if a.cmd == "send":
+        return _send(st, week, a)
 
     if a.cmd == "validate":
         from .validate import check_file

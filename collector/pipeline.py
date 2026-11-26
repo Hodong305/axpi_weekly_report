@@ -325,10 +325,12 @@ def package(settings, issue_week):
     gz = pkg / (intake.name + ".gz")
     with open(intake, "rb") as fi, gzip.GzipFile(gz, "wb", mtime=0) as fo:
         fo.write(fi.read())
+    raw = pkg / intake.name        # 같은 내용의 원본(압축을 받지 못하는 메일 환경 대비, 설계서 4.7)
+    raw.write_bytes(intake.read_bytes())
     rep = pkg / report.name
     rep.write_bytes(report.read_bytes())
     files = []
-    for p in (gz, rep):
+    for p in (gz, raw, rep):
         b = p.read_bytes()
         files.append({"name": p.name, "bytes": len(b), "sha256": hashlib.sha256(b).hexdigest()})
     manifest = {"schema_version": "4.5", "issue_week": issue_week, "revision": rev,
@@ -336,4 +338,4 @@ def package(settings, issue_week):
                 "warnings": warns, "generated_at": now_kst()}
     mf = pkg / file_name(issue_week, "manifest", rev)
     mf.write_text(json.dumps(manifest, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    return [gz, rep, mf], warns
+    return [gz, raw, rep, mf], warns

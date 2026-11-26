@@ -18,5 +18,5 @@ python -m collector check-sources          # 선택: 발행처 피드 접속 점
 python -m collector window                 # 이번 주차·기간 확인
 python -m collector prompt                 # LLM 탐색 프롬프트 5개 생성 → 결과를 candidates/에 저장
 python -m collector run                    # 수집·추출·검증·리포트
-python -m collector package                # 사내 발송 파일
+python -m collector package --send         # 사내 발송 파일 생성 + 사내 메일 발송(첫 주는 send --dry-run으로 확인)
 ```

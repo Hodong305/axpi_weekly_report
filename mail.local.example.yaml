@@ -1,0 +1,16 @@
+# 사내 메일 발송 설정 견본. 이 파일을 mail.local.yaml로 복사해 채운다(mail.local.yaml은 저장소에 올리지 않는다).
+# 비밀번호는 이 파일에 쓰지 않는다. 아래 password_env 이름의 환경변수에 넣는다.
+#   예) export MTCAX_SMTP_PASSWORD='앱 비밀번호'
+smtp_host: smtp.example.com
+smtp_port: 587
+# starttls(보통 587) 또는 ssl(보통 465)
+security: starttls
+username: you@example.com
+from_addr: you@example.com
+to_addrs:
+  - inbox@company.example
+password_env: MTCAX_SMTP_PASSWORD
+# 첨부 합계 한도(MB). 넘으면 원본 intake만 빼고 보낸다. 그래도 넘으면 보내지 않는다.
+max_total_mb: 18      # 첨부 원본 바이트 합계 한도(MB). 메일은 base64로 약 1.37배 커지므로 18MB면 약 25MB
+# Gmail: smtp.gmail.com, 포트 587, security: starttls. 계정 비밀번호가 아니라 '앱 비밀번호'를 써야 한다
+# (Google 계정에서 2단계 인증을 켠 뒤 앱 비밀번호를 만든다).
