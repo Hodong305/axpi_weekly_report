@@ -25,6 +25,10 @@
    - 저장 위치: `work/YYYY-Www/candidates/{claude|gpt|gemini}-{T1|T2|T3|T4|B}.json`
    - 여러 모델을 돌릴수록 후보가 늘어난다. 같은 URL은 자동으로 하나로 합쳐진다.
    - 사람이 직접 찾은 URL은 `work/YYYY-Www/manual/urls.txt`에 한 줄씩 적는다.
+   - (선택) GPT·Gemini 앱에 한 번씩만 넣고 싶을 때: `python tools/combine_prompts.py combine --issue-week YYYY-Www`
+     → `prompts/ALL.txt`를 그대로 입력한다. 받은 답은 파일로 저장해
+     `python tools/combine_prompts.py split --issue-week YYYY-Www 답.txt`로 주제별 파일로 나눈다(모델은 답의 `agent` 표식으로 구분).
+     종료 코드 2(답이 잘림)면 사용자에게 "잘렸으니 이어서 계속 출력해줘"로 받은 답을 추가로 요청하고, 받은 순서대로 파일을 덧붙여 다시 실행한다.
 4. 수집 실행: `python -m collector run --issue-week YYYY-Www`
 5. 리포트 확인: `out/YYYY-Www/mtc-ax-YYYYWww-report-r{n}.md`
 6. **[검토 요청] 재조사** — 리포트에 "재조사 필요"가 있으면 사용자에게 묻는다.
