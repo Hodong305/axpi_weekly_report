@@ -965,6 +965,7 @@ review_log: []             # 검토 요청 응답과 적용 결과
 | `config.yaml`, `sources.yaml`, `queries.yaml` | 설정, 발행처 레지스트리, 분야 정의·검색어 |
 | `prompts/discovery.md`, `prompts/internal-operator.md` | LLM 후보 탐색 프롬프트, 사내 운영 프롬프트 |
 | `prompts/internal-steps.md` | 사내 단계 프롬프트(9.3·9.4 그대로 + 구현 보강 6종) |
+| `tools/compare_runs.py` | 이전 수집 결과(형식 불명 가능)와 새 결과 비교 보고서(`python tools/compare_runs.py OLD NEW --out 보고서.md`) |
 | `internal/` | 사내 파이프라인(`python -m internal run·resume·status`, 9.9) |
 | `tests/` | 오프라인 통합 시험(`python -m pytest -q tests`) |
 | `docs/archive/` | 이전 설계서 |

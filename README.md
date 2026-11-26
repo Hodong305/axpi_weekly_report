@@ -7,6 +7,7 @@ MTC AX/PI팀의 제조 AI관련 주간 소식지 발간을 위한 리포
 - `AGENTS.md` — 사외 수집 주간 절차(사람·Claude·GPT·Gemini 공통)
 - `collector/` — 사외 수집기, `config.yaml`·`sources.yaml`·`queries.yaml` — 설정
 - `prompts/` — LLM 후보 탐색 프롬프트, 사내 운영·단계 프롬프트
+- `tools/compare_runs.py` — 이전 수집 결과와 새 수집 결과 비교(`python tools/compare_runs.py OLD.json NEW.json --out report.md`)
 - `internal/` — 사내 파이프라인(`python -m internal run --package DIR`, 설계서 9장)
 - `tests/` — 오프라인 통합 시험
 - `docs/archive/` — 이전 버전 설계서
