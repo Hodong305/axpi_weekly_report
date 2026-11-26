@@ -20,7 +20,7 @@
 | **주 목적** | 네 분야 동향 전달 | **경쟁 칩메이커의 AX·AI 동향 센싱이 가장 주된 콘텐츠**(1장). 탐색 프롬프트 전체에 최우선 목표로 넣고 회사별 확인 목록·확인 결과(`coverage`)를 받는다(4.5). 핵심 편성에서 경쟁사 사건을 우선한다(9.5) |
 | 편성 | 핵심 2~3, 단신 최대 6 | **핵심은 점수 낙차 컷(상한 없음, 10점 이상 떨어지는 지점에서 자름, 최소 2건), 단신 최대 4**(9.5) |
 | 기술 이름·검색어 | 없음 | 기술·제품·시스템의 원문 이름을 괄호로(예: `결함 원인 분석 AI 에이전트(Defect Agent)`), 적용 범위(업무 흐름의 어디부터 어디까지)를 함께 쓴다. 기사마다 원문 표기 **검색어**(`search_terms`)를 붙여 링크 없이도 원문을 찾게 한다(9.6, 9.8) |
-| 설정 | `config_version` 5 | 8: `deck_chars`, `point_chars`, `figure_why_chars`, `read_chars_per_min`, `core_max`, `competitor_core_min`, `search_terms_max`, `internal.competitors` 추가, 분량 키 조정, `newsletter_theme: B6`. 사외 `queries.yaml`에 `competitors`(회사별 검색어) 추가 |
+| 설정 | `config_version` 5 | 8: `deck_chars`, `point_chars`, `figure_why_chars`, `read_chars_per_min`, `core_gap`, `core_min_count`, `core_alert_count`, `competitor_core_min`, `search_terms_max`, `internal.competitors` 추가, 분량 키 조정, `newsletter_theme: B6`. 사외 `queries.yaml`에 `competitors`(회사별 검색어) 추가 |
 
 견본: `docs/samples/sample-draft-v4.7.yaml`을 `python tools/render_sample.py --png`로 B3·B4·B5 각각 만들어 비교한다(`out_internal/samples/`).
 
@@ -886,7 +886,7 @@ review_log: []             # 검토 요청 응답과 적용 결과
 | 3 | 한 줄 요약(총론) | `summary_chars` |
 | 3a | **30초 브리핑(v4.7)**: 게재 기사마다 번호 · 한 줄(핵심은 `deck`, 단신은 제목). 꼭지 구분 없이 순서대로 싣는다. 코드가 원고에서 만든다(모델 호출 없음) | 기사 수만큼 |
 | 4 | 이번 주 한 방(선택) | `punch_chars` |
-| 5 | 핵심 기사 최대 4건(v4.7): 꼭지 이름표 · 성숙도·근거 유형 꼬리표(글자) · 제목 · **한 줄 핵심** · **요점 3줄** · 수치 카드(있을 때) · 자세히(본문, B5는 생략) · MTC가 볼 것 · 출처 정보 · 검색어 | 건당 `deck_chars` + 3×`point_chars` + `core_chars` + `watch_chars` |
+| 5 | 핵심 기사(점수 낙차 컷, v4.7): 꼭지 이름표 · 성숙도·근거 유형 꼬리표(글자) · 제목 · **한 줄 핵심** · **요점 4개** · 수치 카드(있을 때) · 자세히(본문, B5는 생략) · MTC가 볼 것 · 출처 정보 · 검색어 | 건당 `deck_chars` + 4×`point_chars` + `core_chars` + `watch_chars` |
 | 6 | 단신 0~`brief_max`건(4): 분야 꼬리표 · 제목 · 2문장 · 수치와 의미(있을 때) · 출처 정보 · 검색어 | 건당 `brief_chars` |
 | 7 | 더 볼 거리: 분야별 한 줄 요약 · 출처 정보 | 건당 `more_line_chars` |
 | 8 | 꼬리말: 작성 방식(사내 AI 초안, 편집자 검토), 링크를 싣지 않는 이유, 회신 안내, 그 밖에 검토한 자료 수 | 별도 |
