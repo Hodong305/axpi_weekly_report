@@ -1,0 +1,21 @@
+%%{init: {"theme":"base","flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":30,"rankSpacing":40,"wrappingWidth":420,"padding":14},"themeVariables":{"fontSize":"14px","primaryTextColor":"#111827","lineColor":"#94a3b8"},"themeCSS":".g{color:#6b7280 !important;font-size:12.5px;font-weight:normal} .t{color:#c2410c !important;font-size:11.5px;font-family:Menlo,Consolas,monospace;font-weight:normal} .nodeLabel b{font-size:15px} .cluster-label .nodeLabel{font-weight:bold;font-size:15px;color:#334155}"}}%%
+flowchart TD
+    S0["<b>이번 주 기간 정하기</b><br/><span class='g'>지난주 일요일 0시 ~ 이번 주 일요일 0시(7일)</span><br/><span class='t'>python -m collector window</span>"]:::auto
+    S1["<b>AI에게 줄 질문지 만들기</b><br/><span class='g'>분야별 5종. 맨 앞에 '경쟁 칩메이커 15개사의<br/>제조 AI 소식을 최우선, 설계·개발 소식은 제외'</span><br/><span class='t'>python -m collector prompt · prompts/discovery.md + queries.yaml</span>"]:::auto
+    S2["<b>여러 AI가 기사 후보 찾기</b><br/><span class='g'>같은 질문지를 Claude·GPT·Gemini에 그대로 넣고 웹 검색.<br/>AI는 기사 주소만 찾고, 내용은 쓰지 않음</span><br/><span class='t'>candidates/{claude|gpt|gemini}-T1.json … · 통합본 ALL.txt</span>"]:::ai
+    S3["<b>등록된 뉴스룸 자동 순회</b><br/><span class='g'>회사 뉴스룸·전문지 목록을 정해진 방식으로 확인</span><br/><span class='t'>sources.yaml · RSS / sitemap / 목록 페이지</span>"]:::auto
+    S4["<b>기사 원문 받아 정리</b><br/><span class='g'>본문·날짜·제목을 원문에서 직접 추출하고<br/>같은 기사는 하나로 합침. 막힌 페이지는 브라우저로 재시도</span><br/><span class='t'>python -m collector run · pass1/pass2 · 스키마 검증</span>"]:::auto
+    S5["<b>수집 리포트</b><br/><span class='g'>완결 기사 수, 경쟁사별 확인 결과,<br/>놓친 회사·실패한 기사 목록</span><br/><span class='t'>out/주차/…-report.md · '경쟁사 탐색 범위' 표</span>"]:::auto
+    D1{"<b>기준(10건)에 못 미치거나<br/>빠진 경쟁사가 있나?</b>"}:::human
+    S6["<b>재조사</b><br/><span class='g'>빠진 회사·채널 위주로 다시 탐색</span><br/><span class='t'>prompt --resurvey</span>"]:::ai
+    S7["<b>사내로 보내기</b><br/><span class='g'>압축 자료·리포트·목록을 사내 메일로 전송</span><br/><span class='t'>python -m collector package --send · mail.local.yaml</span>"]:::out
+    S0 --> S1 --> S2 --> S4
+    S3 --> S4
+    S4 --> S5 --> D1
+    D1 -- "예 (사람이 선택)" --> S6 --> S4
+    D1 -- "아니오" --> S7
+    classDef ai fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px
+    classDef auto fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px
+    classDef human fill:#fff7ed,stroke:#ea580c,stroke-width:2px
+    classDef out fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    classDef sg fill:#ffffff,stroke:#cbd5e1,stroke-width:1px
