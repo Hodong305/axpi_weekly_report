@@ -2,6 +2,7 @@
 MTC AX/PI팀의 제조 AI관련 주간 소식지 발간을 위한 리포
 
 ## 구성
+- `docs/SETUP-home.md` — 집 PC 설정 체크리스트(사외 수집 운영 준비)
 - `docs/MTC-AX-Unified-Design-v4.5.md` — 통합 설계서(현행 기준)
 - `schema/MTC-AX-collection-v4.5.schema.json` — 사외 수집 JSON 스키마(Draft 2020-12)
 - `AGENTS.md` — 사외 수집 주간 절차(사람·Claude·GPT·Gemini 공통)
