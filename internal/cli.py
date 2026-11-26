@@ -17,9 +17,12 @@ def build_parser():
     r.add_argument("--package", required=True, help="사외 package/ 폴더(intake·report·manifest)")
     r.add_argument("--issue-week", help="예: 2026-W49 (생략하면 manifest 값)")
     r.add_argument("--restart", action="store_true", help="저장된 진행 상태를 버리고 처음부터(모델 응답 저장은 유지)")
+    r.add_argument("--llm-backend", choices=["http", "file"], help="모델 백엔드(기본: config.yaml의 internal.llm.backend)")
     r.add_argument("--fresh", action="store_true", help="저장된 모델 응답을 쓰지 않고 새로 호출")
     rs = sub.add_parser("resume", parents=[common], help="중단된 진행을 이어서 실행")
     rs.add_argument("--issue-week")
+    rs.add_argument("--llm-backend", choices=["http", "file"], help="모델 백엔드(기본: config.yaml의 internal.llm.backend)")
+    rs.add_argument("--answer", help="대기 중인 검토 요청에 줄 응답(표준입력이 터미널이 아닐 때 쓴다)")
     rs.add_argument("--fresh", action="store_true", help="저장된 모델 응답을 쓰지 않고 새로 호출")
     st = sub.add_parser("status", parents=[common], help="진행 상태 보기")
     st.add_argument("--issue-week")
@@ -37,8 +40,15 @@ def main(argv=None, judge=None, io=None):
         for week, stage, itype, at in rows:
             print(f"{week}  단계 {stage}  {itype or '-'}  {at}")
         return 0
-    judge = judge or Judge(LLMClient.from_config(s.llm_cfg))
-    pipe = Pipeline(s, judge, io or ConsoleIO(), fresh=args.fresh)
+    backend = getattr(args, "llm_backend", None) or s.llm_cfg.get("backend", "http")
+    if judge is None:
+        if backend == "file":
+            from .filellm import FileClient
+            judge = Judge(FileClient())
+        else:
+            judge = Judge(LLMClient.from_config(s.llm_cfg))
+    answer = getattr(args, "answer", None)
+    pipe = Pipeline(s, judge, io or ConsoleIO([answer] if answer is not None else None), fresh=args.fresh)
     if args.cmd == "run":
         return pipe.start(args.package, args.issue_week, args.restart)
     return pipe.resume(args.issue_week)

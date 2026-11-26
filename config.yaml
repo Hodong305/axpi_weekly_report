@@ -51,6 +51,7 @@ internal:
   verbatim_max_run: 30
   # 사내 모델 접속(OpenAI 호환 /v1/chat/completions, 예: vLLM·Ollama). 모든 LLM 단계가 같은 모델을 쓴다.
   llm:
+    backend: http                         # http(OpenAI 호환 서버) | file(요청·응답 파일을 주고받음, 사람·에이전트가 모델 역할)
     base_url: "http://localhost:8000"
     model: "served-model"
     api_key_env: "INTERNAL_LLM_API_KEY"   # 환경변수 이름. 비어 있거나 변수가 없으면 인증 헤더를 보내지 않는다

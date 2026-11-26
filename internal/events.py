@@ -172,10 +172,7 @@ def judge_ledger(judge, event, cands, records):
         return
     keys = {c["event_key"] for c in cands}
     by_key = {c["event_key"]: c for c in cands}
-    user = ("[이번 주 사건]\n" + json.dumps({"event_id": event["event_id"], "subject": event["subject"],
-                                           "site_task": event["site_task"]}, ensure_ascii=False)
-            + "\n[대장 후보 항목]\n" + json.dumps([{k: c.get(k) for k in LEDGER_FIELDS} for c in cands], ensure_ascii=False)
-            + "\n" + "\n".join(judge.source(_rec(records, d)) for d in event["doc_ids"]))
+    user = _ledger_user(judge, event, cands, records)
     try:
         r = judge.ask("s3_ledger", user, LEDGER_SCHEMA, _ledger_validator(event, keys, records))
     except AutoJudgeFailed:
@@ -205,7 +202,21 @@ def _rec(records, doc_id):
     return records[doc_id]
 
 
+def _ledger_user(judge, event, cands, records):
+    return ("[이번 주 사건]\n" + json.dumps({"event_id": event["event_id"], "subject": event["subject"],
+                                           "site_task": event["site_task"]}, ensure_ascii=False)
+            + "\n[대장 후보 항목]\n" + json.dumps([{k: c.get(k) for k in LEDGER_FIELDS} for c in cands], ensure_ascii=False)
+            + "\n" + "\n".join(judge.source(_rec(records, d)) for d in event["doc_ids"]))
+
+
 def match_ledger(judge, events, records, entries, issue_week, lookback):
+    if judge.batching:
+        reqs = []
+        for ev in events:
+            c = ledger_candidates(entries, ev["subject"], ev["doc_ids"], issue_week, lookback) if ev["kind"] == "event" else []
+            if c:
+                reqs.append(("s3_ledger", _ledger_user(judge, ev, c, records), LEDGER_SCHEMA))
+        judge.prefetch(reqs)
     for ev in events:
         if ev["kind"] != "event":
             continue

@@ -138,6 +138,9 @@ def apply_result(event, res, records, fit):
 
 
 def score_events(judge, events, records, fit):
+    if judge.batching:
+        judge.prefetch([("s4_score", _user(judge, ev, fit, records), SCORE_SCHEMA)
+                        for ev in events if ev["kind"] == "event" and ev["status"] == "PENDING"])
     """PASS 후보 사건마다 2단계를 호출한다. 두 번 실패하면 '자동 판정 실패'로 대기 목록에 올린다."""
     for ev in events:
         if ev["kind"] != "event" or ev["status"] != "PENDING":

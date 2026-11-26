@@ -63,6 +63,10 @@ def _validator(rec, allowed_blocks, records):
     return validate
 
 
+def stage1_request(judge, rec):
+    return ("s2_fit", judge.source(rec, set(rec["body"]["lead_ids"])), FIT_SCHEMA)
+
+
 def classify_doc(judge, rec, records):
     """한 문서를 판정해 결과를 {stage1, stage2, decision, flags, ...}로 반환한다."""
     out = {"doc_id": rec["doc_id"], "stage1": None, "stage2": None, "decision": None, "flags": [],
@@ -99,4 +103,16 @@ def classify_doc(judge, rec, records):
 
 
 def run_fit(judge, records):
+    if judge.batching:      # 파일 모드: 1단계 요청을 모두 내보내고, 답이 오면 재분류 요청도 한꺼번에 내보낸다
+        recs = [records[d] for d in sorted(records)]
+        judge.prefetch([stage1_request(judge, r) for r in recs])
+        need = []
+        for r in recs:
+            try:
+                s1 = judge.ask("s2_fit", stage1_request(judge, r)[1], FIT_SCHEMA, _validator(r, r["body"]["lead_ids"], records))
+            except AutoJudgeFailed:
+                continue
+            if decide_stage1(_normalize(s1)) != "ADVANCE":
+                need.append(("s2_reclassify", judge.source(r), FIT_SCHEMA))
+        judge.prefetch(need)
     return {doc_id: classify_doc(judge, rec, records) for doc_id, rec in sorted(records.items())}

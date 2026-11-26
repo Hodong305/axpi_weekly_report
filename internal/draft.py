@@ -167,6 +167,9 @@ def status_draft(issue_week, counts):
 def generate_draft(judge, events, records, issue_week, cfg, issue_type, counts):
     """반환: (draft, 자동 작성 실패한 event_id 목록)"""
     failed, articles = [], []
+    if judge.batching:
+        judge.prefetch([("s6_article", _article_user(judge, ev, ev["slot"], records, cfg, None), ARTICLE_SCHEMA)
+                        for ev in published_events(events)])
     for ev in published_events(events):
         art, bad = gen_article(judge, ev, ev["slot"], records, cfg)
         articles.append(art)

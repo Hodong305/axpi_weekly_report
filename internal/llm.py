@@ -32,6 +32,14 @@ class LLMError(Exception):
     """접속·응답 형식 오류."""
 
 
+class Pending(Exception):
+    """파일 모드: 모델 응답 파일이 아직 없다. paths는 응답을 기다리는 요청 파일 목록이다."""
+
+    def __init__(self, paths):
+        super().__init__("모델 응답 대기")
+        self.paths = list(paths)
+
+
 class AutoJudgeFailed(Exception):
     """재시도 후에도 검증을 통과하지 못함 → '자동 판정 실패'."""
 
@@ -190,6 +198,25 @@ class Judge:
 
     def system_prompt(self, step):
         return self.operator + "\n\n[단계 지시]\n" + self.steps[step]
+
+    @property
+    def batching(self):
+        """파일 모드처럼 요청을 먼저 모두 써 두고 한꺼번에 답을 받는 백엔드인가"""
+        return hasattr(self.client, "peek")
+
+    def prefetch(self, reqs):
+        """독립된 요청들(단계, 입력, 스키마)을 모두 내보낸 뒤, 응답이 없는 것이 있으면 Pending으로 멈춘다(파일 모드 전용)."""
+        pending = []
+        for step, user, schema in reqs:
+            messages = [{"role": "system", "content": self.system_prompt(step)}, {"role": "user", "content": user}]
+            key = (step, sha(messages[0]["content"]), sha(messages[-1]["content"]))
+            if self.cache is not None and self.cache.read and self.cache.get(key):
+                continue
+            path = self.client.peek(messages, schema, step)
+            if path is not None:
+                pending.append(path)
+        if pending:
+            raise Pending(pending)
 
     def _respond(self, step, messages, schema):
         if self.cache is None:

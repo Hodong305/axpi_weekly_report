@@ -770,13 +770,14 @@ review_log: []             # 검토 요청 응답과 적용 결과
 
 | 파일·명령 | 내용 |
 |---|---|
-| `python -m internal run --package DIR [--issue-week W] [--restart] [--fresh]` | 사외 `package/`를 반입해 S1~S8을 진행한다. 검토 요청에서 멈추고 응답을 기다린다(`중단`·`처음부터` 입력 가능) |
-| `python -m internal resume [--issue-week W] [--fresh]` / `status` | `review/{issue_week}-state.json`에서 이어서 실행 / 진행 상태 보기 |
+| `python -m internal run --package DIR [--issue-week W] [--restart] [--fresh] [--llm-backend http|file]` | 사외 `package/`를 반입해 S1~S8을 진행한다. 검토 요청에서 멈추고 응답을 기다린다(`중단`·`처음부터` 입력 가능) |
+| `python -m internal resume [--issue-week W] [--fresh] [--llm-backend file] [--answer 응답]` / `status` | `review/{issue_week}-state.json`에서 이어서 실행 / 진행 상태 보기 |
 | `internal/llm.py`, `prompts/internal-steps.md` | 모델 클라이언트(json_schema 응답, 거부 시 일반 JSON, 검증 실패 시 1회 재시도)와 단계 프롬프트. `s2_fit`·`s4_score`는 9.3·9.4 문구 그대로 |
 | `internal/intake.py` | S1: manifest 해시 확인 후 `collector.validate.check` 실행 |
 | `internal/fit.py`, `events.py`, `score.py`, `select.py` | S2 적합도, S3 사건 묶음·대장 대조(대장 읽기·갱신 포함), S4 중요도·상한, S5 편성(`review/{issue_week}-selection.csv`) |
 | `internal/review.py`, `reviewlog.py` | 검토 요청 ①·상한 확인·②·C 재수정 확인·③의 출력 형식, 응답 문법 해석, 적용. 요청·응답은 `review/{issue_week}-review-log.jsonl`에 시각과 함께 기록 |
 | `internal/draft.py`, `checks.py`, `s7.py` | S6 원고·머리부(`review/{issue_week}-draft.yaml`), S7 검사(URL 삭제, 출처 형식 보정, 숫자·기업명·원문 연속 일치, 재생성 1회) |
+| `internal/filellm.py` | 파일 모드(`internal.llm.backend: file`): 모델 호출마다 `review/{issue_week}-llm/{번호}-{단계}.request.json`을 쓰고 같은 번호의 `.response.json`을 읽는다. 응답이 없으면 종료 코드 3, 비대화형에서 검토 요청에 답이 없으면 종료 코드 4 |
 | `internal/fingerprint.py`, `llm.py`의 `ResponseCache` | 9.11: 실행 지문(직전 호와 비교), 응답 저장(`review/{issue_week}-llm-cache.jsonl`) |
 | `tests/regression/`, `tests/test_regression.py` | 11장 회귀 사례 5종의 고정 입력·모델 응답·기대 결과. `python tests/regression/run.py`로 비교(`--update`로 갱신) |
 | `internal/render.py`, `metrics.py`, `pipeline.py` | S8 정적 HTML·텍스트(`out_internal/{issue_week}/`), 시범 지표(`log/pilot.csv`), 상태 기계 |

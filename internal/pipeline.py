@@ -5,6 +5,7 @@
 """
 import copy
 import json
+import sys
 from datetime import datetime
 
 from . import checks, draft as draftmod, fingerprint, events as ev_mod, fit as fit_mod, metrics, render, review as rv, score as sc_mod
@@ -12,7 +13,7 @@ from . import select as sel
 from .common import add_flag
 from .draft import ABSTRACT_SCHEMA, load_draft, save_draft
 from .intake import IntakeError, load_package
-from .llm import AutoJudgeFailed, ResponseCache, is_truncated
+from .llm import AutoJudgeFailed, Pending, ResponseCache, is_truncated
 from .review import ReviewError
 from .reviewlog import ReviewLog, now_iso
 from .s7 import run_s7
@@ -33,11 +34,25 @@ class Restart(Exception):
     """사용자가 '처음부터'를 입력함."""
 
 
+class NeedAnswer(Exception):
+    """검토 요청에 답할 사람이 없는 환경(표준입력이 터미널이 아니고 --answer도 없음)."""
+
+
 class ConsoleIO:
+    """answers: --answer로 받은 응답(앞에서부터 한 번씩 쓴다). interactive가 거짓이면 입력을 기다리지 않고 NeedAnswer를 낸다."""
+
+    def __init__(self, answers=None, interactive=None):
+        self.answers = list(answers or [])
+        self.interactive = sys.stdin.isatty() if interactive is None else interactive
+
     def write(self, text=""):
         print(text, flush=True)
 
     def read(self):
+        if self.answers:
+            return self.answers.pop(0)
+        if not self.interactive:
+            raise NeedAnswer()
         try:
             return input()
         except EOFError:
@@ -114,6 +129,8 @@ class Pipeline:
 
     def attach_cache(self):
         """모델 응답 저장(9.11). --fresh이면 저장된 응답을 읽지 않는다. --restart는 저장을 지우지 않는다."""
+        if self.judge is not None and hasattr(self.judge.client, "set_dir"):
+            self.judge.client.set_dir(self.s.review_path(self.week, "llm"))
         if self.judge is not None:
             self.judge.cache = ResponseCache(self.s.review_path(self.week, "llm-cache.jsonl"), read=not self.fresh)
 
@@ -163,6 +180,18 @@ class Pipeline:
                 while self.state["stage"] != "DONE":
                     getattr(self, "step_" + self.state["stage"])()
                 return 0
+            except Pending as p:
+                self.save()
+                for path in p.paths:
+                    self.io.write(f"모델 응답 대기: {path}")
+                self.io.write("각 요청 파일 옆에 같은 번호의 .response.json(모델이 돌려줄 JSON 객체)을 쓴 뒤 "
+                              "`python -m internal resume --llm-backend file`로 이어서 진행하세요.")
+                return 3
+            except NeedAnswer:
+                self.save()
+                self.io.write("검토 요청에 답이 필요합니다. 위 요청을 확인하고 "
+                              "`python -m internal resume --answer \"응답\"`으로 이어서 진행하세요.")
+                return 4
             except Interrupted:
                 self.save()
                 self.io.write("중단했습니다. `python -m internal resume`으로 이어서 진행할 수 있습니다.")
