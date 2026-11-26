@@ -3,3 +3,7 @@ out/
 __pycache__/
 *.pyc
 .venv/
+review/
+out_internal/
+ledger/
+log/
