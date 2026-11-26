@@ -460,26 +460,26 @@ def slots(evs):
     return {e["event_id"]: (e["slot"], e["rank"]) for e in evs}
 
 
-CFG3 = dict(CFG, brief_max=3)     # 기존 편성 규칙(단신 3건) 시험용. 기본값은 brief_max 6
+CFG3 = dict(CFG, brief_max=3)     # 단신 3건 시험용. 기본값은 brief_max 4
 
 
-def test_selection_core_two_and_brief_three():
+def test_selection_core_up_to_four_and_brief_three():
     evs = [mk("a", 88), mk("b", 85), mk("c", 84), mk("d", 70), mk("e", 65), mk("f", 61), mk("g", 59)]
     sel.select(evs, CFG3)
     s = slots(evs)
-    assert s["a"] == ("core", 1) and s["b"] == ("core", 2)
-    assert [s[k][0] for k in "cde"] == ["brief"] * 3 and s["f"][0] == "out" and s["g"][0] == "out"   # 3위는 90 미만 → 단신, 단신 최대 3
+    assert [s[k][0] for k in "abc"] == ["core"] * 3 and s["a"] == ("core", 1)          # 80점 이상은 최대 core_max(4)건까지 핵심
+    assert [s[k][0] for k in "def"] == ["brief"] * 3 and s["g"][0] == "out"            # 단신 최대 3(CFG3), 59점은 brief_min 미만
 
 
-def test_selection_core3_rule():
-    evs = [mk("a", 95), mk("b", 92), mk("c", 90), mk("d", 70), mk("e", 65), mk("f", 61)]
-    sel.select(evs, CFG3)
+def test_selection_core_max_is_four_without_core3_rule():
+    assert "core3_min_score" not in CFG and CFG["core_max"] == 4 and CFG["brief_max"] == 4
+    evs = [mk("a", 95), mk("b", 92), mk("c", 90), mk("d", 89), mk("e", 88), mk("f", 70)]
+    sel.select(evs, CFG)
     s = slots(evs)
-    assert [s[k][0] for k in "abc"] == ["core"] * 3
-    assert [s[k][0] for k in "def"] == ["brief", "brief", "out"]        # 핵심 3건이면 단신 최대 2건
-    evs = [mk("a", 95), mk("b", 92), mk("c", 89)]
-    sel.select(evs, CFG3)
-    assert slots(evs)["c"][0] == "brief"
+    assert [s[k][0] for k in "abcd"] == ["core"] * 4 and s["e"][0] == "brief" and s["f"][0] == "brief"      # 핵심은 4건에서 멈추고 단신은 줄지 않는다
+    evs = [mk("a", 95), mk("b", 92), mk("c", 79)]
+    sel.select(evs, CFG)
+    assert slots(evs)["c"][0] == "brief"                                                                    # core_min_score(80) 미만은 단신
 
 
 def test_selection_brief_cap_and_background():
@@ -1174,7 +1174,7 @@ def test_fingerprint_change_warning(tmp_path):
     rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
     fp = rows[WEEK]
     assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.7" and fp["fp_internal_version"]
-    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "7"
+    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "8"
 
 
 def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):

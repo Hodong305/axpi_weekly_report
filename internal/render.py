@@ -278,6 +278,7 @@ def _build(draft, ctx, imgs, mode):
                 "tags": [{"text": t} for t in (a.get("tags") or [])[1:]], "body_html": to_html(segs[("articles", i, "body")]),
                 "watch_html": to_html(segs[("articles", i, "watch")]) if ("articles", i, "watch") in segs else "",
                 "credit": " / ".join(a["credits"]), "has_figures": bool(figs),
+                "terms_text": ("🔎 검색어 · " + " · ".join(a["search_terms"])) if a.get("search_terms") else "",
                 "figures": [{"value": k["value"], "label": k["label"], "why": k.get("why") or "", "w": w, "vsize": value_size(k["value"])} for k in figs],
                 "fig_value": fig["value"] if fig else "", "fig_label": fig["label"] if fig else "", "fig_why": (fig or {}).get("why", ""),
                 "image_src": _img_src(imgs.get(i), mode), "image_caption": imgs[i]["caption"] if i in imgs else "",
@@ -385,7 +386,10 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
             L.append("  수치: " + " / ".join(f"{k['value']} {k['label']}" + (f"(왜 중요: {k['why']})" if k.get("why") else "") for k in figs))
         if ("articles", i, "watch") in segs:
             L.append(f"  MTC가 볼 것 · {to_plain(segs[('articles', i, 'watch')])}")
-        L.extend([f"  출처 · {tc['credit']}", ""])
+        L.append(f"  출처 · {tc['credit']}")
+        if a.get("search_terms"):
+            L.append("  검색어 · " + ", ".join(a["search_terms"]))
+        L.append("")
     if t["has_core"]:
         L.append("[이번 주 핵심]")
         for (i, a), tc in zip(core, t["core"]):

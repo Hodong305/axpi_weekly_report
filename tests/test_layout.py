@@ -46,13 +46,13 @@ def test_same_subject_counts_core_and_brief_together():
     assert s["a"] == s["b"] == "core" and s["c"] == "out" and s["d"] == "brief"
 
 
-def test_brief_max_config_and_core3_reduction():
+def test_brief_max_and_core_max_config():
     evs = [mk(f"e{i}", 70 - i) for i in range(9)]
     sel.select(evs, CFG)
-    assert sum(e["slot"] == "brief" for e in evs) == 6
-    evs = [mk("a", 95), mk("b", 93), mk("c", 91)] + [mk(f"e{i}", 70 - i) for i in range(9)]
+    assert sum(e["slot"] == "brief" for e in evs) == 4
+    evs = [mk(x, 95 - n) for n, x in enumerate("abcde")] + [mk(f"e{i}", 70 - i) for i in range(9)]
     sel.select(evs, CFG)
-    assert sum(e["slot"] == "core" for e in evs) == 3 and sum(e["slot"] == "brief" for e in evs) == 5     # 핵심 3건이면 brief_max-1
+    assert sum(e["slot"] == "core" for e in evs) == 4 and sum(e["slot"] == "brief" for e in evs) == 4     # 핵심이 4건이어도 단신은 줄지 않는다
 
 
 # 더 볼 거리 후보 ---------------------------------------------------------------------

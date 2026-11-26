@@ -18,12 +18,15 @@ WHY_FIGURE_SCHEMA = {       # 수치 + 왜 중요한지(why는 v4.7 추가, 선�
     "type": "object", "additionalProperties": False, "required": ["value", "label"],
     "properties": {**FIGURE_SCHEMA["properties"], "why": {"type": "string"}}}
 
+SEARCH_TERMS_SCHEMA = {"type": "array", "items": {"type": "string"}}     # v4.7 검색어(선택). 개수 한도는 search_terms_max, 근거 블록 일치는 S7 검사(checks.search_term_check)
+
 ARTICLE_SCHEMA = {          # 단신(선택 항목 figure: 오른쪽 수치 배지 하나)
     "type": "object", "additionalProperties": False,
     "required": ["event_id", "title", "title_alternatives", "body", "evidence_ids"],
     "properties": {"event_id": {"type": "string"}, "title": {"type": "string", "minLength": 1},
                    "title_alternatives": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
                    "body": {"type": "string", "minLength": 1}, "figure": {"anyOf": [{"type": "null"}, WHY_FIGURE_SCHEMA]},
+                   "search_terms": SEARCH_TERMS_SCHEMA,
                    "evidence_ids": {"type": "array", "items": {"type": "string"}}}}
 
 IMAGE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["media_ref", "caption"],
@@ -48,6 +51,7 @@ CORE_ARTICLE_SCHEMA = {     # 핵심: 한 줄 핵심(deck) + 요점(points) + �
 # deck·points는 v4.7에서 추가한 키다. 프롬프트는 항상 쓰라고 하지만 스키마에서는 선택으로 두고, 빠지면 코드가 본문으로 대신한다(fallback_deck).
 
 DECK_MAX, POINT_MAX, WHY_MAX = 120, 180, 80
+SEARCH_TERMS_MAX = 3
 
 IMAGE_CAPTION_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["caption"],
                         "properties": {"caption": {"type": "string", "minLength": 1}}}
@@ -145,6 +149,7 @@ def _article_user(judge, ev, slot, records, cfg, feedback):
     info = {"event_id": ev["event_id"], "slot": slot, "subject": ev["subject"], "site_task": ev["site_task"],
             "제목_글자수_한도": cfg["article_title_max"], "본문_글자수_범위": [lo, hi],
             "수치_why_글자수_한도": cfg.get("figure_why_chars", WHY_MAX)}
+    info["검색어_최대_개수"] = cfg.get("search_terms_max", SEARCH_TERMS_MAX)
     if slot == "core":
         info["한줄핵심_글자수_한도"] = cfg.get("deck_chars", DECK_MAX)
         info["요점_한줄_글자수_한도"] = cfg.get("point_chars", POINT_MAX)
@@ -216,9 +221,23 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
     elif r.get("figure"):
         art["figure"] = {"value": r["figure"]["value"].strip(), "label": r["figure"]["label"].strip(),
                          **({"why": r["figure"]["why"].strip()} if (r["figure"].get("why") or "").strip() else {})}
+    terms = clean_search_terms(r.get("search_terms"), cfg.get("search_terms_max", SEARCH_TERMS_MAX))
+    if terms:
+        art["search_terms"] = terms
     art["credits"] = build_credits(r["evidence_ids"], ev["rep_doc_id"], records)
     art["evidence_ids"] = list(r["evidence_ids"])
     return art, failed
+
+
+def clean_search_terms(terms, limit):
+    """검색어: 공백 정리, 빈 값·중복(대소문자 무시) 제거, 최대 limit개."""
+    out, seen = [], set()
+    for t in terms or []:
+        t = " ".join(str(t).split())
+        if t and t.lower() not in seen:
+            seen.add(t.lower())
+            out.append(t)
+    return out[:limit]
 
 
 def fallback_deck(body, cfg=None):

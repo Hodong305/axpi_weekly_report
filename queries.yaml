@@ -1,15 +1,141 @@
-# LLM 후보 탐색용 분야 정의와 검색어 묶음 (설계서 v4.6 3장, 4.5).
+# LLM 후보 탐색용 분야 정의와 검색어 묶음 (설계서 v4.7 3장, 4.5).
 # 모든 LLM(Claude·GPT·Gemini)이 같은 정의·같은 검색어를 받는다. 바꾸면 registry_version처럼 날짜를 남긴다.
-queries_version: "2026-11-26.1"
+queries_version: "2026-11-27.1"
+
+# 경쟁 칩메이커 확인 목록(설계서 v4.7 1장, 4.5). 모든 프롬프트의 [최우선 목표]에 이름이 들어가고,
+# T1 프롬프트에는 회사별 공식 채널·검색어가 들어간다. 모델은 목록의 모든 회사를 하나씩 확인한다.
+# 모든 검색어는 회사 이름에 제조(팹·수율·결함·계측·설비 보전·스마트 팩토리·반송 등) 용어를 붙인다. 설계·제품 개발·출시 용어는 쓰지 않는다.
+# aliases: 리포트·재조사에서 레코드의 발행처·제목·URL 호스트와 대조하는 이름. channels: 확인할 공식 채널 이름(주소는 sources.yaml이나 검색으로 찾는다).
+competitors:
+  - name: "SK hynix"
+    aliases: ["SK하이닉스", "SK Hynix", "하이닉스"]
+    channels: ["뉴스룸", "기술 블로그", "IR·실적 발표", "기술 행사(SK hynix 기술 심포지엄 등)"]
+    queries:
+      - "SK하이닉스 AI 팹 / 제조 지능화 / 수율 / 설비 예지보전 / 스마트 팩토리"
+      - "SK hynix fab AI manufacturing yield defect"
+      - "SK hynix smart factory digital twin fab automation"
+      - "SK하이닉스 이천 청주 M15X 제조 AI 에이전트"
+  - name: "Micron"
+    aliases: ["Micron Technology", "마이크론"]
+    channels: ["뉴스룸", "기술 블로그", "IR·실적 발표", "기술 행사"]
+    queries:
+      - "Micron smart manufacturing AI fab yield"
+      - "Micron fab automation machine learning defect inspection"
+      - "Micron Idaho Boise Manassas fab AI"
+      - "마이크론 팹 AI 스마트 제조"
+  - name: "TSMC"
+    aliases: ["台積電", "台积电", "Taiwan Semiconductor", "TSMC Fab", "대만 TSMC"]
+    channels: ["뉴스룸", "기술 심포지엄(Technology Symposium)", "IR·실적 발표", "ESG·연간 보고서"]
+    queries:
+      - "TSMC AI fab automation yield defect intelligent manufacturing"
+      - "TSMC smart manufacturing AI agent fab"
+      - "台積電 智慧製造 AI 良率 晶圓廠"
+      - "台積電 AI 缺陷檢測 自動化 先進製程"
+      - "TSMC Technology Symposium fab AI manufacturing yield"
+  - name: "Intel (Foundry)"
+    aliases: ["Intel", "Intel Foundry", "인텔"]
+    channels: ["뉴스룸", "기술 블로그", "IR·실적 발표", "Intel Foundry Direct Connect 등 행사"]
+    queries:
+      - "Intel Foundry fab AI yield manufacturing"
+      - "Intel fab automation machine learning defect"
+      - "Intel Foundry fab AI predictive maintenance defect"
+      - "인텔 파운드리 팹 AI 수율"
+  - name: "GlobalFoundries"
+    aliases: ["GlobalFoundries", "GF", "글로벌파운드리스", "GLOBALFOUNDRIES"]
+    channels: ["뉴스룸", "기술 블로그", "IR·실적 발표", "기술 행사"]
+    queries:
+      - "GlobalFoundries fab AI yield manufacturing"
+      - "GlobalFoundries Spot robot fab inspection"
+      - "GlobalFoundries smart manufacturing machine learning Malta Dresden"
+      - "글로벌파운드리스 팹 AI 로봇"
+  - name: "UMC"
+    aliases: ["聯電", "联电", "United Microelectronics", "유나이티드 마이크로일렉트로닉스"]
+    channels: ["뉴스룸", "IR·실적 발표", "기술 행사"]
+    queries:
+      - "UMC fab AI smart manufacturing yield"
+      - "聯電 智慧製造 AI 良率"
+      - "聯電 晶圓廠 自動化 AI 缺陷"
+      - "UMC AI defect inspection mature node fab"
+  - name: "SMIC"
+    aliases: ["中芯国际", "中芯國際", "Semiconductor Manufacturing International", "SMIC"]
+    channels: ["뉴스룸", "IR·실적 발표", "기술 행사"]
+    queries:
+      - "SMIC fab AI smart manufacturing"
+      - "中芯国际 智能制造 AI 良率"
+      - "中芯国际 晶圆厂 人工智能 缺陷检测"
+      - "SMIC AI yield improvement fab automation"
+  - name: "Kioxia"
+    aliases: ["キオクシア", "KIOXIA", "키옥시아", "Toshiba Memory"]
+    channels: ["뉴스룸", "기술 블로그", "IR·실적 발표", "기술 행사"]
+    queries:
+      - "Kioxia fab AI manufacturing yield Yokkaichi Kitakami"
+      - "キオクシア AI 製造 歩留まり 工場"
+      - "キオクシア スマートファクトリー 異常検知 AI"
+      - "Kioxia NAND fab automation machine learning"
+  - name: "SanDisk"
+    aliases: ["Sandisk", "SanDisk", "샌디스크"]
+    channels: ["뉴스룸", "기술 블로그", "IR·실적 발표"]
+    queries:
+      - "Sandisk fab AI manufacturing yield NAND"
+      - "Sandisk Kioxia joint venture fab AI"
+      - "Sandisk smart manufacturing machine learning"
+  - name: "CXMT"
+    aliases: ["长鑫存储", "長鑫存儲", "ChangXin Memory", "CXMT", "창신메모리"]
+    channels: ["뉴스룸(공식 사이트·위챗)", "IR·상장 서류", "기술 행사"]
+    queries:
+      - "CXMT fab AI manufacturing yield DRAM"
+      - "长鑫存储 智能制造 AI 良率"
+      - "长鑫存储 晶圆厂 人工智能 缺陷"
+      - "ChangXin Memory smart factory automation"
+  - name: "YMTC"
+    aliases: ["长江存储", "長江存儲", "Yangtze Memory", "YMTC", "양쯔메모리"]
+    channels: ["뉴스룸(공식 사이트·위챗)", "기술 행사"]
+    queries:
+      - "YMTC fab AI manufacturing yield NAND"
+      - "长江存储 智能制造 AI 良率"
+      - "长江存储 晶圆厂 人工智能 缺陷检测"
+      - "Yangtze Memory smart factory automation"
+  - name: "Nanya"
+    aliases: ["南亞科", "南亚科", "Nanya Technology", "난야"]
+    channels: ["뉴스룸", "IR·실적 발표", "기술 행사"]
+    queries:
+      - "Nanya Technology fab AI smart manufacturing"
+      - "南亞科 智慧製造 AI 良率"
+      - "南亞科 DRAM 晶圓廠 自動化 AI"
+  - name: "Winbond"
+    aliases: ["華邦電", "华邦电", "Winbond Electronics", "윈본드"]
+    channels: ["뉴스룸", "IR·실적 발표", "기술 행사"]
+    queries:
+      - "Winbond fab AI smart manufacturing yield"
+      - "華邦電 智慧製造 AI 良率"
+      - "華邦電 晶圓廠 自動化 AI 缺陷"
+  - name: "PSMC"
+    aliases: ["力積電", "力积电", "Powerchip", "Powerchip Semiconductor", "PSMC"]
+    channels: ["뉴스룸", "IR·실적 발표", "기술 행사"]
+    queries:
+      - "PSMC Powerchip fab AI smart manufacturing"
+      - "力積電 智慧製造 AI 良率"
+      - "力積電 晶圓廠 自動化 AI"
+  - name: "Rapidus"
+    aliases: ["ラピダス", "Rapidus Corporation", "라피더스"]
+    channels: ["뉴스룸", "기술 블로그", "연구 컨소시엄(LSTC) 발표", "기술 행사"]
+    queries:
+      - "Rapidus fab AI manufacturing IIM-1 Chitose"
+      - "ラピダス AI 製造 RUMS 短TAT 工場"
+      - "ラピダス スマートファクトリー 自動化 AI"
+      - "Rapidus AI-assisted manufacturing single wafer processing"
 
 topics:
   T1:
     name: "① 칩메이커 (T1_CHIPMAKER)"
     scope: |
-      대상: 삼성전자, SK하이닉스, Micron, TSMC, Intel Foundry, GlobalFoundries 등 팹 운영사.
+      대상: 경쟁 칩메이커(아래 [경쟁사별 확인 목록]: SK하이닉스, Micron, TSMC, Intel Foundry, GlobalFoundries, UMC, SMIC, Kioxia, SanDisk,
+            CXMT, YMTC, Nanya, Winbond, PSMC, Rapidus)가 최우선이다. 삼성전자는 비교 기준으로 함께 찾는다.
       채택: 팹 운영사의 수율 분석·결함 대응·설비 보전·물류·생산계획 변화에 AI·자동화를 쓴 사례.
             팹 투자·양산 전환은 팹 운영 판단과 직접 연결될 때만.
       오탐: AI용 칩 판매, 신제품 연산 성능, 주가·메모리 가격만 다룬 기사.
+            경쟁사라도 설계·개발 소식(칩·회로 설계, 설계용 AI·EDA, 신제품·신기술 개발·출시, HBM·DRAM·공정 노드 로드맵 자체,
+            R&D 투자·인력, 실적·주가)은 제외한다. 제조 현장(팹 운영)의 AI·자동화만 대상이다.
     queries:
       - "삼성전자 반도체 AI 수율 분석 / 결함 / 설비 예지보전 / 스마트 팩토리"
       - "SK하이닉스 AI 팹 / 제조 지능화 / 수율 / 계측 데이터"
@@ -21,7 +147,13 @@ topics:
       - "TSMC 智慧製造 AI 良率 (현지어)"
       - "wafer map root cause analysis AI fab"
       - "fab dispatch scheduling AI semiconductor"
+      - "memory fab AI agent defect root cause (SK hynix / Micron / Kioxia / CXMT / YMTC)"
+      - "foundry fab AI automation (TSMC / UMC / SMIC / GlobalFoundries / Intel Foundry / Rapidus)"
+      - "competitor chipmaker smart factory AI announcement semiconductor manufacturing"
+      - "競合 半導体メーカー 工場 AI 歩留まり / 晶圓廠 AI 智慧製造 / 晶圆厂 人工智能 智能制造"
     resurvey_queries:
+      - "경쟁 칩메이커별 공식 채널(뉴스룸·IR·기술 블로그·기술 행사)에서 팹·제조 AI 발표(이번 기간, 회사별로 하나씩)"
+      - "경쟁사 현지어 산업 매체(經濟日報·DigiTimes, 日経·日刊工業新聞, 集微网, 전자신문·디일렉)의 팹 AI 보도와 그 원발표"
       - "각 칩메이커 IR 발표자료·실적 발표 중 제조 AI 언급(이번 기간)"
       - "각 칩메이커 기술 블로그·학회 발표(IEDM, SEMICON, ASMC, AEC/APC) 중 팹 운영 AI"
       - "현지어 원문: 한국어(삼성·SK), 중국어 번체(TSMC), 일본어(Kioxia 등)"

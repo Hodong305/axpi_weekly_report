@@ -211,8 +211,17 @@ def more_source(item, events_by_id, records):
         [records[item["ref"]]["title"]] + [b["text"] for b in records[item["ref"]]["body"]["blocks"]]) if item["ref"] in records else "")
 
 
+def search_term_check(a, records):
+    """검색어(9.7): 기사가 인용한 근거 블록에 대소문자 무시로 그대로 있는 것만 남긴다. 반환: (남긴 목록, 지운 목록)."""
+    source = norm("\n".join(evidence_text(e, records) for e in a.get("evidence_ids") or []))
+    keep, dropped = [], []
+    for t in a.get("search_terms") or []:
+        (keep if norm(t) and norm(t) in source else dropped).append(t)
+    return keep, dropped
+
+
 def autofix(draft, records):
-    """URL 삭제와 출처 정보 형식 보정. 반환: 경고 목록."""
+    """URL 삭제, 출처 정보 형식 보정, 근거에 없는 검색어 삭제. 반환: 경고 목록."""
     warns = []
 
     def clean(text, scope, label):
@@ -254,6 +263,15 @@ def autofix(draft, records):
                 docs.append(d)
         if docs:
             a["credits"] = [format_credit(records[d]) for d in docs]
+        if a.get("search_terms"):
+            keep, dropped = search_term_check(a, records)
+            for t in dropped:
+                warns.append({"scope": labels[i], "quote": t[:40], "kind": "검색어",
+                              "message": f"검색어 '{t}'가 인용한 근거 블록에 없어 자동 삭제함", "fix": None})
+            if keep:
+                a["search_terms"] = keep
+            else:
+                a.pop("search_terms")
     for j, m in enumerate(draft.get("more") or [], 1):
         m["line"] = clean(m["line"], f"F{j}", "더 볼 거리")
     return warns

@@ -275,7 +275,7 @@ class Pipeline:
             if any(is_truncated(self.records[d], limit) for d in e["doc_ids"]):
                 add_flag(e, "본문 일부만 판정")
         if evs:
-            sel.select(evs, self.cfg)
+            sel.select(evs, self.cfg, self.records)
         for e in evs:
             e["auto_slot"], e["auto_rank"] = e["slot"], e["rank"]
         self.state["counts"] = self.counts()

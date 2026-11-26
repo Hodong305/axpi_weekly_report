@@ -1,27 +1,47 @@
 """S5 자동 편성(설계서 9.5) → review/{issue_week}-selection.csv."""
 import csv
 
+from collector.competitors import find_company
+
 from .common import add_flag, evidence_text, trunc
 from .events import _norm, ledger_label
 from .score import METRICS
 
 CSV_COLUMNS = ["rank", "slot", "event_id", "total", "placement_cap", "title_draft", "claim", "stage", "evidence",
-               "ledger", "flags", "note"]
+               "ledger", "flags", "note", "competitor"]
+
+
+def detect_competitor(ev, records, cfg):
+    """경쟁사 사건이면 회사 이름, 아니면 ""(9.5). 주체를 먼저 보고, 없으면 대표 자료 발행처, 그것도 없으면 제목을 본다."""
+    companies = cfg.get("competitors") or []
+    if not companies:
+        return ""
+    rec = (records or {}).get(ev.get("rep_doc_id")) or {}
+    texts = [ev.get("subject")]
+    if not (ev.get("subject") or "").strip():
+        texts += [rec.get("publisher"), rec.get("title")]
+    else:
+        texts.append(rec.get("publisher"))
+    return find_company(companies, *texts) or ""
 
 
 def _tie_key(ev):
+    """총점 → 경쟁사 사건 → FAB 관련성 → 근거 수준 → 이번 주 변화(v4.7)."""
     t = ev["score"]["tiers"]
-    return (ev["score"]["total"], t["fab_relevance"], t["evidence_level"], t["weekly_change"])
+    return (ev["score"]["total"], 1 if ev.get("competitor") else 0, t["fab_relevance"], t["evidence_level"], t["weekly_change"])
 
 
 def sort_candidates(events):
-    """총점 → FAB 관련성 → 근거 수준 → 이번 주 변화 순(내림차순). 같으면 event_id 순으로 고정한다."""
+    """총점 → 경쟁사 사건 → FAB 관련성 → 근거 수준 → 이번 주 변화 순(내림차순). 같으면 event_id 순으로 고정한다."""
     return sorted(events, key=lambda e: tuple(-v for v in _tie_key(e)) + (e["event_id"],))
 
 
-def select(events, cfg):
-    """사건의 slot·rank·flags를 정한다(제자리 수정). 반환: 요약 dict."""
-    core_min, core3_min, brief_min = cfg["core_min_score"], cfg["core3_min_score"], cfg["brief_min_score"]
+def select(events, cfg, records=None):
+    """사건의 slot·rank·flags를 정한다(제자리 수정). 반환: 요약 dict. records는 경쟁사 판정에 대표 자료 발행처·제목을 쓰려고 받는다."""
+    core_min, brief_min = cfg["core_min_score"], cfg["brief_min_score"]
+    core_max, comp_min = cfg.get("core_max", 4), cfg.get("competitor_core_min", 2)
+    for ev in events:
+        ev["competitor"] = detect_competitor(ev, records, cfg)
     for ev in events:
         if ev["status"] == "HOLD":
             ev["slot"], ev["rank"] = "hold", None
@@ -33,7 +53,9 @@ def select(events, cfg):
             e["slot"], e["rank"], e["note"] = "out", None, f"점수 미달({e['score']['total']}<{brief_min})"
     cands = sort_candidates([e for e in cands if e["score"]["total"] >= brief_min])
 
-    # 핵심: 게재 상한이 단신인 사건은 점수와 관계없이 뺀다. core_min 이상 상위 2건, 3위도 core3_min 이상이면 3건.
+    # 핵심(v4.7): 게재 상한이 단신인 사건은 점수와 관계없이 뺀다. core_min 이상 중 최대 core_max건.
+    # 경쟁사 사건도 1단계 적합도·점수 판정을 통과한 제조 AX·AI 사건(PASS)만 여기에 온다. 설계·개발 사건은 경쟁사여도 우선하지 않는다.
+    # 핵심 자격이 있는 경쟁사 사건을 먼저 competitor_core_min건 배정하고, 남은 자리를 점수 순으로 채운다.
     # 같은 주체는 핵심+단신을 합쳐 same_subject_max건까지이며, 넘는 사건은 점수가 낮은 쪽부터 빠진다(점수순으로 채우므로 자연히 낮은 쪽이 빠짐).
     limit = cfg.get("same_subject_max") or 99
     count, subj_skipped = {}, set()
@@ -51,16 +73,17 @@ def select(events, cfg):
 
     pool = [e for e in cands if e["cap"] != "brief" and e["score"]["total"] >= core_min]
     core = []
-    for e in pool:
-        if not room(e):
-            continue
-        if len(core) < 2 or (len(core) == 2 and e["score"]["total"] >= core3_min):
+    for phase_comp in (True, False):
+        for e in pool:
+            if len(core) >= (min(comp_min, core_max) if phase_comp else core_max):
+                break
+            if e in core or (phase_comp and not e["competitor"]) or not room(e):
+                continue
             core.append(e)
             take(e)
-        else:
-            break
-    # 단신: 남은 brief_min 이상 중 최대 brief_max건(핵심 3건이면 brief_max-1건). 산업 배경은 최대 1건.
-    max_brief = cfg["brief_max"] if len(core) < 3 else cfg["brief_max"] - 1
+    core = [e for e in pool if e in core]          # 핵심 안의 순서는 점수 순(같으면 경쟁사 먼저)
+    # 단신: 남은 brief_min 이상 중 최대 brief_max건. 점수가 같으면 경쟁사 사건이 먼저(정렬 기준). 산업 배경은 최대 1건.
+    max_brief = cfg["brief_max"]
     brief, background, bg_skipped = [], 0, set()
     for e in cands:
         if e in core:
@@ -140,7 +163,7 @@ def write_csv(path, events, records):
                         "placement_cap": e["cap"] or "", "title_draft": e["title_draft"],
                         "claim": sc["claim"] if sc else "", "stage": sc["maturity"] if sc else "",
                         "evidence": evidence_excerpt(e, records), "ledger": ledger_label(e) if e["kind"] == "event" else "NEW",
-                        "flags": ";".join(e["flags"]), "note": e["note"]})
+                        "flags": ";".join(e["flags"]), "note": e["note"], "competitor": e.get("competitor") or ""})
 
 
 TOPIC_ORDER = ["T1_CHIPMAKER", "T2_EQUIPMENT", "T3_SOLUTION", "T4_PHYSICAL_AI", "B"]

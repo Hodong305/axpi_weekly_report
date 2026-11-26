@@ -21,7 +21,7 @@ def sample():
 
 def ctx(theme):
     return {"issue_week": "2026-W48", "period": "2026-11-15 ~ 2026-11-21", "period_short": "11.15 ~ 11.21", "issue_type": "정규호",
-            "counts": {"pass_docs": 14, "published": 6}, "events": [], "status_rows": [], "corrections": [], "note": "",
+            "counts": {"pass_docs": 14, "published": 8}, "events": [], "status_rows": [], "corrections": [], "note": "",
             "newsletter_name": CFG["newsletter_name"], "newsletter_tagline": CFG["newsletter_tagline"], "newsletter_team": CFG["newsletter_team"],
             "theme": theme, "issue_no": 1, "n_docs": 39, "read_chars_per_min": 500}
 
@@ -36,7 +36,7 @@ def test_config_v47_keys():
     assert CFG["newsletter_theme"] == "B6"
     assert (CFG["deck_chars"], CFG["point_chars"], CFG["figure_why_chars"], CFG["watch_chars"]) == (120, 180, 80, 160)
     assert CFG["core_chars"] == [400, 640] and CFG["brief_chars"] == [90, 150] and CFG["summary_chars"] == [140, 240]
-    assert CFG["more_line_chars"] == 120 and CFG["punch_chars"] == 320 and CFG["issue_body_max"] == 5600 and CFG["article_title_max"] == 50
+    assert CFG["more_line_chars"] == 120 and CFG["punch_chars"] == 320 and CFG["issue_body_max"] == 9000 and CFG["article_title_max"] == 50
     th = render.load_themes()
     for t in ("B6", "S4"):
         assert th[t]["gloss_top"] is True and th[t]["numbers_panel"] is True and th[t]["show_body"] is True
@@ -73,9 +73,9 @@ def test_b6_sections_in_reading_order_and_static():
         assert f">{lab}</span>" in h
     assert CORE_BODY in h and "MTC가 볼 것" in h and "●" not in h
     # 이번 호 구성: 구역별 건수
-    assert re.search(r"이번 주 핵심 <b[^>]*>2</b>", h) and re.search(r"단신 <b[^>]*>4</b>", h) and re.search(r"숫자로 보는 이번 주 <b[^>]*>5</b>", h)
+    assert re.search(r"이번 주 핵심 <b[^>]*>4</b>", h) and re.search(r"단신 <b[^>]*>4</b>", h) and re.search(r"숫자로 보는 이번 주 <b[^>]*>7</b>", h)
     # 받은편지함 미리 보기 글(숨김)은 총론 첫 문장
-    assert 'display:none;max-height:0' in h and "이번 주에는 삼성전자가 웨이퍼 결함의" in h
+    assert 'display:none;max-height:0' in h and "이번 주에는 경쟁 칩메이커 두 곳이" in h
     # 텍스트본도 같은 순서, 숫자 구역 포함
     assert t.index("[30초 브리핑]") < t.index("[숫자로 보는 이번 주]") < t.index("[이번 주 핵심]")
     assert "- 99% 임무 성공률(≠ 이상 검출률) (기사 02) — 로봇이 멈추지 않고" in t
@@ -89,7 +89,7 @@ def test_b6_briefs_are_two_column_grid():
 def test_s4_number_tiles_and_core_cards():
     h = build("S4")["html_preview"]
     render.verify_static(h)
-    assert h.count("border-top:4px solid #ffd60a") == 5                          # 숫자 타일 5개(핵심 4 + 단신 1)
+    assert h.count("border-top:4px solid #ffd60a") == 7                          # 숫자 타일 7개(핵심 6 + 단신 1)
     assert "기사 02 · Physical AI" in h and ">왜 중요</span>" in h and CORE_BODY in h
     assert "이 기사의 숫자는 위 '숫자로 보는 이번 주'에 모았습니다" in h
 
@@ -133,9 +133,9 @@ def test_deck_points_and_figure_why_length_and_url_checks():
     assert any("의미 85자" in m for m in msgs)
     d2 = sample()
     d2["articles"][0]["points"]["what"] = "자세한 내용은 example.com 참고"
-    d2["articles"][2]["figure"]["why"] = "example.com 참고"
+    d2["articles"][4]["figure"]["why"] = "example.com 참고"
     warns = checks.autofix(d2, {})
-    assert "example.com" not in d2["articles"][0]["points"]["what"] + d2["articles"][2]["figure"]["why"]
+    assert "example.com" not in d2["articles"][0]["points"]["what"] + d2["articles"][4]["figure"]["why"]
     assert len([w for w in warns if w["kind"] == "URL"]) == 2
 
 
@@ -143,7 +143,7 @@ def test_points_without_why_still_work():
     d = sample()
     del d["articles"][0]["points"]["why"]
     h = build("B6", d)["html_preview"]
-    assert h.count(">왜 중요</span>") == 1                                            # 두 번째 기사에만
+    assert h.count(">왜 중요</span>") == 3                                            # 나머지 핵심 세 건에만
 
 
 def test_fallback_deck_when_model_omits_summary_layer():
@@ -156,7 +156,7 @@ def test_review2_shows_deck_and_points():
     d = sample()
     d["articles"][0]["title_alternatives"] = ["대안 a", "대안 b"]
     text = rv.render_review2("2026-W48", d, [], CFG)
-    assert "      ▶ 삼성전자가 웨이퍼 결함의 원인 분석을" in text and "      · 왜 중요: 결함 원인 분석은" in text and "      · 어디까지: 회사 발표 기준이다." in text
+    assert "      ▶ 삼성전자가 결함 원인 분석 AI 에이전트(Defect Agent)에" in text and "      · 왜 중요: 결함 원인 분석은" in text and "      · 어디까지: 회사 발표 기준이다." in text
 
 
 def test_gloss_field_order():

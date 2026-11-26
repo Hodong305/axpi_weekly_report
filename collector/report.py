@@ -1,7 +1,8 @@
 """수집 리포트(Markdown). 운영자가 일요일에 확인하고 사내로 함께 보낸다."""
 import random
 
-from .settings import TOPIC_CODES
+from .competitors import complete_counts, find_company
+from .settings import LLM_AGENTS, TOPIC_CODES
 
 ACTION = {
     "ACCESS_BLOCKED": "개인 브라우저로 열어(필요하면 무료 로그인) 페이지를 저장 → `{manual}/{did}.html` (PDF는 `.pdf`)",
@@ -16,6 +17,55 @@ ACTION = {
 
 def _agents(r):
     return sorted({d["agent"] for d in r["discovery"]})
+
+
+def coverage_table(settings, recs, llm_files):
+    """경쟁사 탐색 범위(설계서 4.5): 회사 × 모델의 확인 여부·후보 수, 수집 결과 complete 수. 재조사 대상 표시."""
+    companies = settings.queries.get("competitors", [])
+    if not companies:
+        return []
+    cov = {}          # (회사, 모델) → {"checked": 확인 항목 수, "found": 후보 수}
+    submitted = False
+    for f in llm_files:
+        if f.get("topic") != "T1" or not f.get("agent"):
+            continue
+        for c in f.get("coverage") or []:
+            name = find_company(companies, c["company"])
+            if not name:
+                continue
+            submitted = True
+            cur = cov.setdefault((name, f["agent"]), {"checked": 0, "found": 0})
+            cur["checked"] += len(c["checked"])
+            cur["found"] += c["found"] or 0
+    counts = complete_counts(companies, recs)
+    L = ["## 경쟁사 탐색 범위",
+         "| 경쟁사 | " + " | ".join(LLM_AGENTS) + " | complete | 비고 |",
+         "|---|" + "---|" * (len(LLM_AGENTS) + 2)]
+    todo = []
+    for c in companies:
+        cells, any_checked = [], False
+        for a in LLM_AGENTS:
+            v = cov.get((c["name"], a))
+            if v is None:
+                cells.append("-")
+            elif v["checked"]:
+                any_checked = True
+                cells.append(f"확인 · 후보 {v['found']}")
+            else:
+                cells.append(f"미확인 · 후보 {v['found']}")
+        # coverage가 한 건도 없으면(모델이 안 적었거나 T1 파일이 없음) 확인 여부로는 판단하지 않는다
+        need = counts[c["name"]] == 0 or (submitted and not any_checked)
+        if need:
+            todo.append(c["name"])
+        L.append(f"| {c['name']} | " + " | ".join(cells) + f" | {counts[c['name']]} | {'**재조사 대상**' if need else ''} |")
+    if not submitted:
+        L.append("")
+        L.append("T1 후보 파일에 coverage가 없어 확인 여부는 알 수 없습니다. complete 수만 표시했습니다.")
+    if todo:
+        L.append("")
+        L.append("- 재조사 대상: " + ", ".join(todo) + " (재조사 T1 프롬프트가 이 회사를 맨 앞에 나열합니다)")
+    L.append("")
+    return L
 
 
 def write_report(settings, docs, stats, meta, errors, path):
@@ -74,6 +124,8 @@ def write_report(settings, docs, stats, meta, errors, path):
     for b in stats["bad_urls"]:
         L.append(f"- 잘못된 URL 무시: {b['url']} ({b['error']})")
     L.append("")
+
+    L += coverage_table(settings, recs, stats["llm_files"])
 
     L.append("## 레지스트리 순회")
     L.append("| id | 방식 | HTTP | 항목 | 채택 | 비고 |")

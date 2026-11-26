@@ -1,5 +1,5 @@
 # MTC AX/PI 위클리 설정값 (설계서 v4.7 10장). 값을 바꾸면 config_version을 올린다.
-config_version: "7"
+config_version: "8"
 
 paths:
   work_dir: work      # 주차별 작업 폴더: candidates/, manual/, prompts/
@@ -42,7 +42,8 @@ thresholds:
 # 사내 파이프라인 값 (설계서 7.2, 9장)
 internal:
   core_min_score: 80
-  core3_min_score: 90
+  core_max: 4                 # 핵심 최대 건수(9.5). 점수 순으로 채우되 경쟁사 사건을 먼저 배정한다
+  competitor_core_min: 2      # 핵심 자격이 있는 경쟁사 사건을 핵심에 먼저 배정하는 최소 건수
   brief_min_score: 60
   ledger_lookback_issues: 12
   article_title_max: 50        # 전문 용어에 쉬운 수식어를 붙일 여유(36 → 50)
@@ -51,13 +52,32 @@ internal:
   punch_chars: 320            # 이번 주 한 방(text+twist, big 제외): 무엇을 잰 숫자인지 + 무엇과 비교해 왜 중요한지
   core_chars: [400, 640]      # 핵심 본문(자세히: 배경·방식·조건·업계 맥락 4~6문장). 요점(points)과 겹치지 않게
   brief_chars: [90, 150]      # 단신 2문장: 무슨 일 + 왜 볼 만한지
-  issue_body_max: 5600        # 한 방 + 핵심(한 줄 핵심·요점·본문·MTC가 볼 것·수치 의미) + 단신 합계
+  issue_body_max: 9000        # 한 방 + 핵심(한 줄 핵심·요점·본문·MTC가 볼 것·수치 의미) + 단신 합계(핵심 4건 기준)
   deck_chars: 120             # 핵심 기사 한 줄 핵심(30초 브리핑에도 쓴다): 주체·사건·결과 + 왜 중요한지
   point_chars: 180            # 핵심 기사 요점(무슨 일 · 얼마나 · 왜 중요 · 어디까지) 각 1~2문장
   figure_why_chars: 80        # 수치의 "왜 중요"(비교 기준·업무상 의미)
   read_chars_per_min: 500     # 읽는 시간 표시용 분당 글자 수
+  # 경쟁 칩메이커(1장 주 목적). 사건 주체(없으면 대표 자료 발행처·제목)가 이름·별칭과 대소문자 무시로 일치하면 경쟁사 사건이다(9.5).
+  # 사외 queries.yaml의 competitors와 같은 회사 목록을 쓴다.
+  competitors:
+    - {name: "SK hynix", aliases: ["SK하이닉스", "SK Hynix", "하이닉스"]}
+    - {name: "Micron", aliases: ["Micron Technology", "마이크론"]}
+    - {name: "TSMC", aliases: ["台積電", "台积电", "Taiwan Semiconductor", "대만 TSMC"]}
+    - {name: "Intel (Foundry)", aliases: ["Intel", "Intel Foundry", "인텔"]}
+    - {name: "GlobalFoundries", aliases: ["GF", "글로벌파운드리스"]}
+    - {name: "UMC", aliases: ["聯電", "联电", "United Microelectronics"]}
+    - {name: "SMIC", aliases: ["中芯国际", "中芯國際", "Semiconductor Manufacturing International"]}
+    - {name: "Kioxia", aliases: ["キオクシア", "KIOXIA", "키옥시아", "Toshiba Memory"]}
+    - {name: "SanDisk", aliases: ["샌디스크"]}
+    - {name: "CXMT", aliases: ["长鑫存储", "長鑫存儲", "ChangXin Memory", "창신메모리"]}
+    - {name: "YMTC", aliases: ["长江存储", "長江存儲", "Yangtze Memory", "양쯔메모리"]}
+    - {name: "Nanya", aliases: ["南亞科", "南亚科", "Nanya Technology", "난야"]}
+    - {name: "Winbond", aliases: ["華邦電", "华邦电", "Winbond Electronics", "윈본드"]}
+    - {name: "PSMC", aliases: ["力積電", "力积电", "Powerchip", "Powerchip Semiconductor"]}
+    - {name: "Rapidus", aliases: ["ラピダス", "라피더스"]}
   verbatim_max_run: 30
-  brief_max: 6                # 단신 최대 건수(핵심이 3건이면 -1)
+  brief_max: 4                # 단신 최대 건수
+  search_terms_max: 3         # 기사(핵심·단신)당 검색어 최대 개수. 근거 블록에 그대로 있는 원문 표기만 남긴다(9.7)
   same_subject_max: 2         # 핵심+단신에서 같은 주체 최대 건수
   watch_chars: 160            # 핵심 기사 'MTC가 볼 것' 1~2문장
   more_max: 20                # 더 볼 거리 최대 건수

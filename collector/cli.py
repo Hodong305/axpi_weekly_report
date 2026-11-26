@@ -3,7 +3,7 @@ import argparse
 import sys
 from datetime import datetime, timedelta
 
-from .candidates import candidate_filename, render_prompt
+from .candidates import candidate_filename, render_prompt, zero_complete_companies
 from .ref import KST, weekly_window
 from .settings import PROMPT_TOPICS, WEEK_RE, load_settings
 
@@ -80,8 +80,10 @@ def main(argv=None):
         topics = PROMPT_TOPICS if a.topic == "all" else [a.topic]
         if a.resurvey:
             topics = [t for t in topics if t != "B"]
+        # 재조사 T1: 최신 수집 결과에서 complete가 0건인 경쟁사를 맨 앞에 나열한다(결과가 없으면 전체 목록 그대로)
+        priority = zero_complete_companies(st, week) if a.resurvey else None
         for t in topics:
-            text = render_prompt(st, t, s, e, a.resurvey)
+            text = render_prompt(st, t, s, e, a.resurvey, priority if t == "T1" else None)
             name = f"{'resurvey-' if a.resurvey else ''}{t}.txt"
             (d / name).write_text(text + "\n", encoding="utf-8")
             print(f"{d / name}")

@@ -54,7 +54,8 @@ def render_table(events):
         total = e["score"]["total"] if e.get("score") and e["score"]["total"] is not None else "-"
         lines.append(" ".join([pad(str(i), 3, True), pad(SLOT_KO[e["slot"]], 4), pad(str(total), 4, True),
                                pad((e["primary_topic"] or "")[:2], 4), pad(_fmt_tail(e["title_draft"], 36), 36),
-                               pad(ledger_display(e), 10), "  ".join(e["flags"])]).rstrip())
+                               pad(ledger_display(e), 10),
+                               "  ".join((["[경쟁사]"] if e.get("competitor") else []) + e["flags"])]).rstrip())
     return "\n".join(lines)
 
 
