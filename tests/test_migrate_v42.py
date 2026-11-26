@@ -12,7 +12,7 @@ from collector.validate import check  # noqa: E402
 
 def old_rec(url, title, date, publisher="발행처", topics=("equipment",), blocks=None, bad_id=False):
     norm, did = ref.document_key(ref.to_ascii_uri(url))
-    blocks = blocks or [{"id": "P1", "kind": "paragraph", "text": "  첫 문단입니다.   " + "가" * 120, "page": None},
+    blocks = blocks or [{"id": "P1", "kind": "paragraph", "text": "  첫 문단입니다.   " + title + "가" * 120, "page": None},
                         {"id": "P2", "kind": "paragraph", "text": "둘째 문단입니다. " + "나" * 120, "page": None},
                         {"id": "P3", "kind": "table", "text": "a | b\r\n1 | 2", "page": None}]
     return {"doc_id": "url1_" + "0" * 64 if bad_id else did, "source_url": url, "normalized_url": norm, "title": title,
@@ -34,7 +34,7 @@ def test_migrate_rules():
         old_rec("https://e.example.org/bad", "id 불일치", "2026-11-18", bad_id=True)],
         "resurvey": {"before_count": 2, "after_count": 3, "topics_checked": {"chipmaker": "칩", "equipment": "장비", "solution": "솔루션", "physical_ai": "로봇"},
                      "report": "2건 → 3건"}}
-    merged, intake, rows, aborted = mg.migrate(old, "2026-W48", st, now="2026-11-26T10:00:00+09:00")
+    merged, intake, rows, aborted, extra = mg.migrate(old, "2026-W48", st, now="2026-11-26T10:00:00+09:00")
     for doc in (merged, intake):
         errs, _ = check(doc, 40, 10)
         assert errs == [], errs
@@ -57,4 +57,4 @@ def test_migrate_rules():
     assert rs["after_count"] == 3 and rs["before_count"] == 2 and rs["report"] == "[v4.2] 2건 → 3건"
     assert [t["topic"] for t in rs["topics_checked"]] == ["T1_CHIPMAKER", "T2_EQUIPMENT", "T3_SOLUTION", "T4_PHYSICAL_AI"]
     assert rs["topics_checked"][0]["method"] == "v4.2 기록" and rs["topics_checked"][0]["result"] == "칩"
-    assert mg.render_report(old, "2026-W48", merged, intake, rows, [])
+    assert mg.render_report([old], "2026-W48", merged, intake, rows, [], extra)
