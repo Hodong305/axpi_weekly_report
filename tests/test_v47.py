@@ -124,7 +124,7 @@ def test_editorial_and_swiss_designs_render_three_layers():
 
 def test_figure_why_is_shown_checked_and_in_text():
     out = render.build_all(sample(), ctx("B4"))
-    assert "왜 중요" in out["html_preview"] and "(왜 중요: 일회성 시범이 아니라 상시 운영 규모)" in out["text"]
+    assert "일회성 시범이 아니라 상시 운영 규모" in out["html_preview"] and "(왜 중요: 일회성 시범이 아니라 상시 운영 규모)" in out["text"]
     d = sample()
     d["articles"][1]["key_figures"][0]["why"] = "가" * 45
     assert any("의미 45자" in m for _, m in checks.length_violations(d, CFG, "정규호"))
