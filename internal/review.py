@@ -284,7 +284,7 @@ def _punch_line(i, p):
 
 def render_review2(issue_week, draft, warnings, cfg=None, img=None):
     cfg = cfg or {}
-    from .draft import TOPIC_LABEL
+    from .draft import POINT_LABELS, TOPIC_LABEL
     lines = [f"{BAR} 검토 요청 ② 머리부·제목 · {issue_week} {BAR}",
              "[A 이번 주 헤드라인]  " + _cands("A", draft["issue_title_candidates"], cfg.get("issue_title_max")),
              "[B 한 줄 요약(총론)]  " + _cands("B", draft["summary_candidates"], (cfg.get("summary_chars") or [0, 0])[1]),
@@ -295,6 +295,11 @@ def render_review2(issue_week, draft, warnings, cfg=None, img=None):
         a = draft["articles"][i]
         mx = cfg.get("article_title_max")
         lines.append(f"  {lab}  " + " | ".join(t + over_note(t, mx) for t in [a["title"]] + list(a["title_alternatives"][:2])))
+        if a["slot"] == "core" and a.get("deck"):       # v4.7 요약층: 바꿀 때는 E(경고 수정안) 또는 draft.yaml 직접 수정
+            lines.append(f"      ▶ {a['deck']}" + over_note(a["deck"], cfg.get("deck_chars")))
+            for k, lab2 in POINT_LABELS:
+                if (a.get("points") or {}).get(k):
+                    lines.append(f"      · {lab2}: {a['points'][k]}" + over_note(a["points"][k], cfg.get("point_chars")))
     lines.append("[F 더 볼 거리]   (분야별 한 줄 요약 · 빼려면 F3=빼기)")
     if not draft.get("more"):
         lines.append("  (없음)")

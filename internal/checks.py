@@ -235,6 +235,10 @@ def autofix(draft, records):
         a["body"] = clean(a["body"], labels[i], "본문")
         if a.get("watch"):
             a["watch"] = clean(a["watch"], labels[i], "MTC가 볼 것")
+        if a.get("deck"):
+            a["deck"] = clean(a["deck"], labels[i], "한 줄 핵심")
+        for pk in list(a.get("points") or {}):
+            a["points"][pk] = clean(a["points"][pk], labels[i], "요점")
         for k in list(a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else []):
             k["value"], k["label"] = clean(k["value"], labels[i], "수치 카드"), clean(k["label"], labels[i], "수치 카드")
         a["title_alternatives"] = [clean(t, labels[i], "제목 대안") for t in a["title_alternatives"]]
@@ -274,6 +278,12 @@ def length_violations(draft, cfg, issue_type):
             v.append((("article", i), f"이미지 설명 {len(a['image']['caption'])}자 > 한도 {cfg['image_caption_chars']}자"))
         if a["slot"] == "core" and len(a.get("watch") or "") > cfg["watch_chars"]:
             v.append((("article", i), f"MTC가 볼 것 {len(a['watch'])}자 > 한도 {cfg['watch_chars']}자"))
+        dmax, pmax = cfg.get("deck_chars", 40), cfg.get("point_chars", 36)
+        if a["slot"] == "core" and len(a.get("deck") or "") > dmax:
+            v.append((("article", i), f"한 줄 핵심 {len(a['deck'])}자 > 한도 {dmax}자"))
+        for pk, pt in (a.get("points") or {}).items():
+            if len(pt) > pmax:
+                v.append((("article", i), f"요점({pk}) {len(pt)}자 > 한도 {pmax}자"))
     for j, m in enumerate(draft.get("more") or []):
         n = len(strip_suffix(m["line"]))
         if n > cfg["more_line_chars"]:
@@ -282,10 +292,18 @@ def length_violations(draft, cfg, issue_type):
 
 
 def body_total(draft):
-    """9.8의 4~6: 이번 주 한 방(text+twist) + 핵심 본문·MTC가 볼 것 + 단신 본문(더 볼 거리·꼬리말은 넣지 않는다)"""
+    """9.8의 4~6: 이번 주 한 방(text+twist) + 핵심 한 줄 핵심·요점·본문·MTC가 볼 것 + 단신 본문(더 볼 거리·꼬리말은 넣지 않는다)"""
     p = draft.get("punch")
     return ((len(p["text"]) + len(p["twist"]) if p else 0)
-            + sum(len(a["body"]) + len(a.get("watch") or "") for a in draft["articles"]))
+            + sum(len(a["body"]) + len(a.get("watch") or "") + len(a.get("deck") or "") + sum(len(x) for x in (a.get("points") or {}).values())
+                  for a in draft["articles"]))
+
+
+def article_fields(a):
+    """검사 대상 글 칸: [(경로 꼬리, 텍스트)]. 요점은 ("points", 키)."""
+    out = [((f,), a[f]) for f in ("title", "deck", "body", "watch") if a.get(f)]
+    out += [(("points", k), v) for k, v in (a.get("points") or {}).items() if v]
+    return out
 
 
 def hard_violations(draft, events_by_id, records, cfg, issue_type):
@@ -309,12 +327,10 @@ def hard_violations(draft, events_by_id, records, cfg, issue_type):
                 hit = verbatim_hit(img["caption"], norm(" ".join(x for x in (cand["caption"], cand["alt"]) if x)), run)
                 if hit:
                     v.append((("article", i), "원문 연속 일치", f"이미지 설명이 원문 캡션과 {run}자 이상 같음: \"{hit[:40]}…\""))
-        for fld in ("title", "body", "watch"):
-            if not a.get(fld):
-                continue
-            hit = verbatim_hit(a[fld], src, run)
+        for path, text in article_fields(a):
+            hit = verbatim_hit(text, src, run)
             if hit:
-                v.append((("article", i), "원문 연속 일치", f"{fld}에 원문과 {run}자 이상 같은 구간: \"{hit[:40]}…\""))
+                v.append((("article", i), "원문 연속 일치", f"{'.'.join(path)}에 원문과 {run}자 이상 같은 구간: \"{hit[:40]}…\""))
                 break
     for j, m in enumerate(draft.get("more") or []):
         errs = evidence_errors(m["evidence_ids"], records, more_docs(m, events_by_id))
@@ -350,11 +366,9 @@ def soft_warnings(draft, events_by_id, records, cfg, issue_type):
         all_pairs += pairs
         src = _source_text(ev, records)
         all_src += "\n" + src
-        for fld in ("title", "body", "watch"):
-            if not a.get(fld):
-                continue
-            warns += number_warnings(a[fld], pairs, ["articles", i, fld], labels[i])
-            warns += company_warnings(a[fld], src, labels[i])
+        for path, text in article_fields(a):
+            warns += number_warnings(text, pairs, ["articles", i, *path], labels[i])
+            warns += company_warnings(text, src, labels[i])
         for k_i, k in enumerate(a.get("key_figures") or []):
             warns += number_warnings(k["value"], pairs, ["articles", i, "key_figures", k_i, "value"], labels[i], figure=True)
             warns += company_warnings(k["label"], src, labels[i])

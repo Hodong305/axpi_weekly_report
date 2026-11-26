@@ -1,7 +1,7 @@
 # 사외 수집 운영 절차 (모든 실행 주체 공통)
 
 이 저장소의 사외 수집은 사람이 직접 하든 Claude Code·Codex·Gemini CLI 같은 에이전트가 하든 **아래 절차와 명령만으로** 진행한다.
-기준 문서는 `docs/MTC-AX-Unified-Design-v4.6.md`이고, 결과 형식은 `schema/MTC-AX-collection-v4.6.schema.json`이다.
+기준 문서는 `docs/MTC-AX-Unified-Design-v4.7.md`이고, 결과 형식은 `schema/MTC-AX-collection-v4.6.schema.json`이다.
 
 ## 에이전트가 지켜야 할 규칙
 

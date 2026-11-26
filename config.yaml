@@ -1,5 +1,5 @@
-# MTC AX/PI 위클리 설정값 (설계서 v4.6 10장). 값을 바꾸면 config_version을 올린다.
-config_version: "5"
+# MTC AX/PI 위클리 설정값 (설계서 v4.7 10장). 값을 바꾸면 config_version을 올린다.
+config_version: "6"
 
 paths:
   work_dir: work      # 주차별 작업 폴더: candidates/, manual/, prompts/
@@ -47,24 +47,27 @@ internal:
   ledger_lookback_issues: 12
   article_title_max: 36
   issue_title_max: 30         # 이번 주 헤드라인
-  summary_chars: [100, 170]   # 한 줄 요약(총론)
+  summary_chars: [70, 120]    # 한 줄 요약(총론). v4.7에서 줄임(100~170 → 70~120)
   punch_chars: 120            # 이번 주 한 방(text+twist, big 제외)
-  core_chars: [220, 300]
-  brief_chars: [60, 95]
-  issue_body_max: 2000
+  core_chars: [150, 220]      # 핵심 본문(자세히). v4.7에서 줄임(220~300 → 150~220): 요점은 points가 맡는다
+  brief_chars: [45, 75]       # 단신 한 문장. v4.7에서 줄임(60~95 → 45~75)
+  issue_body_max: 1600        # 한 방 + 핵심(한 줄 핵심·요점·본문·MTC가 볼 것) + 단신 합계. v4.7에서 줄임(2000 → 1600)
+  deck_chars: 40              # 핵심 기사 한 줄 핵심(30초 브리핑에도 쓴다)
+  point_chars: 36             # 핵심 기사 요점 한 줄(무엇이 · 얼마나 · 어디까지 확인)
+  read_chars_per_min: 500     # 읽는 시간 표시용 분당 글자 수
   verbatim_max_run: 30
   brief_max: 6                # 단신 최대 건수(핵심이 3건이면 -1)
   same_subject_max: 2         # 핵심+단신에서 같은 주체 최대 건수
   watch_chars: 80             # 핵심 기사 'MTC가 볼 것' 한 문장
   more_max: 20                # 더 볼 거리 최대 건수
-  more_line_chars: 70         # 더 볼 거리 한 줄 요약
+  more_line_chars: 60         # 더 볼 거리 한 줄 요약. v4.7에서 줄임(70 → 60)
   newsletter_name: "MTC AX Tech Brief"            # 후보, 확정 전. B3 테마는 끝 두 단어(Tech Brief)를 강조색으로 쓴다
   newsletter_tagline: "메모리 제조기술센터 AX/PI팀이 매주 정리하는 팹 AI 브리프"
   newsletter_team: "삼성전자 DS부문 메모리 제조기술센터(MTC) AX/PI팀"   # 꼬리말 소개("…팀이 매주 화요일 보내는")
   image_caption_chars: 40       # 대표 이미지 설명(새로 쓴 문장)
   image_max_kb: 300             # 발송본 이미지 한 장의 파일 크기 상한(표시 폭 624px)
   newsletter_from: ""           # newsletter.eml의 From. 비우면 헤더를 넣지 않는다(편집자가 메일 프로그램에서 정한다)
-  newsletter_theme: B3                               # A 삼성 블루 팝 / B 클린룸 민트 / C 웨이퍼 나이트 / B3 민트 블록(꼭지 번호)
+  newsletter_theme: B4                               # B4 요점 카드(기본, v4.7) / B5 스마트 브리핑(본문 없음) / B3 민트 블록 / A·B·C(v4.4 구조)
   # 사내 모델 접속(OpenAI 호환 /v1/chat/completions, 예: vLLM·Ollama). 모든 LLM 단계가 같은 모델을 쓴다.
   llm:
     backend: http                         # http(OpenAI 호환 서버) | file(요청·응답 파일을 주고받음, 사람·에이전트가 모델 역할)

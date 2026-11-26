@@ -374,11 +374,11 @@ def test_caption_checks_length_url_and_verbatim():
     ev["doc_ids"] = [lam["doc_id"]]
     ev.update(cap="core", slot="core")
     orig = lam["media"][1]["caption"]
-    art = {"event_id": ev["event_id"], "slot": "core", "title": "t", "title_alternatives": [], "body": fill("본문", 280), "watch": "w", "key_figures": [],
+    art = {"event_id": ev["event_id"], "slot": "core", "title": "t", "title_alternatives": [], "body": fill("본문", 200), "watch": "w", "key_figures": [],
            "evidence_ids": [f"{lam['doc_id']}/P1"], "credits": [],
            "image": {"media_ref": f"{lam['doc_id']}#M2", "caption": "가" * 41}}
-    draft = {"issue_week": WEEK, "issue_title": "제목", "summary": fill("총론", 130), "punch": None, "punch_candidates": [], "glossary": [],
-             "issue_title_candidates": ["제목"], "summary_candidates": [fill("총론", 130)], "articles": [art], "more": [], "excluded_count": 0, "review_log": []}
+    draft = {"issue_week": WEEK, "issue_title": "제목", "summary": fill("총론", 100), "punch": None, "punch_candidates": [], "glossary": [],
+             "issue_title_candidates": ["제목"], "summary_candidates": [fill("총론", 100)], "articles": [art], "more": [], "excluded_count": 0, "review_log": []}
     by_id = {ev["event_id"]: ev}
     assert any("이미지 설명 41자" in m for _, m in checks.length_violations(draft, CFG, "정규호"))
     art["image"]["caption"] = "자세히는 https://x.example.org/a 참조"

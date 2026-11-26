@@ -1,4 +1,4 @@
-# 소식지 테마(설계서 9.8): 구조는 같고 색만 다르다. internal.newsletter_theme(A|B|C)로 고른다.
+# 소식지 테마(설계서 9.8). A·B·C는 같은 구조(newsletter.html)에 색만 다르고, B3·B4·B5는 template으로 구조를 바꾼다. internal.newsletter_theme으로 고른다(기본 B4).
 # topic: 꼭지별 [글자색, 배경색]. hero_dark가 참이면 그라데이션 머리띠(고정색 + 그라데이션), 거짓이면 흰 머리띠.
 A:
   name: A · 삼성 블루 팝
@@ -111,3 +111,67 @@ B3:
   punch_twist: "#bfe9e4"
   watch_bg: "#f3fbfa"
   watch_ink: "#00685f"
+B4:
+  name: B4 · 요점 카드(v4.7 기본)
+  template: newsletter-b4.html       # 30초 브리핑 + 핵심 카드(한 줄 핵심 · 요점 3줄 · 수치 · 자세히 · MTC가 볼 것)
+  show_body: true
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#0b2b3c"
+  bg: "#eef6f5"
+  hero: "#00a898"
+  hero2: "#00a898"
+  hero_text: "#ffffff"
+  hero_sub: "#dcfbf6"
+  hero_chip_bg: "#0b8f82"
+  accent: "#00a898"
+  ink: "#0f2733"
+  soft: "#f3faf9"
+  card_border: "#dbeceb"
+  radius: 16px
+  topic:
+    T1: ["#2563eb", "#e8f0ff"]
+    T2: ["#00897b", "#dff5f2"]
+    T3: ["#7c4dcc", "#f1eaff"]
+    T4: ["#e0640f", "#fff0e2"]
+    B: ["#5a6475", "#eef0f3"]
+  punch_bg: "#0f2733"
+  punch_border: "#0f2733"
+  punch_big: "#2fe0cc"
+  punch_label: "#2fe0cc"
+  punch_text: "#ffffff"
+  punch_twist: "#b9e6e0"
+  watch_bg: "#fff7e6"
+  watch_ink: "#8a5300"
+B5:
+  name: B5 · 스마트 브리핑(본문 없음, v4.7)
+  template: newsletter-b5.html       # 핵심 본문 없이 라벨 줄(핵심·무엇이·얼마나·어디까지·그래서)과 큰 숫자
+  show_body: false
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#2fe0cc"
+  bg: "#eceff3"
+  hero: "#0f1f2b"
+  hero2: "#0f1f2b"
+  hero_text: "#ffffff"
+  hero_sub: "#a9bcc7"
+  accent: "#00a898"
+  ink: "#0f1f2b"
+  soft: "#f4f6f8"
+  card_border: "#e3e8ec"
+  footer_bg: "#f7f9fa"
+  radius: 16px
+  topic:
+    T1: ["#2563eb", "#e8f0ff"]
+    T2: ["#00897b", "#dff5f2"]
+    T3: ["#7c4dcc", "#f1eaff"]
+    T4: ["#e0640f", "#fff0e2"]
+    B: ["#5a6475", "#eef0f3"]
+  punch_bg: "#ffffff"
+  punch_border: "#2fe0cc"
+  punch_big: "#0f1f2b"
+  punch_label: "#00897b"
+  punch_text: "#0f1f2b"
+  punch_twist: "#5b6b75"
+  watch_bg: "#ffffff"
+  watch_ink: "#8a5300"

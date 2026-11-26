@@ -25,12 +25,21 @@ ARTICLE_SCHEMA = {          # 단신(선택 항목 figure: 오른쪽 수치 배�
 IMAGE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["media_ref", "caption"],
                 "properties": {"media_ref": {"type": "string"}, "caption": {"type": "string", "minLength": 1}}}
 
-CORE_ARTICLE_SCHEMA = {     # 핵심: 본문 + MTC가 볼 것(watch) + 수치 카드(key_figures 0~3개) + 대표 이미지(image, 후보가 있을 때)
+POINTS_SCHEMA = {          # v4.7 핵심 요점 3줄: 무엇이 바뀌었나 · 얼마나 · 어디까지 확인됐나(라벨은 코드가 붙인다)
+    "type": "object", "additionalProperties": False, "required": ["what", "how_much", "scope"],
+    "properties": {k: {"type": "string", "minLength": 1} for k in ("what", "how_much", "scope")}}
+POINT_LABELS = (("what", "무엇이"), ("how_much", "얼마나"), ("scope", "어디까지"))
+
+CORE_ARTICLE_SCHEMA = {     # 핵심: 한 줄 핵심(deck) + 요점(points) + 본문 + MTC가 볼 것(watch) + 수치 카드(key_figures 0~3개) + 대표 이미지(image, 후보가 있을 때)
     "type": "object", "additionalProperties": False,
     "required": ["event_id", "title", "title_alternatives", "body", "watch", "key_figures", "evidence_ids"],
     "properties": {**{k: v for k, v in ARTICLE_SCHEMA["properties"].items() if k != "figure"},
+                   "deck": {"type": "string", "minLength": 1}, "points": POINTS_SCHEMA,
                    "watch": {"type": "string", "minLength": 1}, "key_figures": {"type": "array", "maxItems": 3, "items": FIGURE_SCHEMA},
                    "image": {"anyOf": [{"type": "null"}, IMAGE_SCHEMA]}}}
+# deck·points는 v4.7에서 추가한 키다. 프롬프트는 항상 쓰라고 하지만 스키마에서는 선택으로 두고, 빠지면 코드가 본문으로 대신한다(fallback_deck).
+
+DECK_MAX, POINT_MAX = 40, 36
 
 IMAGE_CAPTION_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["caption"],
                         "properties": {"caption": {"type": "string", "minLength": 1}}}
@@ -128,6 +137,8 @@ def _article_user(judge, ev, slot, records, cfg, feedback):
     info = {"event_id": ev["event_id"], "slot": slot, "subject": ev["subject"], "site_task": ev["site_task"],
             "제목_글자수_한도": cfg["article_title_max"], "본문_글자수_범위": [lo, hi]}
     if slot == "core":
+        info["한줄핵심_글자수_한도"] = cfg.get("deck_chars", DECK_MAX)
+        info["요점_한줄_글자수_한도"] = cfg.get("point_chars", POINT_MAX)
         info["watch_글자수_한도"] = cfg["watch_chars"]
         info["key_figures_최대"] = 3
         if image_candidates(ev, records, cfg):
@@ -185,6 +196,9 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
     art = {"event_id": ev["event_id"], "slot": slot, "title": r["title"], "title_alternatives": list(r["title_alternatives"]),
            "tags": make_tags(ev, slot), "body": r["body"].strip()}
     if slot == "core":
+        art["deck"] = (r.get("deck") or "").strip() or fallback_deck(art["body"], cfg)
+        pts = r.get("points")
+        art["points"] = {k: pts[k].strip() for k, _ in POINT_LABELS} if pts else None
         art["watch"] = r["watch"].strip()
         art["key_figures"] = [{"value": k["value"].strip(), "label": k["label"].strip()} for k in r["key_figures"]]
         img = r.get("image")
@@ -194,6 +208,12 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
     art["credits"] = build_credits(r["evidence_ids"], ev["rep_doc_id"], records)
     art["evidence_ids"] = list(r["evidence_ids"])
     return art, failed
+
+
+def fallback_deck(body, cfg=None):
+    """한 줄 핵심이 없을 때(이전 버전 응답, 자동 작성 실패): 본문 첫 문장을 한도에 맞춰 자른다."""
+    first = re.split(r"(?<=[.!?。])\s+|(?<=다\.)", body.strip(), maxsplit=1)[0].strip()
+    return trunc(first, (cfg or {}).get("deck_chars", DECK_MAX))
 
 
 def key_figure_errors(figs, evidence_ids, records):
@@ -306,7 +326,7 @@ def _header_user(judge, articles, more, issue_type, counts, cfg, feedback):
             "한방_글자수_한도(text+twist)": cfg["punch_chars"], "통계": counts}
     parts = ["[작성 지침]\n" + json.dumps(info, ensure_ascii=False)]
     for a in articles:
-        parts.append("[기사] " + json.dumps({"slot": a["slot"], "title": a["title"], "body": a["body"], "watch": a.get("watch"),
+        parts.append("[기사] " + json.dumps({"slot": a["slot"], "title": a["title"], "deck": a.get("deck"), "body": a["body"], "watch": a.get("watch"),
                                            "key_figures": a.get("key_figures"), "evidence_ids": a["evidence_ids"]}, ensure_ascii=False))
     for m in more:
         parts.append("[더 볼 거리] " + json.dumps({"line": m["line"], "evidence_ids": m["evidence_ids"]}, ensure_ascii=False))

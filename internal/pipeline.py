@@ -605,7 +605,8 @@ class Pipeline:
                "theme": self.cfg.get("newsletter_theme", "A"),
                "period_short": render.period_short(self.pkg.doc["window_start"], self.pkg.doc["window_end_exclusive"]),
                "issue_no": metrics.issue_number(self.s.pilot_csv, self.week), "n_docs": len(self.records)}
-        ctx.update(image_loader=self.load_image, image_max_kb=self.cfg["image_max_kb"], newsletter_from=self.cfg.get("newsletter_from", ""))
+        ctx.update(image_loader=self.load_image, image_max_kb=self.cfg["image_max_kb"], newsletter_from=self.cfg.get("newsletter_from", ""),
+                   read_chars_per_min=self.cfg.get("read_chars_per_min", 500))
         built = render.build_all(d, ctx)
         out = self.s.out_dir(self.week)
         out.mkdir(parents=True, exist_ok=True)

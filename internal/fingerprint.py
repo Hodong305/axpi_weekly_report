@@ -20,7 +20,7 @@ def _file_sha(path):
 
 
 def design_version():
-    p = ROOT / "docs" / "MTC-AX-Unified-Design-v4.6.md"
+    p = ROOT / "docs" / "MTC-AX-Unified-Design-v4.7.md"
     m = re.search(r"\*\*(v\d+(?:\.\d+)*)\b", p.read_text(encoding="utf-8")) if p.exists() else None
     return m.group(1) if m else "unknown"
 

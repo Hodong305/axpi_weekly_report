@@ -22,10 +22,13 @@ def _pattern(term):
 
 
 def gloss_fields(draft):
-    """풀이를 붙이는 자리(제목·헤드라인·총론에는 붙이지 않는다), 문서 순서: 핵심 본문·MTC가 볼 것 → 단신 본문 → 더 볼 거리.
-    반환: [(경로, 텍스트)]"""
+    """풀이를 붙이는 자리(제목·헤드라인·총론·한 줄 핵심에는 붙이지 않는다), 문서 순서: 핵심 요점·본문·MTC가 볼 것 → 단신 본문 → 더 볼 거리.
+    반환: [(경로, 텍스트)]. 요점은 ("articles", i, "point_what") 등."""
     out = []
     for i, a in enumerate(draft.get("articles") or []):
+        for k, v in (a.get("points") or {}).items():
+            if v:
+                out.append((("articles", i, "point_" + k), v))
         out.append((("articles", i, "body"), a["body"]))
         if a.get("watch"):
             out.append((("articles", i, "watch"), a["watch"]))

@@ -102,8 +102,8 @@ LONG_B = "Intel Foundry, AI 보조 공정 최적화 사례를 학회에서 처�
 
 def test_overlong_alternatives_are_kept_and_shown_with_reason():
     assert len(LONG_A) > 36 and len(LONG_B) > 36
-    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 280))
-    draft["summary"] = draft["summary_candidates"][0] = fill("총론", 130)
+    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 200))
+    draft["summary"] = draft["summary_candidates"][0] = fill("총론", 100)
     draft["articles"][0]["title"] = "Lam 제목"
     draft["articles"][0]["title_alternatives"] = [LONG_A, LONG_B]
     draft["articles"][0]["evidence_ids"] = [f"{d}/P1"]

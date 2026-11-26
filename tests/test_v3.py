@@ -97,7 +97,7 @@ def test_s7_proposes_glossary_for_unknown_acronym_and_pipeline_appends(tmp_path)
         def r_s6_article(self, user):
             out = super().r_s6_article(user)
             if '"slot": "core"' in user and "Lam" in user:
-                out["body"] = fill("QWXZ 설비가 챔버 매칭 시간을 최대 30% 줄였다. AMHS 연계도 있다.", 280)
+                out["body"] = fill("QWXZ 설비가 챔버 매칭 시간을 최대 30% 줄였다. AMHS 연계도 있다.", 200)
             return out
 
         def r_s6_glossary(self, user):
@@ -120,7 +120,7 @@ def test_s7_proposes_glossary_for_unknown_acronym_and_pipeline_appends(tmp_path)
 
 
 def test_glossary_proposal_failure_is_listed_for_manual_input():
-    draft, by_id, recs, d = articles_ctx(fill("QWXZ 설비를 쓴다", 280))
+    draft, by_id, recs, d = articles_ctx(fill("QWXZ 설비를 쓴다", 200))
     draft["more"] = []
     c = FakeClient({"s6_glossary": lambda u: {"term": "다른말", "meaning": "x", "evidence_ids": []}})
     warns = []
@@ -140,7 +140,7 @@ def test_header_input_is_final_drafts_and_punch_validation():
     d = [r for r in sample_records() if r["publisher"] == "Lam Research"][0]["doc_id"]
     articles = [{"slot": "core", "title": "제목", "body": "본문", "watch": "볼 것", "key_figures": [], "evidence_ids": [f"{d}/P1"]}]
     more = [{"line": "더 볼 거리 줄", "evidence_ids": [f"{d}/P2"]}]
-    good = {"issue_title_candidates": ["가", "나", "다"], "summary_candidates": [fill("총론", 130)] * 2,
+    good = {"issue_title_candidates": ["가", "나", "다"], "summary_candidates": [fill("총론", 100)] * 2,
             "punch_candidates": [{"big": "30%", "label": "아무거나", "text": "t", "twist": "w", "evidence_id": f"{d}/P1"}]}
     bad_ev = dict(good, punch_candidates=[dict(good["punch_candidates"][0], evidence_id=f"{d}/P9")])
     bad_big = dict(good, punch_candidates=[dict(good["punch_candidates"][0], big="77%")])
@@ -164,12 +164,12 @@ def test_header_input_is_final_drafts_and_punch_validation():
 
 
 def test_header_checks_summary_range_and_punch_length():
-    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 280))
+    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 200))
     draft["summary"] = fill("총론", 50)
     draft["punch"] = {"big": "30%", "label": "x", "text": "가" * 80, "twist": "나" * 60, "evidence_id": f"{d}/P1"}
     msgs = [m for _, m in checks.length_violations(draft, CFG, "정규호")]
     assert any("총론 50자" in m for m in msgs) and any("이번 주 한 방" in m and "140자" in m for m in msgs)
-    assert not any("총론" in m for _, m in checks.length_violations(dict(draft, summary=fill("총론", 130)), CFG, "정규호"))
+    assert not any("총론" in m for _, m in checks.length_violations(dict(draft, summary=fill("총론", 100)), CFG, "정규호"))
     assert not any("총론" in m for _, m in checks.length_violations(dict(draft, summary=fill("총론", 50)), CFG, "현황호"))
     draft["punch"]["big"] = "99%"                                               # 근거에 없는 big → 근거 위반
     assert any(t == ("header",) and k == "근거 ID" for t, k, _ in checks.hard_violations(draft, by_id, recs, CFG, "정규호"))
@@ -203,7 +203,7 @@ def test_key_figure_phrase_accepted_in_core_article_and_brief_figure():
     assert draftmod.key_figure_errors([{"value": "1개 라인 → 2개 라인", "label": "x"}], [f"{d}/P1"], recs) == []
     assert draftmod.key_figure_errors([{"value": "수 시간", "label": "x"}], ev, recs)
     e = ev_new(d, ko)
-    brief = {"event_id": e["event_id"], "title": "t", "title_alternatives": ["a", "b"], "body": fill("본문", 80),
+    brief = {"event_id": e["event_id"], "title": "t", "title_alternatives": ["a", "b"], "body": fill("본문", 60),
              "figure": {"value": "2개 라인", "label": "운영 범위"}, "evidence_ids": [f"{d}/P1"]}
     art, failed = draftmod.gen_article(Judge(FakeClient({"s6_article": lambda u: brief})), e, "brief", recs, CFG)
     assert not failed and art["figure"] == {"value": "2개 라인", "label": "운영 범위"} and "watch" not in art
@@ -240,7 +240,7 @@ def test_figure_fix_adds_qualifier_and_passes_recheck():
 
 def test_e_fix_on_key_figure_is_applied_through_review():
     """E=수정을 고르면 수치 카드가 실제로 바뀐다(이전에는 수정안이 없어 아무 일도 일어나지 않았다)."""
-    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 280))
+    draft, by_id, recs, d = articles_ctx(fill("정상 본문", 200))
     draft["articles"][0]["evidence_ids"] = [f"{d}/P2"]
     draft["articles"][0]["key_figures"] = [{"value": "12", "label": "고객 팹"}]
     recs[d]["body"]["blocks"][1]["text"] = "The rollout covers more than 12 customer fabs over eight weeks."
@@ -345,10 +345,10 @@ def test_config_v3_keys():
     cfg = settings_mod.load().internal
     for gone in ("one_line_max", "abstract_chars", "hook_chars"):
         assert gone not in cfg
-    assert cfg["summary_chars"] == [100, 170] and cfg["punch_chars"] == 120 and cfg["article_title_max"] == 36
-    assert cfg["newsletter_name"] == "MTC AX Tech Brief" and cfg["newsletter_theme"] == "B3" and "팹 AI 브리프" in cfg["newsletter_tagline"]
+    assert cfg["summary_chars"] == [70, 120] and cfg["punch_chars"] == 120 and cfg["article_title_max"] == 36
+    assert cfg["newsletter_name"] == "MTC AX Tech Brief" and cfg["newsletter_theme"] == "B4" and "팹 AI 브리프" in cfg["newsletter_tagline"]
     assert cfg["newsletter_team"].endswith("AX/PI팀")
-    assert settings_mod.load().config["config_version"] == "5"
+    assert settings_mod.load().config["config_version"] == "6"
 
 
 def test_step_prompts_carry_v3_rules():
