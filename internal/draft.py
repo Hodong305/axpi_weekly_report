@@ -39,7 +39,7 @@ CORE_ARTICLE_SCHEMA = {     # 핵심: 한 줄 핵심(deck) + 요점(points) + �
                    "image": {"anyOf": [{"type": "null"}, IMAGE_SCHEMA]}}}
 # deck·points는 v4.7에서 추가한 키다. 프롬프트는 항상 쓰라고 하지만 스키마에서는 선택으로 두고, 빠지면 코드가 본문으로 대신한다(fallback_deck).
 
-DECK_MAX, POINT_MAX = 40, 36
+DECK_MAX, POINT_MAX = 60, 36
 
 IMAGE_CAPTION_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["caption"],
                         "properties": {"caption": {"type": "string", "minLength": 1}}}

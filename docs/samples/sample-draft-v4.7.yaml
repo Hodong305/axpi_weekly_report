@@ -22,7 +22,7 @@ articles:
     title: 수 시간 걸리던 결함 원인 찾기, 삼성 AI 에이전트는 ‘수 분’
     title_alternatives: []
     tags: [칩메이커, 현장 실증·적용, 운영사 발표]
-    deck: 결함 원인 분석을 AI 에이전트가 먼저 맡아 몇 분 만에 답을 낸다
+    deck: 삼성전자, 웨이퍼 결함 원인 분석에 AI 에이전트 적용…분석 시간 수 시간 → 수 분
     points:
       what: 웨이퍼 결함 RCA를 에이전트가 먼저 수행하고 엔지니어가 검토
       how_much: 원인 분석 시간 수 시간 → 수 분
@@ -39,7 +39,7 @@ articles:
     title: 로봇개가 서브팹 9만 건 점검…GF, Spot을 팹 4곳으로
     title_alternatives: []
     tags: [Physical AI, 현장 실증·적용, 운영사 발표]
-    deck: 서브팹 설비 순회 점검을 로봇이 돌고, 적용 팹을 4곳으로 넓힌다
+    deck: GlobalFoundries, 로봇개 Spot의 서브팹 점검을 팹 4곳으로 확대…누적 9만 건
     points:
       what: 4족 로봇 Spot이 서브팹 설비 순회 점검을 수행
       how_much: 누적 점검 임무 9만 건 이상, 임무 성공률 99%

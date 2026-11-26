@@ -8,7 +8,7 @@ MTC AX/PI팀의 제조 AI관련 주간 소식지 발간을 위한 리포
 - `AGENTS.md` — 사외 수집 주간 절차(사람·Claude·GPT·Gemini 공통)
 - `collector/` — 사외 수집기, `config.yaml`·`sources.yaml`·`queries.yaml` — 설정
 - `prompts/` — LLM 후보 탐색 프롬프트, 사내 운영·단계 프롬프트
-- `collector/media.py` — 공식 발표 이미지 후보 추출·내려받기·축소(설계서 4.4), `internal/templates/newsletter.html`·`newsletter-b3.html`·`newsletter-b4.html`·`newsletter-b5.html`, `themes.yaml` — 발송본 HTML 템플릿(표 기반·인라인 스타일, 링크·원격 이미지 없음)과 테마 A·B·C·B3·B4·B5(`internal.newsletter_theme`, 기본 B4 요점 카드)
+- `collector/media.py` — 공식 발표 이미지 후보 추출·내려받기·축소(설계서 4.4), `internal/templates/newsletter.html`·`newsletter-b3.html`·`newsletter-b4.html`·`newsletter-b5.html`·`newsletter-e.html`·`newsletter-s.html`, `themes.yaml` — 발송본 HTML 템플릿(표 기반·인라인 스타일, 링크·원격 이미지 없음)과 테마 A·B·C·B3·B4·B5·E·S(`internal.newsletter_theme`, 기본 B4 요점 카드, E 에디토리얼·S 스위스 볼드는 시안)
 - `tools/render_sample.py`, `docs/samples/` — 견본 원고로 테마별 발송본을 만들어 비교(`python tools/render_sample.py --png` → `out_internal/samples/`), v4.7 결정 사항은 `docs/samples/v4.7-결정과-비교.md`
 - `glossary.yaml` — 소식지 약어·용어 풀이(이번 호 첫 등장에 괄호 풀이, 새 용어는 검토 요청 ②의 [G]에서 확정되면 발송 때 추가)
 - `tools/compare_runs.py` — 이전 수집 결과와 새 수집 결과 비교(`python tools/compare_runs.py OLD.json NEW.json --out report.md`)

@@ -35,7 +35,7 @@
     <!--LOOP tldr-->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;"><tr>
       <td width="30" valign="top" style="font-size:15px;font-weight:800;color:{{fg}};padding-top:1px;">{{num}}</td>
-      <td valign="top" style="font-size:14.5px;line-height:1.55;"><!--IF is_core--><b><!--END is_core-->{{line}}<!--IF is_core--></b><!--END is_core--> &nbsp;{{{pill_html}}}</td>
+      <td valign="top" style="font-size:14.5px;line-height:1.55;"><!--IF is_core--><b><!--END is_core-->{{line}}<!--IF is_core--></b><!--END is_core--></td>
     </tr></table>
     <!--END tldr-->
   </td></tr></table>
@@ -78,7 +78,7 @@
     <!--END image_src-->
     <div style="padding:14px 18px 16px 18px;">
       <!--IF followup--><div style="font-size:12px;color:{{accent}};margin-bottom:4px;">↻ {{followup}}</div><!--END followup-->
-      <div>{{{pill_html}}} &nbsp;{{{stage_html}}}<!--IF evidence_tag--> <span style="font-size:11.5px;color:#8a94a6;">· {{evidence_tag}}</span><!--END evidence_tag--></div>
+      <div>{{{pill_html}}}<!--IF tags_text--> <span style="font-size:11.5px;color:#8a94a6;">· {{tags_text}}</span><!--END tags_text--></div>
       <div style="font-size:19.5px;font-weight:800;line-height:1.4;letter-spacing:-0.3px;margin-top:8px;">{{title}}</div>
       <!--IF deck--><div style="font-size:15px;font-weight:bold;line-height:1.55;color:{{topic_fg}};margin-top:6px;">{{deck}}</div><!--END deck-->
       <!--IF has_points-->
@@ -161,7 +161,6 @@
   <div style="border-top:1px solid {{card_border}};padding-top:10px;font-size:12px;line-height:1.7;color:#8a94a6;">
     {{name}}는 {{team}}이 매주 화요일 보내는 제조 AI 동향 소식지입니다. 이번 호는 공개 자료 {{n_docs}}건을 검토해 {{n_pub}}건을 골랐고,
     사내 AI가 초안을 쓰고 편집자가 검토했습니다. 원문 링크는 보안 정책상 싣지 않으니 출처의 발행처·제목으로 검색해 보세요.<!--IF has_image--> 이미지는 각 발행처의 공개 자료이며 저작권은 발행처에 있습니다.<!--END has_image--><br>
-    ●●●● 확인 단계: 구상·연구 → 도입 계획 → 현장 실증·적용 → 양산·상시 운영.<br>
     이 밖에 검토했으나 싣지 않은 자료는 {{excluded_count}}건입니다.<br>
     의견·제보·정정은 이 메일에 회신해 주세요.
   </div>

@@ -119,26 +119,12 @@ def number_marker(theme, code):
             f'{B3_NUM[code]}</span>&nbsp;<span style="font-size:12px;font-weight:bold;color:{fg};">{B3_NAME[code]}</span>')
 
 
-STAGE = {"구상·연구": 1, "도입 계획": 2, "현장 실증·적용": 3, "양산·상시 운영": 4}     # v4.7 확인 단계 막대(꼬리표 성숙도)
-EVIDENCE_TAGS = ("독립 검증·기관 확정", "운영사 발표", "당사자 발표", "언론 보도")
-
-
 def topic_pill(theme, code):
     """v4.7 꼭지 표식: 꼭지 색 바탕의 작은 이름표(이모지·번호 없음)."""
     fg, bg = theme["topic"][code]
     return (f'<span style="display:inline-block;background:{bg};color:{fg};font-size:11.5px;font-weight:bold;padding:2px 8px;'
             f'border-radius:999px;">{B3_NAME[code]}</span>')
 
-
-def stage_meter(theme, code, tags):
-    """확인 단계 막대: ●●●○ 현장 실증·적용. 글자로 그려 메일 프로그램마다 같게 보인다. 성숙도 꼬리표가 없으면 빈 문자열."""
-    label = next((t for t in tags or [] if t in STAGE), None)
-    if not label:
-        return ""
-    n, (fg, _) = STAGE[label], theme["topic"][code]
-    return (f'<span style="color:{fg};font-size:11px;letter-spacing:1px;">{"●" * n}</span>'
-            f'<span style="color:#d3dbe0;font-size:11px;letter-spacing:1px;">{"●" * (4 - n)}</span>'
-            f'&nbsp;<span style="font-size:11.5px;color:#6b7785;">{html.escape(label)}</span>')
 
 
 def read_minutes(draft, show_body, cpm):
@@ -265,8 +251,7 @@ def _build(draft, ctx, imgs, mode):
         pts = a.get("points") or {}
         points = [{"label": lab, "text_html": to_html(segs[("articles", i, "point_" + k)])}
                   for k, lab in POINT_LABELS if pts.get(k) and ("articles", i, "point_" + k) in segs]
-        return {"pill_html": topic_pill(th, code), "stage_html": stage_meter(th, code, tags),
-                "evidence_tag": next((t for t in tags if t in EVIDENCE_TAGS), ""), "deck": a.get("deck") or "",
+        return {"pill_html": topic_pill(th, code), "topic_name": B3_NAME[code], "deck": a.get("deck") or "",
                 "points": points, "has_points": bool(points), "show_body": show_body or a["slot"] != "core",
                 "fig1_value": figs[0]["value"] if figs else "", "fig1_label": figs[0]["label"] if figs else "",
                 "fig_rest": [{"value": k["value"], "label": k["label"]} for k in figs[1:]],
@@ -286,6 +271,9 @@ def _build(draft, ctx, imgs, mode):
         tldr.append({"num": f"{n:02d}", "fg": th["topic"][code][0], "pill_html": topic_pill(th, code),
                      "line": (a.get("deck") or a["title"]) if a["slot"] == "core" else a["title"], "is_core": a["slot"] == "core"})
     mins, secs = read_minutes(draft, show_body, ctx.get("read_chars_per_min", 500))
+    core_ctx, brief_ctx = [art(i, a) for i, a in core], [art(i, a) for i, a in brief]
+    for n, c in enumerate(core_ctx + brief_ctx, 1):       # 30초 브리핑과 같은 번호(E·S 디자인이 기사 앞에 쓴다)
+        c["num"] = f"{n:02d}"
     groups = []
     for j, m in enumerate(more):
         code = TOPIC_CODE.get(m["topic"], "B")
@@ -312,7 +300,7 @@ def _build(draft, ctx, imgs, mode):
          "punch_label_text": punch["label"] if punch else "", "punch_text_body": punch["text"] if punch else "",
          "punch_twist_body": punch["twist"] if punch else "",
          "has_status": bool(status), "status_rows": status, "status_note": ctx["note"] if status else "",
-         "has_core": bool(core), "core": [art(i, a) for i, a in core], "has_brief": bool(brief), "brief": [art(i, a) for i, a in brief],
+         "has_core": bool(core), "core": core_ctx, "has_brief": bool(brief), "brief": brief_ctx,
          "has_more": bool(groups), "more": groups, "has_gloss": bool(gl), "glossary": [{"term": g["term"], "meaning": g["meaning"]} for g in gl],
          "has_corr": bool(corr), "corrections": [{"text": c} for c in corr], "excluded_count": draft.get("excluded_count", 0)}
     out_html = fill((TEMPLATE_DIR / th.get("template", "newsletter.html")).read_text(encoding="utf-8"), t)
@@ -324,7 +312,7 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
     imgs = imgs or {}
     L = [f"{ctx['newsletter_name']} · 제{ctx['issue_no']}호 · {ctx['issue_week']}", ctx["newsletter_tagline"],
          f"대상 기간 {ctx['period']}", "01 칩메이커 · 02 장비사 · 03 제조 솔루션 · 04 Physical AI" if b3 else
-         "칩메이커 · 장비사 · 제조 솔루션 · Physical AI" if t.get("tldr") is not None and ctx.get("theme") in ("B4", "B5") else
+         "칩메이커 · 장비사 · 제조 솔루션 · Physical AI" if ctx.get("theme") not in ("A", "B", "C") else
          "🏭 칩메이커 · ⚙️ 장비사 · 📊 제조 솔루션 · 🤖 Physical AI", "",
          "[이번 주 헤드라인]", draft["issue_title"], "", "[한 줄 요약]", draft["summary"], ""]
     if t["tldr"]:

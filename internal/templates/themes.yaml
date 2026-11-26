@@ -175,3 +175,67 @@ B5:
   punch_twist: "#5b6b75"
   watch_bg: "#ffffff"
   watch_ink: "#8a5300"
+E:
+  name: E · 에디토리얼(신문형 시안, v4.7)
+  template: newsletter-e.html        # 미색 종이 · 명조 제호와 제목 · 검은 괘선 · 붉은 강조 하나. 꼭지 색을 쓰지 않는다
+  show_body: true
+  hero_dark: false
+  bg: "#ece8df"
+  paper: "#fffdf8"
+  hero: "#fffdf8"
+  hero2: "#fffdf8"
+  hero_text: "#1a1a1a"
+  hero_sub: "#6b665d"
+  accent: "#b3261e"
+  ink: "#1a1a1a"
+  muted: "#7a746a"
+  rule: "#d9d3c7"
+  serif: "'Nanum Myeongjo','AppleMyungjo','Batang','Noto Serif KR',Georgia,serif"
+  soft: "#f6f2ea"
+  card_border: "#d9d3c7"
+  radius: 0px
+  topic:
+    T1: ["#b3261e", "#f6f2ea"]
+    T2: ["#b3261e", "#f6f2ea"]
+    T3: ["#b3261e", "#f6f2ea"]
+    T4: ["#b3261e", "#f6f2ea"]
+    B: ["#b3261e", "#f6f2ea"]
+  punch_bg: "#fffdf8"
+  punch_border: "#1a1a1a"
+  punch_big: "#b3261e"
+  punch_label: "#b3261e"
+  punch_text: "#1a1a1a"
+  punch_twist: "#7a746a"
+  watch_bg: "#fffdf8"
+  watch_ink: "#1a1a1a"
+S:
+  name: S · 스위스 볼드(흑백·노랑 시안, v4.7)
+  template: newsletter-s.html        # 검정 머리띠 + 노랑 띠 · 아주 굵은 글씨와 큰 번호 · 두꺼운 괘선. 꼭지 색을 쓰지 않는다
+  show_body: true
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#ffd60a"
+  bg: "#e6e6e6"
+  hero: "#111111"
+  hero2: "#111111"
+  hero_text: "#ffffff"
+  hero_sub: "#bdbdbd"
+  accent: "#ffd60a"
+  ink: "#111111"
+  soft: "#f2f2f2"
+  card_border: "#111111"
+  radius: 0px
+  topic:
+    T1: ["#111111", "#ffd60a"]
+    T2: ["#111111", "#ffd60a"]
+    T3: ["#111111", "#ffd60a"]
+    T4: ["#111111", "#ffd60a"]
+    B: ["#111111", "#ffd60a"]
+  punch_bg: "#ffd60a"
+  punch_border: "#111111"
+  punch_big: "#111111"
+  punch_label: "#111111"
+  punch_text: "#111111"
+  punch_twist: "#111111"
+  watch_bg: "#f2f2f2"
+  watch_ink: "#111111"
