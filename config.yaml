@@ -1,5 +1,5 @@
 # MTC AX/PI 위클리 설정값 (설계서 v4.5 10장). 값을 바꾸면 config_version을 올린다.
-config_version: "1"
+config_version: "2"
 
 paths:
   work_dir: work      # 주차별 작업 폴더: candidates/, manual/, prompts/
@@ -45,10 +45,16 @@ internal:
   one_line_max: 60
   abstract_chars: [220, 350]
   hook_chars: 120
-  core_chars: [250, 320]
+  core_chars: [220, 300]
   brief_chars: [60, 95]
-  issue_body_max: 1400
+  issue_body_max: 2000
   verbatim_max_run: 30
+  brief_max: 6                # 단신 최대 건수(핵심이 3건이면 -1)
+  same_subject_max: 2         # 핵심+단신에서 같은 주체 최대 건수
+  watch_chars: 80             # 핵심 기사 'MTC가 볼 것' 한 문장
+  more_max: 20                # 더 볼 거리 최대 건수
+  more_line_chars: 70         # 더 볼 거리 한 줄 요약
+  newsletter_name: "MTC AX/PI · 제조 AI 위클리"   # 임시 이름
   # 사내 모델 접속(OpenAI 호환 /v1/chat/completions, 예: vLLM·Ollama). 모든 LLM 단계가 같은 모델을 쓴다.
   llm:
     backend: http                         # http(OpenAI 호환 서버) | file(요청·응답 파일을 주고받음, 사람·에이전트가 모델 역할)

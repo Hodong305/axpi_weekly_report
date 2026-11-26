@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{title_tag}}</title></head>
+<body style="margin:0;padding:0;background:#eef1f5;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;"><tr><td align="center" style="padding:20px 8px;">
+<table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#ffffff;font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',Arial,sans-serif;color:#1f2933;">
+
+<!-- 머리띠 -->
+<tr><td style="background:#16324f;padding:18px 28px;color:#ffffff;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td style="font-size:13px;font-weight:bold;letter-spacing:0.5px;color:#ffffff;">{{newsletter_name}}</td>
+    <td align="right" style="font-size:12px;color:#c7d4e2;">제{{issue_no}}호 · {{issue_week}}</td>
+  </tr></table>
+  <div style="font-size:12px;color:#c7d4e2;margin-top:4px;">대상 기간 {{period}} · 검토 문서 {{n_docs}}건 · 게재 {{n_pub}}건</div>
+</td></tr>
+
+<!-- 타이틀·한 줄 요약 -->
+<tr><td style="padding:26px 28px 6px 28px;">
+  <div style="font-size:25px;line-height:1.35;font-weight:bold;color:#111827;">{{issue_title}}</div>
+  <div style="font-size:16px;line-height:1.6;color:#374151;margin-top:8px;">{{one_line}}</div>
+</td></tr>
+
+<!--IF note-->
+<tr><td style="padding:8px 28px 0 28px;">
+  <div style="font-size:13px;color:#92400e;background:#fef3c7;padding:8px 12px;">{{note}}</div>
+</td></tr>
+<!--END note-->
+
+<!-- 이번 주 요약 -->
+<tr><td style="padding:14px 28px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-left:4px solid #16324f;background:#f5f7fa;padding:14px 16px;font-size:14.5px;line-height:1.75;color:#1f2933;">
+    <div style="font-size:12px;font-weight:bold;color:#16324f;margin-bottom:4px;">이번 주 요약</div>
+    {{abstract}}
+  </td></tr></table>
+</td></tr>
+
+<!--IF hook-->
+<!-- 팹 판단 한 컷 -->
+<tr><td style="padding:6px 28px 10px 28px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border:1px solid #f0c36d;background:#fff8e6;padding:12px 16px;">
+    <div style="font-size:12px;font-weight:bold;color:#9a6700;">팹 판단 한 컷</div>
+    <div style="font-size:15px;font-weight:bold;color:#111827;margin-top:4px;">Q. {{hook_q}}</div>
+    <div style="font-size:14.5px;color:#374151;margin-top:4px;">A. {{hook_a}}</div>
+  </td></tr></table>
+</td></tr>
+<!--END hook-->
+
+<!--IF has_status-->
+<tr><td style="padding:16px 28px 0 28px;font-size:13px;font-weight:bold;color:#16324f;letter-spacing:0.5px;">네 분야 조사 결과</td></tr>
+<tr><td style="padding:8px 28px 4px 28px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
+    <!--LOOP status_rows-->
+    <tr><td style="border:1px solid #e3e7ec;padding:6px 8px;width:40%;">{{name}}</td><td style="border:1px solid #e3e7ec;padding:6px 8px;">{{result}}</td></tr>
+    <!--END status_rows-->
+  </table>
+  <div style="font-size:14px;margin-top:8px;">0건 사유: {{status_note}}</div>
+</td></tr>
+<!--END has_status-->
+
+<!--IF has_core-->
+<!-- 핵심 기사 -->
+<tr><td style="padding:16px 28px 0 28px;font-size:13px;font-weight:bold;color:#16324f;letter-spacing:0.5px;">핵심 기사</td></tr>
+<!--LOOP core-->
+<tr><td style="padding:8px 28px 4px 28px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e3e7ec;"><tr><td style="padding:16px 18px;">
+    <!--IF followup--><div style="font-size:12px;color:#2563eb;margin-bottom:4px;">{{followup}}</div><!--END followup-->
+    <div style="font-size:12px;">
+      <!--LOOP tags--><span style="display:inline-block;background:{{bg}};color:{{fg}};padding:2px 8px;border-radius:10px;">{{text}}</span> <!--END tags-->
+    </div>
+    <div style="font-size:19px;font-weight:bold;line-height:1.4;color:#111827;margin-top:8px;">{{title}}</div>
+    <div style="font-size:14.5px;line-height:1.8;color:#1f2933;margin-top:8px;">{{body}}</div>
+    <!--IF has_figures-->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;"><tr>
+      <!--LOOP figures--><td width="{{w}}%" style="background:#f5f7fa;padding:10px 8px;text-align:center;border-right:6px solid #ffffff;"><div style="font-size:20px;font-weight:bold;color:#16324f;">{{value}}</div><div style="font-size:11.5px;color:#6b7280;">{{label}}</div></td><!--END figures-->
+    </tr></table>
+    <!--END has_figures-->
+    <!--IF watch-->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;"><tr><td style="background:#f5f7fa;padding:10px 12px;font-size:13.5px;line-height:1.7;color:#1f2933;">
+      <b style="color:#16324f;">MTC가 볼 것</b> · {{watch}}
+    </td></tr></table>
+    <!--END watch-->
+    <div style="font-size:12px;color:#6b7280;margin-top:8px;">출처 · {{credit}}</div>
+  </td></tr></table>
+</td></tr>
+<!--END core-->
+<!--END has_core-->
+
+<!--IF has_brief-->
+<!-- 단신 -->
+<tr><td style="padding:20px 28px 0 28px;font-size:13px;font-weight:bold;color:#16324f;letter-spacing:0.5px;">단신</td></tr>
+<tr><td style="padding:6px 28px 0 28px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <!--LOOP brief-->
+    <tr><td style="border-bottom:1px solid #e3e7ec;padding:10px 0;">
+      <!--IF followup--><div style="font-size:12px;color:#2563eb;">{{followup}}</div><!--END followup-->
+      <div style="font-size:15px;font-weight:bold;color:#111827;"><!--LOOP tags--><span style="display:inline-block;background:{{bg}};color:{{fg}};padding:1px 7px;border-radius:10px;font-size:11.5px;font-weight:normal;vertical-align:2px;">{{text}}</span><!--END tags--> {{title}}</div>
+      <div style="font-size:14px;line-height:1.7;color:#374151;margin-top:4px;">{{body}}</div>
+      <div style="font-size:12px;color:#6b7280;margin-top:4px;">출처 · {{credit}}</div>
+    </td></tr>
+    <!--END brief-->
+  </table>
+</td></tr>
+<!--END has_brief-->
+
+<!--IF has_more-->
+<!-- 더 볼 거리 -->
+<tr><td style="padding:22px 28px 0 28px;font-size:13px;font-weight:bold;color:#16324f;letter-spacing:0.5px;">더 볼 거리</td></tr>
+<tr><td style="padding:4px 28px 0 28px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <!--LOOP more-->
+    <tr><td style="padding:12px 0 2px 0;font-size:12px;font-weight:bold;color:{{fg}};">{{heading}}</td></tr>
+    <!--LOOP items-->
+    <tr><td style="border-bottom:1px solid #e3e7ec;padding:7px 0;">
+      <div style="font-size:14px;line-height:1.65;color:#1f2933;">{{line}}</div>
+      <div style="font-size:12px;color:#6b7280;margin-top:2px;">{{credit}}</div>
+    </td></tr>
+    <!--END items-->
+    <!--END more-->
+  </table>
+</td></tr>
+<!--END has_more-->
+
+<!--IF has_corr-->
+<tr><td style="padding:20px 28px 0 28px;font-size:13px;font-weight:bold;color:#16324f;letter-spacing:0.5px;">정정</td></tr>
+<tr><td style="padding:6px 28px 0 28px;">
+  <!--LOOP corrections--><div style="font-size:13px;margin:4px 0;">{{text}}</div><!--END corrections-->
+</td></tr>
+<!--END has_corr-->
+
+<!-- 꼬리말 -->
+<tr><td style="padding:22px 28px 26px 28px;">
+  <div style="font-size:12px;line-height:1.7;color:#6b7280;border-top:1px solid #e3e7ec;padding-top:12px;">
+    이 소식지는 공개 자료를 요약·재구성했으며, 사내 AI가 초안을 쓰고 편집자가 검토했습니다. 원문 링크는 사내 보안 정책에 따라 싣지 않습니다.<br>
+    이 밖에 검토했으나 싣지 않은 자료는 {{excluded_count}}건입니다.<br>
+    의견·정정 요청은 이 메일에 회신해 주세요. · MTC AX/PI팀
+  </div>
+</td></tr>
+
+</table>
+</td></tr></table>
+</body></html>

@@ -385,15 +385,19 @@ class Pipeline:
 
     def step_S6(self):
         it = self.state["issue_type"]
+        evs = self.state["events"]
+        excluded = sum(len(e["doc_ids"]) for e in evs if e["status"] == "EXCLUDE")   # 꼬리말의 '그 밖에 검토한 자료'
         if it == "현황호":
             self.step_header("S6", "생략(게재 사건 없음, 현황호)")
             d = draftmod.status_draft(self.week, {"collected": len(self.records), "pass_docs": self.state["counts"]["pass_docs"],
-                                                  "events": self.state["counts"]["events"]})
+                                                  "events": self.state["counts"]["events"]}, excluded)
             self.state["failed_gen"] = []
         else:
             self.step_header("S6")
-            d, failed = draftmod.generate_draft(self.judge, self.state["events"], self.records, self.week, self.cfg, it,
-                                                self.header_counts())
+            more, overflow = sel.more_candidates(evs, self.state["fit"], self.records, self.cfg)
+            self.state["more_overflow"] = overflow
+            d, failed = draftmod.generate_draft(self.judge, evs, self.records, self.week, self.cfg, it, self.header_counts(),
+                                                more, excluded)
             self.state["failed_gen"] = failed
         d["review_log"] = list(self.state["review_log"])
         save_draft(self.s.draft_path(self.week), d)
@@ -484,7 +488,8 @@ class Pipeline:
             ids = sorted(set(prev["d_ids"]) | set(stats["d_ids"]))
             merged.update(A_custom=prev["A_custom"] or stats["A_custom"], B_custom=prev["B_custom"] or stats["B_custom"],
                           c_revisions=prev["c_revisions"] + c_rev, d_ids=ids, d_changed=len(ids), e_total=prev["e_total"],
-                          e_fix=prev["e_fix"] + stats["e_fix"], e_keep=prev["e_keep"] + stats["e_keep"])
+                          e_fix=prev["e_fix"] + stats["e_fix"], e_keep=prev["e_keep"] + stats["e_keep"],
+                          f_removed=prev.get("f_removed", 0) + stats["f_removed"])
         self.state["metrics"]["r2"] = merged
         d["review_log"].append({"review": "②", "at": self.clock(), "response": text.strip(),
                                 "applied": f"A·B 확정, C {'수정 ' + str(c_rev) + '회' if c_rev else '승인'}, "
@@ -558,7 +563,8 @@ class Pipeline:
         ctx = {"issue_week": self.week, "period": render.period_text(self.pkg.doc["window_start"], self.pkg.doc["window_end_exclusive"]),
                "issue_type": it, "counts": {"pass_docs": self.state["counts"]["pass_docs"], "published": pub},
                "events": self.state["events"], "status_rows": self.status_rows() if it == "현황호" else [],
-               "corrections": corrections, "note": note}
+               "corrections": corrections, "note": note, "newsletter_name": self.cfg["newsletter_name"],
+               "issue_no": metrics.issue_number(self.s.pilot_csv, self.week), "n_docs": len(self.records)}
         html_doc, text_doc = render.build(d, ctx)
         out = self.s.out_dir(self.week)
         out.mkdir(parents=True, exist_ok=True)

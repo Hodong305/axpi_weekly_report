@@ -190,6 +190,30 @@ def _source_text(event, records):
     return norm("\n".join(parts))
 
 
+SUFFIXES = (" (논문)", " (보도)")
+
+
+def strip_suffix(line):
+    for x in SUFFIXES:
+        if line.endswith(x):
+            return line[:-len(x)]
+    return line
+
+
+def more_docs(item, events_by_id):
+    """더 볼 거리 항목이 가리키는 자료 doc_id 집합(ref가 doc_id이면 그 자료, 사건이면 사건의 자료)."""
+    if item["ref"].startswith("url1_"):
+        return {item["ref"]}
+    ev = events_by_id.get(item["ref"])
+    return set(ev["doc_ids"]) if ev else set()
+
+
+def more_source(item, events_by_id, records):
+    ev = events_by_id.get(item["ref"])
+    return _source_text(ev, records) if ev else norm("\n".join(
+        [records[item["ref"]]["title"]] + [b["text"] for b in records[item["ref"]]["body"]["blocks"]]) if item["ref"] in records else "")
+
+
 def autofix(draft, records):
     """URL 삭제와 출처 정보 형식 보정. 반환: 경고 목록."""
     warns = []
@@ -211,6 +235,10 @@ def autofix(draft, records):
     for i, a in enumerate(draft["articles"]):
         a["title"] = clean(a["title"], labels[i], "제목")
         a["body"] = clean(a["body"], labels[i], "본문")
+        if a.get("watch"):
+            a["watch"] = clean(a["watch"], labels[i], "MTC가 볼 것")
+        for k in a.get("key_figures") or []:
+            k["value"], k["label"] = clean(k["value"], labels[i], "수치 카드"), clean(k["label"], labels[i], "수치 카드")
         a["title_alternatives"] = [clean(t, labels[i], "제목 대안") for t in a["title_alternatives"]]
         # 출처 정보: 코드가 자료 메타데이터로 만든 형식으로 항상 되돌린다(자동 보정)
         docs = []
@@ -220,6 +248,8 @@ def autofix(draft, records):
                 docs.append(d)
         if docs:
             a["credits"] = [format_credit(records[d]) for d in docs]
+    for j, m in enumerate(draft.get("more") or [], 1):
+        m["line"] = clean(m["line"], f"F{j}", "더 볼 거리")
     return warns
 
 
@@ -242,12 +272,20 @@ def length_violations(draft, cfg, issue_type):
         lo, hi = cfg["core_chars"] if a["slot"] == "core" else cfg["brief_chars"]
         if not lo <= len(a["body"]) <= hi:
             v.append((("article", i), f"본문 {len(a['body'])}자, 허용 {lo}~{hi}자"))
+        if a["slot"] == "core" and len(a.get("watch") or "") > cfg["watch_chars"]:
+            v.append((("article", i), f"MTC가 볼 것 {len(a['watch'])}자 > 한도 {cfg['watch_chars']}자"))
+    for j, m in enumerate(draft.get("more") or []):
+        n = len(strip_suffix(m["line"]))
+        if n > cfg["more_line_chars"]:
+            v.append((("more", j), f"더 볼 거리 한 줄 {n}자 > 한도 {cfg['more_line_chars']}자"))
     return v
 
 
 def body_total(draft):
     h = draft.get("hook")
-    return (len(h["question"]) + len(h["answer"]) if h else 0) + sum(len(a["body"]) for a in draft["articles"])
+    """9.8의 4~6: 팹 판단 한 컷 + 핵심 본문·MTC가 볼 것 + 단신 본문(더 볼 거리·꼬리말은 넣지 않는다)"""
+    return ((len(h["question"]) + len(h["answer"]) if h else 0)
+            + sum(len(a["body"]) + len(a.get("watch") or "") for a in draft["articles"]))
 
 
 def hard_violations(draft, events_by_id, records, cfg, issue_type):
@@ -262,11 +300,20 @@ def hard_violations(draft, events_by_id, records, cfg, issue_type):
             v.append((("article", i), "근거 ID", "; ".join(errs) or "근거 ID가 없음"))
         src = _source_text(ev, records)
         all_src += "\n" + src
-        for fld in ("title", "body"):
+        for fld in ("title", "body", "watch"):
+            if not a.get(fld):
+                continue
             hit = verbatim_hit(a[fld], src, run)
             if hit:
                 v.append((("article", i), "원문 연속 일치", f"{fld}에 원문과 {run}자 이상 같은 구간: \"{hit[:40]}…\""))
                 break
+    for j, m in enumerate(draft.get("more") or []):
+        errs = evidence_errors(m["evidence_ids"], records, more_docs(m, events_by_id))
+        if errs or not m["evidence_ids"]:
+            v.append((("more", j), "근거 ID", "; ".join(errs) or "근거 ID가 없음"))
+        hit = verbatim_hit(strip_suffix(m["line"]), more_source(m, events_by_id, records), run)
+        if hit:
+            v.append((("more", j), "원문 연속 일치", f"한 줄 요약이 원문과 {run}자 이상 같음: \"{hit[:40]}…\""))
     if draft["articles"]:
         text = draft["abstract"] + "\n" + (draft["hook"]["question"] + draft["hook"]["answer"] if draft.get("hook") else "")
         hit = verbatim_hit(text, all_src, run)
@@ -291,9 +338,14 @@ def soft_warnings(draft, events_by_id, records, cfg, issue_type):
         all_pairs += pairs
         src = _source_text(ev, records)
         all_src += "\n" + src
-        for fld in ("title", "body"):
+        for fld in ("title", "body", "watch"):
+            if not a.get(fld):
+                continue
             warns += number_warnings(a[fld], pairs, ["articles", i, fld], labels[i])
             warns += company_warnings(a[fld], src, labels[i])
+        for k_i, k in enumerate(a.get("key_figures") or []):
+            warns += number_warnings(k["value"], pairs, ["articles", i, "key_figures", k_i, "value"], labels[i])
+            warns += company_warnings(k["label"], src, labels[i])
         if a["slot"] == "core" and ev["cap"] == "brief" and not ev["cap_override"]:
             warns.append({"scope": labels[i], "quote": a["title"], "kind": "게재 상한",
                           "message": f"게재 상한 위반: 상한 '단신'({' · '.join(ev['cap_reasons'])})인데 핵심으로 편성됨", "fix": None})
@@ -308,6 +360,10 @@ def soft_warnings(draft, events_by_id, records, cfg, issue_type):
     if draft.get("hook"):
         for fld in ("question", "answer"):
             warns += company_warnings(draft["hook"][fld], all_src, "머리부")
+    for j, m in enumerate(draft.get("more") or []):
+        pairs = [(e, evidence_text(e, records)) for e in m["evidence_ids"]]
+        warns += number_warnings(m["line"], pairs, ["more", j, "line"], f"F{j + 1}")
+        warns += company_warnings(m["line"], more_source(m, events_by_id, records), f"F{j + 1}")
     total = body_total(draft)
     if total > cfg["issue_body_max"]:
         warns.append({"scope": "머리부", "quote": "", "kind": "글자 수",

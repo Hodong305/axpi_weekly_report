@@ -52,6 +52,14 @@ def build_row(state, doc, log, config_version):
     return row
 
 
+def issue_number(path, issue_week):
+    """머리띠의 호수: pilot.csv에서 issue_week보다 앞선 호의 행 수 + 1(같은 호를 다시 만들어도 같은 번호)."""
+    if not path.exists():
+        return 1
+    with open(path, encoding="utf-8", newline="") as f:
+        return sum(1 for r in csv.DictReader(f) if r["issue_week"] < issue_week) + 1
+
+
 def upsert_row(path, row):
     """같은 issue_week 행이 있으면 바꾸고 없으면 덧붙인다(S8 재실행에도 중복되지 않는다)."""
     path.parent.mkdir(parents=True, exist_ok=True)

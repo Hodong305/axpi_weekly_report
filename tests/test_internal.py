@@ -190,8 +190,16 @@ class FakeClient:
         doc = pick_doc(user)
         core = info["slot"] == "core"
         body = fill("챔버 매칭 시간을 최대 30% 줄였다고 밝혔다." if "Lam" in user else "운영 범위를 넓혔다고 밝혔다.", 280 if core else 80)
-        return {"event_id": info["event_id"], "title": "제목 " + "가나다라마바"[int(info["event_id"][-2:]) - 1], "title_alternatives": ["대안 가", "대안 나"],
-                "body": body, "evidence_ids": [f"{doc}/P1"]}
+        out = {"event_id": info["event_id"], "title": "제목 " + "가나다라마바"[int(info["event_id"][-2:]) - 1], "title_alternatives": ["대안 가", "대안 나"],
+               "body": body, "evidence_ids": [f"{doc}/P1"]}
+        if core:
+            out.update(watch="후속 지표를 확인할 필요가 있다.", key_figures=[])
+        return out
+
+    def r_s6_more(self, user):
+        info = json.loads(re.search(r"\[작성 지침\]\n(\{.*\})", user).group(1))
+        doc = pick_doc(user)
+        return {"ref": info["ref"], "line": "더 볼 거리 한 줄 요약이다.", "evidence_ids": [f"{doc}/P1"]}
 
     def r_s6_header(self, user):
         return {"issue_title_candidates": ["제조 현장 AI 확산 흐름", "현장 적용 범위 확대", "검증 단계 진입"],
@@ -436,9 +444,12 @@ def slots(evs):
     return {e["event_id"]: (e["slot"], e["rank"]) for e in evs}
 
 
+CFG3 = dict(CFG, brief_max=3)     # 기존 편성 규칙(단신 3건) 시험용. 기본값은 brief_max 6
+
+
 def test_selection_core_two_and_brief_three():
     evs = [mk("a", 88), mk("b", 85), mk("c", 84), mk("d", 70), mk("e", 65), mk("f", 61), mk("g", 59)]
-    sel.select(evs, CFG)
+    sel.select(evs, CFG3)
     s = slots(evs)
     assert s["a"] == ("core", 1) and s["b"] == ("core", 2)
     assert [s[k][0] for k in "cde"] == ["brief"] * 3 and s["f"][0] == "out" and s["g"][0] == "out"   # 3위는 90 미만 → 단신, 단신 최대 3
@@ -446,12 +457,12 @@ def test_selection_core_two_and_brief_three():
 
 def test_selection_core3_rule():
     evs = [mk("a", 95), mk("b", 92), mk("c", 90), mk("d", 70), mk("e", 65), mk("f", 61)]
-    sel.select(evs, CFG)
+    sel.select(evs, CFG3)
     s = slots(evs)
     assert [s[k][0] for k in "abc"] == ["core"] * 3
     assert [s[k][0] for k in "def"] == ["brief", "brief", "out"]        # 핵심 3건이면 단신 최대 2건
     evs = [mk("a", 95), mk("b", 92), mk("c", 89)]
-    sel.select(evs, CFG)
+    sel.select(evs, CFG3)
     assert slots(evs)["c"][0] == "brief"
 
 
@@ -688,9 +699,9 @@ def sample_draft():
 
 
 def test_parse_review2_valid():
-    assert rv.parse_review2("승인") == {"A": ("pick", 1), "B": ("pick", 1), "C": ("approve",), "D": {}, "E": {}}
+    assert rv.parse_review2("승인") == {"A": ("pick", 1), "B": ("pick", 1), "C": ("approve",), "D": {}, "E": {}, "F": []}
     r = rv.parse_review2("A2 B1 C승인 D 핵심1=a E1=수정")
-    assert r == {"A": ("pick", 2), "B": ("pick", 1), "C": ("approve",), "D": {"핵심1": ("pick", "a")}, "E": {"E1": "수정"}}
+    assert r == {"A": ("pick", 2), "B": ("pick", 1), "C": ("approve",), "D": {"핵심1": ("pick", "a")}, "E": {"E1": "수정"}, "F": []}
     r = rv.parse_review2('A:"직접 쓴 타이틀" B:"직접 쓴 한 줄" C:"단신 문장을 줄여라" D 핵심1=b, 단신1:"새 제목" E1=유지 E2=수정')
     assert r["A"] == ("text", "직접 쓴 타이틀") and r["B"] == ("text", "직접 쓴 한 줄") and r["C"] == ("text", "단신 문장을 줄여라")
     assert r["D"] == {"핵심1": ("pick", "b"), "단신1": ("text", "새 제목")} and r["E"] == {"E1": "유지", "E2": "수정"}
@@ -835,7 +846,7 @@ def test_s7_regenerates_verbatim_once_then_warns():
     def article(u):
         calls.append(1)
         return {"event_id": next(iter(by_id)), "title": "Lam 제목", "title_alternatives": ["가", "나"], "body": fill("새 본문입니다.", 280),
-                "evidence_ids": [f"{d}/P1"]}
+                "evidence_ids": [f"{d}/P1"], "watch": "후속 지표 확인", "key_figures": []}
     c = FakeClient({"s6_article": article})
     out, warns = run_s7(Judge(c), draft, list(by_id.values()), recs, CFG, "정규호", {})
     assert len(calls) == 1 and out["articles"][0]["body"].startswith("새 본문")
@@ -843,7 +854,8 @@ def test_s7_regenerates_verbatim_once_then_warns():
     # 재생성도 원문을 옮기면 경고로 남는다
     draft["articles"][0]["body"] = fill("보도: " + src_text[:60], 280)
     c2 = FakeClient({"s6_article": lambda u: {"event_id": next(iter(by_id)), "title": "Lam 제목", "title_alternatives": ["가", "나"],
-                                              "body": fill("또 " + src_text[:60], 280), "evidence_ids": [f"{d}/P1"]}})
+                                              "body": fill("또 " + src_text[:60], 280), "evidence_ids": [f"{d}/P1"],
+                                              "watch": "후속 지표 확인", "key_figures": []}})
     out, warns = run_s7(Judge(c2), draft, list(by_id.values()), recs, CFG, "정규호", {})
     assert [w for w in warns if w["kind"] == "원문 연속 일치"] and [w["id"] for w in warns] == [f"E{i}" for i in range(1, len(warns) + 1)]
 
@@ -854,7 +866,8 @@ def test_s7_invalid_evidence_regenerates_then_drops():
     draft["articles"][0]["evidence_ids"] = [f"{d}/P1", f"{d}/P77"]
     draft["abstract"] = fill("요약", 260)
     c = FakeClient({"s6_article": lambda u: {"event_id": next(iter(by_id)), "title": "Lam 제목", "title_alternatives": ["가", "나"],
-                                              "body": fill("본문", 280), "evidence_ids": [f"{d}/P1"]}})
+                                              "body": fill("본문", 280), "evidence_ids": [f"{d}/P1"],
+                                              "watch": "후속 지표 확인", "key_figures": []}})
     out, warns = run_s7(Judge(c), draft, list(by_id.values()), recs, CFG, "정규호", {})
     assert out["articles"][0]["evidence_ids"] == [f"{d}/P1"]
 
@@ -883,15 +896,16 @@ def test_full_run_outputs(tmp_path):
     assert [r["total"] for r in by_slot["core"]] == ["95", "85"]
     # draft.yaml 키
     d = yaml.safe_load((tmp_path / "review" / f"{WEEK}-draft.yaml").read_text(encoding="utf-8"))
-    assert list(d) == ["issue_week", "issue_title", "issue_title_candidates", "one_line", "one_line_candidates", "abstract", "hook", "articles", "review_log"]
-    assert list(d["articles"][0]) == ["event_id", "slot", "title", "title_alternatives", "body", "credits", "evidence_ids"]
+    assert list(d) == ["issue_week", "issue_title", "issue_title_candidates", "one_line", "one_line_candidates", "abstract", "hook", "articles", "more", "excluded_count", "review_log"]
+    assert list(d["articles"][0]) == ["event_id", "slot", "title", "title_alternatives", "tags", "body", "watch", "key_figures", "credits", "evidence_ids"]
+    assert list(d["articles"][2]) == ["event_id", "slot", "title", "title_alternatives", "tags", "body", "credits", "evidence_ids"]    # 단신
     assert d["articles"][0]["credits"][0].startswith("Lam Research, 「Lam expands fleet analytics」, 2026-11-24 (영문)")
     assert [r["review"] for r in d["review_log"]] == ["①", "②", "발송 확인"]
     # 발송본
     html = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
     assert "http" not in html.lower() and "<a " not in html.lower() and "<script" not in html.lower() and "<img" not in html.lower()
-    assert "<style" not in html.lower() and 'style="' in html and "이번 주 요약" in html and "출처 정보" in html
-    assert html.index("핵심 기사") < html.index("단신") < html.index("출처 정보")
+    assert "<style" not in html.lower() and 'style="' in html and "이번 주 요약" in html and "출처 · " in html
+    assert html.index("핵심 기사") < html.index("단신") < html.index("이 밖에 검토했으나")
     assert "http" not in (tmp_path / "out_internal" / WEEK / "newsletter.txt").read_text(encoding="utf-8")
     # 대장
     led = [json.loads(l) for l in (tmp_path / "ledger" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -1109,7 +1123,7 @@ def test_fingerprint_change_warning(tmp_path):
     rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
     fp = rows[WEEK]
     assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.5" and fp["fp_internal_version"]
-    assert fp["fp_collector_version"] == "0.1.0" and fp["config_version"] == "1"
+    assert fp["fp_collector_version"] == "0.1.0" and fp["config_version"] == "2"
 
 
 def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):

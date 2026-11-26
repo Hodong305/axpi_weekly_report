@@ -1,6 +1,6 @@
 """S7 원고 자동 검사 실행(설계서 9.7): 자동 보정 → 재생성 1회 → 남은 문제는 경고(검토 요청 ②의 [E])."""
 from . import checks
-from .draft import gen_article, gen_header, apply_header
+from .draft import gen_article, gen_header, gen_more, apply_header
 from .evidence import prune_invalid_evidence
 from .review import article_labels
 
@@ -15,9 +15,11 @@ def run_s7(judge, draft, events, records, cfg, issue_type, counts, failed_gen=()
 
     regenerated = False
     vio = checks.hard_violations(draft, by_id, records, cfg, issue_type)
-    art_fb, hdr_fb = {}, []
+    art_fb, hdr_fb, more_fb = {}, [], {}
     for tgt, kind, msg in vio:
-        if tgt[0] == "article":
+        if tgt[0] == "more":
+            more_fb.setdefault(tgt[1], []).append(f"[{kind}] {msg}")
+        elif tgt[0] == "article":
             art_fb.setdefault(tgt[1], []).append(f"[{kind}] {msg}")
         else:
             hdr_fb.append(f"[{kind}] {msg}")
@@ -27,6 +29,12 @@ def run_s7(judge, draft, events, records, cfg, issue_type, counts, failed_gen=()
         if not bad:
             draft["articles"][idx] = new
             regenerated = True
+    for j, msgs in more_fb.items():       # 더 볼 거리 한 줄도 한 번 다시 만든다(9.7)
+        m = draft["more"][j]
+        doc = m["ref"] if m["ref"].startswith("url1_") else by_id[m["ref"]]["rep_doc_id"]
+        new, bad = gen_more(judge, {"ref": m["ref"], "topic": m["topic"], "doc_id": doc}, records, cfg, "\n".join(msgs))
+        if not bad:
+            draft["more"][j] = new
     if (hdr_fb or regenerated) and draft["articles"]:
         fb = list(hdr_fb) + (["기사 본문이 다시 쓰였으니 내용이 어긋나지 않게 머리부를 다시 써라."] if regenerated and not hdr_fb else [])
         h, bad = gen_header(judge, draft["articles"], by_id, records, issue_type, counts, cfg, "\n".join(fb))
@@ -50,7 +58,7 @@ def run_s7(judge, draft, events, records, cfg, issue_type, counts, failed_gen=()
     if draft["one_line_candidates"][0] != draft["one_line"]:
         draft["one_line"] = draft["one_line_candidates"][0]
     for tgt, kind, msg in checks.hard_violations(draft, by_id, records, cfg, issue_type):
-        scope = labels[tgt[1]] if tgt[0] == "article" else "머리부"
+        scope = labels[tgt[1]] if tgt[0] == "article" else (f"F{tgt[1] + 1}" if tgt[0] == "more" else "머리부")
         warns.append({"scope": scope, "quote": "", "kind": kind, "message": f"재생성 후에도 남음: {msg}", "fix": None})
     warns += checks.soft_warnings(draft, by_id, records, cfg, issue_type)
     return draft, checks.number_ids(warns)

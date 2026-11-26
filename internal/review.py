@@ -265,6 +265,12 @@ def render_review2(issue_week, draft, warnings, cfg=None):
         a = draft["articles"][i]
         mx = cfg.get("article_title_max")
         lines.append(f"  {lab}  " + " | ".join(t + over_note(t, mx) for t in [a["title"]] + list(a["title_alternatives"][:2])))
+    lines.append("[F 더 볼 거리]   (분야별 한 줄 요약 · 빼려면 F3=빼기)")
+    if not draft.get("more"):
+        lines.append("  (없음)")
+    for j, m in enumerate(draft.get("more") or [], 1):
+        from .draft import TOPIC_LABEL
+        lines.append(f"  F{j} {TOPIC_LABEL.get(m['topic'], m['topic'] or '기타')} · {m['line']}")
     lines.append("[E 자동 검사 경고]")
     if not warnings:
         lines.append("  (없음)")
@@ -280,6 +286,7 @@ def render_review2(issue_week, draft, warnings, cfg=None):
               " - C: C승인, 또는 C:\"수정 지시 또는 대체 문단\"",
               " - D: 바꿀 기사만. 생략하면 현재 제목 유지",
               " - E: 경고마다 수정 또는 유지. 생략하면 수정안 적용",
+              " - F: 뺄 항목만. 예: F3=빼기, F7=빼기. 생략하면 모두 싣는다",
               " - 전부 권장안이면: 승인",
               "응답:"]
     return "\n".join(lines)
@@ -294,6 +301,7 @@ _TOK = [
     ("A", re.compile(r"A([1-9])(?!\w)")),
     ("B", re.compile(r"B([1-9])(?!\w)")),
     ("E", re.compile(r"E(\d+)\s*=\s*(수정|유지)")),
+    ("F", re.compile(r"F(\d+)\s*=\s*빼기")),
     ("D", re.compile(r"D(?=[\s,]|$)")),
     ("OK", re.compile(r"승인")),
 ]
@@ -305,7 +313,7 @@ def parse_review2(text):
     s = (text or "").strip()
     if not s:
         raise ReviewError("응답이 비어 있습니다. 예: A2 B1 C승인, 또는 승인")
-    res = {"A": None, "B": None, "C": None, "D": {}, "E": {}}
+    res = {"A": None, "B": None, "C": None, "D": {}, "E": {}, "F": []}
     approve_all = False
     pos, in_d = 0, False
     while pos < len(s):
@@ -342,6 +350,10 @@ def parse_review2(text):
             res["B"] = ("pick", int(tm.group(1)))
         elif name == "E":
             res["E"][f"E{int(tm.group(1))}"] = tm.group(2)
+        elif name == "F":
+            n = int(tm.group(1))
+            if n not in res["F"]:
+                res["F"].append(n)
         elif name == "D":
             in_d = True
         else:
@@ -378,6 +390,9 @@ def validate_review2(res, draft, warnings, cfg):
             raise ReviewError(f"D {lab}={val}: 대안이 {len(a['title_alternatives']['ab'.index(val)])}자로 한도 {cfg['article_title_max']}자를 넘습니다.")
         if kind == "text" and not 1 <= len(val.strip()) <= cfg["article_title_max"]:
             raise ReviewError(f"D {lab} 직접 입력은 {cfg['article_title_max']}자 이내로 쓰세요(현재 {len(val.strip())}자).")
+    for n in res["F"]:
+        if not 1 <= n <= len(draft.get("more") or []):
+            raise ReviewError(f"F{n}: 해당 더 볼 거리 항목이 없습니다.")
     ids = {w["id"] for w in warnings}
     for e in res["E"]:
         if e not in ids:
@@ -399,7 +414,7 @@ def apply_fix(draft, fix):
 def apply_review2(draft, res, warnings):
     """A·B·D·E를 원고에 반영한다(C의 수정 지시는 호출 쪽이 모델로 처리). 반환: 통계 dict."""
     st = {"A_custom": False, "B_custom": False, "d_changed": 0, "d_total": len(draft["articles"]),
-          "e_fix": 0, "e_keep": 0, "e_total": len(warnings), "d_ids": []}
+          "e_fix": 0, "e_keep": 0, "e_total": len(warnings), "d_ids": [], "f_removed": 0}
     for key, field, cands in (("A", "issue_title", "issue_title_candidates"), ("B", "one_line", "one_line_candidates")):
         kind, val = res[key]
         chosen = val.strip() if kind == "text" else draft[cands][val - 1]
@@ -415,6 +430,10 @@ def apply_review2(draft, res, warnings):
             a["title"] = new
             st["d_changed"] += 1
             st["d_ids"].append(a["event_id"])
+    if res["F"]:        # F: 뺄 항목(요청 시점의 번호 기준)
+        gone = set(res["F"])
+        draft["more"] = [m for j, m in enumerate(draft.get("more") or [], 1) if j not in gone]
+        st["f_removed"] = len(gone)
     for w in warnings:
         choice = res["E"].get(w["id"], "수정")    # 생략하면 수정안 적용
         w["decision"] = choice

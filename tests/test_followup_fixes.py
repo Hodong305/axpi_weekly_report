@@ -54,7 +54,7 @@ def test_out_note_background_only_when_quota_used():
     notes = {e["event_id"]: e["note"] for e in evs}
     assert notes["e"] == "편성 한도 초과(산업 배경은 1건)" and slots(evs)["d"][0] == "brief"
     evs = [mk("a", 88), mk("b", 85), mk("c", 70), mk("d", 66), mk("e", 64), mk("f", 62, fab=10, cap="brief")]
-    sel.select(evs, CFG)
+    sel.select(evs, dict(CFG, brief_max=3))
     s = {e["event_id"]: (e["slot"], e["note"]) for e in evs}
     assert s["f"] == ("out", "편성 한도 초과")            # 산업 배경 한도가 아니라 일반 단신 한도 때문
 
