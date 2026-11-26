@@ -1,5 +1,5 @@
-# MTC AX/PI 위클리 설정값 (설계서 v4.5 10장). 값을 바꾸면 config_version을 올린다.
-config_version: "3"
+# MTC AX/PI 위클리 설정값 (설계서 v4.6 10장). 값을 바꾸면 config_version을 올린다.
+config_version: "4"
 
 paths:
   work_dir: work      # 주차별 작업 폴더: candidates/, manual/, prompts/
@@ -16,6 +16,11 @@ collection:
   browser_fallback: true        # playwright가 설치돼 있으면 pass2에서 렌더링 재시도
   feed_date_margin_days: 1      # 피드 날짜 힌트로 건너뛸 때 두는 여유일
   max_items_per_source: 200
+  # 이미지 정책(설계서 4.4): 공식 발표 발행처의 complete 레코드만 이미지 후보를 내려받는다
+  media_source_types: [company_official, standards_body, research_lab]
+  media_max_per_doc: 5
+  media_min_px: 300             # 가로·세로 중 하나라도 이보다 작으면 제외(로고·추적 픽셀)
+  media_max_px: 1200            # 긴 변이 이보다 크면 줄인다
 
 extraction:
   min_body_chars: 200
@@ -56,6 +61,9 @@ internal:
   newsletter_name: "FAB4 위클리"                  # 후보, 확정 전
   newsletter_tagline: "칩 · 장비 · 솔루션 · 로봇, 네 박자로 읽는 제조 AI"
   newsletter_team: "삼성전자 DS · 메모리 MTC AX/PI"   # 꼬리말 소개
+  image_caption_chars: 40       # 대표 이미지 설명(새로 쓴 문장)
+  image_max_kb: 300             # 발송본 이미지 한 장의 파일 크기 상한(표시 폭 624px)
+  newsletter_from: ""           # newsletter.eml의 From. 비우면 헤더를 넣지 않는다(편집자가 메일 프로그램에서 정한다)
   newsletter_theme: A                                # A 삼성 블루 팝 / B 클린룸 민트 / C 웨이퍼 나이트
   # 사내 모델 접속(OpenAI 호환 /v1/chat/completions, 예: vLLM·Ollama). 모든 LLM 단계가 같은 모델을 쓴다.
   llm:

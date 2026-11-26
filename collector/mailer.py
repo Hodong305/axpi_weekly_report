@@ -16,7 +16,7 @@ from .settings import file_name
 
 REQUIRED = ["smtp_host", "smtp_port", "security", "username", "from_addr", "to_addrs"]
 DEFAULT_PASSWORD_ENV = "MTCAX_SMTP_PASSWORD"
-MIME = {".gz": ("application", "gzip"), ".json": ("application", "json"), ".md": ("text", "markdown")}
+MIME = {".gz": ("application", "gzip"), ".json": ("application", "json"), ".md": ("text", "markdown"), ".zip": ("application", "zip")}
 
 
 class MailError(Exception):
@@ -53,7 +53,7 @@ def get_password(cfg, environ=None):
 
 
 def package_paths(settings, issue_week):
-    """최신 revision의 package/ 파일 네 개: (rev, [gz, 원본, 리포트, manifest], package 폴더)"""
+    """최신 revision의 package/ 파일: (rev, [gz, 원본, 리포트, manifest, (이미지 묶음)], package 폴더). 이미지 묶음은 있을 때만."""
     out = settings.out_dir(issue_week)
     rev = next_revision(out, issue_week) - 1
     pkg = out / "package"
@@ -62,6 +62,9 @@ def package_paths(settings, issue_week):
     base = file_name(issue_week, "intake", rev)
     paths = [pkg / (base + ".gz"), pkg / base, pkg / file_name(issue_week, "report", rev, "md"),
              pkg / file_name(issue_week, "manifest", rev)]
+    zp = pkg / file_name(issue_week, "media", rev, "zip")
+    if zp.exists():
+        paths.append(zp)
     miss = [p.name for p in paths if not p.exists()]
     if miss:
         raise MailError(f"package/에 파일이 없습니다: {', '.join(miss)} — package를 다시 실행하세요")
@@ -84,14 +87,18 @@ def build_body(issue_week, rev, manifest, paths, dropped):
     for p in paths:
         b = p.read_bytes()
         lines.append(f"  - {p.name}  {len(b):,} B  {hashlib.sha256(b).hexdigest()}")
-    if dropped:
-        lines.append(f"※ 메일 크기 한도 때문에 원본 intake({dropped.name})는 첨부하지 않았습니다. 압축 intake로 처리하세요.")
+    for d in dropped:
+        if d.suffix == ".zip":
+            lines.append(f"※ 메일 크기 한도 때문에 이미지 묶음({d.name})은 첨부하지 않았습니다. 사내 발송본은 이미지 없이 만들어집니다.")
+        else:
+            lines.append(f"※ 메일 크기 한도 때문에 원본 intake({d.name})는 첨부하지 않았습니다. 압축 intake로 처리하세요.")
     lines += ["사내 처리: 첨부 파일을 한 폴더에 저장한 뒤", f"  python -m internal run --package <그 폴더> --issue-week {issue_week}"]
     return "\n".join(lines) + "\n"
 
 
-def build_message(cfg, issue_week, rev, paths, manifest, dropped=None):
-    keep = [p for p in paths if p != dropped]
+def build_message(cfg, issue_week, rev, paths, manifest, dropped=()):
+    dropped = list(dropped)
+    keep = [p for p in paths if p not in dropped]
     msg = EmailMessage()
     msg["Subject"] = subject_for(issue_week, rev, manifest)
     msg["From"] = cfg["from_addr"]
@@ -105,16 +112,19 @@ def build_message(cfg, issue_week, rev, paths, manifest, dropped=None):
 
 
 def plan_attachments(cfg, paths):
-    """합계가 max_total_mb를 넘으면 원본 intake만 뺀다. 그래도 넘으면 MailError. 반환: (뺀 파일 또는 None, 합계 바이트)"""
+    """합계가 max_total_mb를 넘으면 원본 intake를 먼저 빼고, 그래도 넘으면 이미지 묶음을 뺀다(4.7). 그래도 넘으면 MailError.
+    반환: (뺀 파일 목록, 보내는 파일 합계 바이트)"""
     limit = cfg["max_total_mb"] * 1024 * 1024
     total = sum(p.stat().st_size for p in paths)
-    if total <= limit:
-        return None, total
-    dropped = paths[1]
-    total -= dropped.stat().st_size
+    dropped = []
+    for cand in [p for p in paths if p.suffix == ".json" and "intake" in p.name] + [p for p in paths if p.suffix == ".zip"]:
+        if total <= limit:
+            break
+        dropped.append(cand)
+        total -= cand.stat().st_size
     if total > limit:
         raise MailError(f"첨부 합계 {total / 1024 / 1024:.1f} MB가 한도 {cfg['max_total_mb']:g} MB를 넘어 보내지 않습니다"
-                        "(원본 intake를 빼도 초과). max_total_mb를 올리거나 후보 수를 줄이세요")
+                        "(원본 intake와 이미지 묶음을 빼도 초과). max_total_mb를 올리거나 후보 수를 줄이세요")
     return dropped, total
 
 
@@ -140,8 +150,8 @@ def send(settings, issue_week, config_path=None, dry_run=False, resend=False, ou
         out(f"[dry-run] 제목: {msg['Subject']}")
         for p in keep:
             out(f"  첨부 {p.name}  {p.stat().st_size:,} B")
-        if dropped:
-            out(f"  (한도 초과로 원본 intake 제외: {dropped.name})")
+        for d in dropped:
+            out(f"  (한도 초과로 제외: {d.name})")
         out(f"  합계 {total:,} B (한도 {cfg['max_total_mb']:g} MB) · 수신자 {len(cfg['to_addrs'])}명 · 보내지 않았습니다")
         return None
     password = get_password(cfg, environ)

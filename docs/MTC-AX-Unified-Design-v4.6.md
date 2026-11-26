@@ -842,7 +842,7 @@ review_log: []             # 검토 요청 응답과 적용 결과
 | `internal/fingerprint.py`, `llm.py`의 `ResponseCache` | 9.11: 실행 지문(직전 호와 비교), 응답 저장(`review/{issue_week}-llm-cache.jsonl`) |
 | `tests/regression/`, `tests/test_regression.py` | 11장 회귀 사례 5종의 고정 입력·모델 응답·기대 결과. `python tests/regression/run.py`로 비교(`--update`로 갱신) |
 | `internal/glossary.py`, `glossary.yaml` | 약어·용어 풀이: 이번 호 첫 등장 풀이, 모르는 약어 찾기(S7), `s6_glossary` 제안, 발송 확정 때 `glossary.yaml`에 덧붙임(주석·순서 보존) |
-| `internal/render.py`, `internal/templates/newsletter.html`·`themes.yaml`, `metrics.py`, `pipeline.py` | S8 정적 HTML·텍스트(`out_internal/{issue_week}/`; 템플릿을 작은 치환기로 채움), 시범 지표(`log/pilot.csv`), 상태 기계 |
+| `internal/render.py`, `internal/templates/newsletter.html`·`themes.yaml`, `metrics.py`, `pipeline.py` | S8 `newsletter.eml`(이미지 cid 내장)·미리 보기 `newsletter.html`(data URI)·`newsletter.txt`(`out_internal/{issue_week}/`; 템플릿을 작은 치환기로 채움, 이미지는 Pillow로 축소), 시범 지표(`log/pilot.csv`), 상태 기계 |
 | `ledger/events.jsonl` | 사건 대장(7.2). S8에서만 갱신 |
 
 `review/`, `out_internal/`, `ledger/`, `log/`는 실행 결과이므로 저장소에 올리지 않는다(`.gitignore`).
@@ -1030,7 +1030,7 @@ review_log: []             # 검토 요청 응답과 적용 결과
 | `schema/MTC-AX-collection-v4.6.schema.json` | 사외 수집 JSON 스키마 |
 | `AGENTS.md` (`CLAUDE.md`·`GEMINI.md`가 참조) | 사외 수집 운영 절차 |
 | `mail.local.example.yaml` | 사내 메일 발송 설정 견본(실제 `mail.local.yaml`은 저장소에 올리지 않음) |
-| `collector/` | 수집기(`python -m collector window·prompt·run·package·send·validate·check-sources`) |
+| `collector/` | 수집기(이미지 후보 추출·축소는 `collector/media.py`, `python -m collector window·prompt·run·package·send·validate·check-sources`) |
 | `config.yaml`, `sources.yaml`, `queries.yaml` | 설정, 발행처 레지스트리, 분야 정의·검색어 |
 | `prompts/discovery.md`, `prompts/internal-operator.md` | LLM 후보 탐색 프롬프트, 사내 운영 프롬프트 |
 | `prompts/internal-steps.md` | 사내 단계 프롬프트(9.3·9.4 그대로 + 구현 보강 6종) |

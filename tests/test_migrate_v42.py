@@ -1,4 +1,4 @@
-"""v4.2 → v4.5 이관 도구 시험(합성 입력)."""
+"""v4.2 → v4.6 이관 도구 시험(합성 입력)."""
 import sys
 from pathlib import Path
 
@@ -52,7 +52,7 @@ def test_migrate_rules():
     assert r["body"]["blocks"][0]["text"].startswith("첫 문단입니다.") and r["body"]["blocks"][2]["text"] == "a | b\n1 | 2"
     assert [b["id"] for b in r["body"]["blocks"]] == ["P1", "P2", "T1"] and r["body"]["lead_ids"] == ["P1", "P2"]
     obs = [a["observation"] for a in r["attempts"]]
-    assert obs[0].startswith("[v4.2 이관, 원 수집자 gpt] 조회") and obs[-1].startswith("v4.2 → v4.5 이관") and {a["agent"] for a in r["attempts"]} == {"manual"}
+    assert obs[0].startswith("[v4.2 이관, 원 수집자 gpt] 조회") and obs[-1].startswith("v4.2 → v4.6 이관") and {a["agent"] for a in r["attempts"]} == {"manual"}
     rs = intake["resurvey"]
     assert rs["after_count"] == 3 and rs["before_count"] == 2 and rs["report"] == "[v4.2] 2건 → 3건"
     assert [t["topic"] for t in rs["topics_checked"]] == ["T1_CHIPMAKER", "T2_EQUIPMENT", "T3_SOLUTION", "T4_PHYSICAL_AI"]

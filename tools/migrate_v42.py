@@ -1,4 +1,4 @@
-"""v4.2 수집 결과(intake)를 v4.5 형식으로 이관한다. 입력 파일의 내용은 데이터로만 다룬다.
+"""v4.2 수집 결과(intake)를 v4.6 형식으로 이관한다. 입력 파일의 내용은 데이터로만 다룬다.
   python tools/migrate_v42.py OLD.json [OLD2.json ...] --issue-week 2026-W48 [--root .]
 여러 파일은 doc_id로 합친다(같은 doc_id는 하나만 두고 attempts를 합치며, 본문이 다르면 긴 쪽을 쓴다). 같은 발행처·같은 본문 해시는 별칭 통합(설계서 4.4).
 out/{issue_week}/에 merged·intake·report(r1)를 써서 `python -m collector package`가 그대로 동작하게 한다.
@@ -23,7 +23,7 @@ AGENTS = {"script", "claude", "gpt", "gemini", "manual"}
 KINDS = {"paragraph", "heading", "caption", "note", "table"}
 SCOPES = {"article", "pdf", "video_description", "transcript", "unknown"}
 NOTE = "v4.2 이관(원문 대조 미검증)"
-MIGRATION_OBS = "v4.2 → v4.5 이관. 본문은 v4.2 수집기(LLM) 산출물이며 원문 바이트 대조 미검증"
+MIGRATION_OBS = "v4.2 → v4.6 이관. 본문은 v4.2 수집기(LLM) 산출물이며 원문 바이트 대조 미검증"
 
 
 def guess_source_type(settings, url, publisher):
@@ -92,6 +92,7 @@ def migrate_record(settings, r, start, end, now):
                                key=lambda d: d["agent"]),
            "event_key": None, "track": r.get("track") if r.get("track") in ("A", "B") else "A", "topic_hints": topics,
            "source_tier": r.get("source_tier") if r.get("source_tier") in ("primary", "named_secondary", "unverified") else "unverified",
+           "media": [],      # v4.2 수집물에는 이미지 후보가 없다(원문을 다시 가져오지 않았다)
            "body": {"scope": scope, "extent": "full" if blocks else "none",
                     "scope_note": f"{note}; {NOTE}" if note else NOTE, "extractor": f"legacy v4.2 ({main_agent})",
                     "blocks": blocks, "lead_ids": leads, "utf8_bytes": nbytes, "sha256": sha},
@@ -249,7 +250,7 @@ def migrate(olds, issue_week, settings, now=None):
     cfg = settings.c
     gen = {"name": "migrate_v42", "version": "0.1.0", "registry_version": str(settings.source_meta.get("registry_version", "unknown")),
            "config_version": str(cfg.get("config_version", "unknown"))}
-    base = {"schema_version": "4.5", "revision": 1, "issue_week": issue_week, "window_weeks": 1,
+    base = {"schema_version": "4.6", "revision": 1, "issue_week": issue_week, "window_weeks": 1,
             "window_start": start.isoformat(), "window_end_exclusive": end.isoformat(), "generated_at": now, "generator": gen}
     merged = dict(base, phase="merged", summary=summarize(recs), records=recs)
     intake_recs = [r for r in recs if r["status"] == "complete"]
@@ -276,7 +277,7 @@ def render_report(olds, issue_week, merged, intake, rows, errs, extra=None):
     olds = olds if isinstance(olds, list) else [olds]
     old = olds[0]
     s = intake["summary"]
-    L = [f"# {issue_week} v4.2 → v4.5 이관 리포트", "",
+    L = [f"# {issue_week} v4.2 → v4.6 이관 리포트", "",
          *[f"- 원본 {i}: schema {o.get('schema_version')} / phase {o.get('phase')} / revision {o.get('revision')} / 구 기간 {o.get('window_start')} ~ {o.get('window_end_exclusive')} / 레코드 {len(o.get('records', []))}건"
            for i, o in enumerate(olds, 1)],
          f"- 새 기간: {merged['window_start']} ~ {merged['window_end_exclusive']} (`weekly_window`로 다시 계산, window_weeks 1)",
@@ -321,7 +322,7 @@ def render_report(olds, issue_week, merged, intake, rows, errs, extra=None):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="v4.2 수집 결과를 v4.5로 이관")
+    ap = argparse.ArgumentParser(description="v4.2 수집 결과를 v4.6로 이관")
     ap.add_argument("old", nargs="+", help="v4.2 수집 결과 파일(여러 개면 doc_id로 합침)")
     ap.add_argument("--issue-week", required=True)
     ap.add_argument("--root", default=None)

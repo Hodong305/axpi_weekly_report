@@ -258,11 +258,31 @@ def new_terms(draft):
     return [g for g in draft.get("glossary") or [] if g["source"] != "glossary"]
 
 
+def image_items(draft, img):
+    """[I] 대상: 후보가 있거나 이미지가 있는 핵심 기사. 반환: [(번호, articles 인덱스, 핵심 라벨, 후보 목록)]. img = {articles 인덱스: 후보 목록}"""
+    out, k = [], 0
+    for i, a in enumerate(draft["articles"]):
+        if a["slot"] != "core":
+            continue
+        k += 1
+        cands = (img or {}).get(i) or []
+        if cands or a.get("image"):
+            out.append((len(out) + 1, i, f"핵심{k}", cands))
+    return out
+
+
+def _image_entry(n, lab, art, cands):
+    cur = art.get("image")
+    label = next((c["label"] for c in cands if cur and c["media_ref"] == cur["media_ref"]), None)
+    head = f"I{n} {lab} · " + (f"{label or '이미지'} {cur['caption']}" if cur else "없음")
+    return head + (f" (후보 M1~M{len(cands)})" if cands else "")
+
+
 def _punch_line(i, p):
     return f"C{i} {p['big']} · {p['text']} / {p['twist']}" + (" (권장)" if i == 1 else "")
 
 
-def render_review2(issue_week, draft, warnings, cfg=None):
+def render_review2(issue_week, draft, warnings, cfg=None, img=None):
     cfg = cfg or {}
     from .draft import TOPIC_LABEL
     lines = [f"{BAR} 검토 요청 ② 머리부·제목 · {issue_week} {BAR}",
@@ -280,6 +300,8 @@ def render_review2(issue_week, draft, warnings, cfg=None):
         lines.append("  (없음)")
     for j, m in enumerate(draft.get("more") or [], 1):
         lines.append(f"  F{j} {TOPIC_LABEL.get(m['topic'], m['topic'] or '기타')} · {m['line']}")
+    items = image_items(draft, img)
+    lines.append("[I 대표 이미지]   " + (" / ".join(_image_entry(n, lab, draft["articles"][i], c) for n, i, lab, c in items) or "(없음)"))
     lines.append("[G 새 용어 풀이]")
     news = new_terms(draft)
     if not news:
@@ -304,6 +326,7 @@ def render_review2(issue_week, draft, warnings, cfg=None):
               " - D: 바꿀 기사만. 생략하면 현재 제목 유지",
               " - E: 경고마다 수정 또는 유지. 생략하면 수정안 적용",
               " - F: 뺄 항목만. 예: F3=빼기, F7=빼기. 생략하면 모두 싣는다",
+              " - I: 바꿀 이미지만. 예: I1=빼기, I2=M3. 생략하면 모델 선택 유지",
               " - 전부 권장안이면: 승인",
               "응답:"]
     return "\n".join(lines)
@@ -321,6 +344,8 @@ _TOK = [
     ("C", re.compile(r"C([1-9])(?!\w)")),
     ("E", re.compile(r"E(\d+)\s*=\s*(수정|유지)")),
     ("F", re.compile(r"F(\d+)\s*=\s*빼기")),
+    ("I_NONE", re.compile(r"I(\d+)\s*=\s*빼기")),
+    ("I_SWAP", re.compile(r"I(\d+)\s*=\s*M(\d+)")),
     ("D", re.compile(r"D(?=[\s,]|$)")),
     ("OK", re.compile(r"승인")),
 ]
@@ -334,7 +359,7 @@ def parse_review2(text):
     s = (text or "").strip()
     if not s:
         raise ReviewError("응답이 비어 있습니다. 예: A2 B1 C1, 또는 승인")
-    res = {"A": None, "B": None, "C": None, "D": {}, "E": {}, "F": [], "G": {}}
+    res = {"A": None, "B": None, "C": None, "D": {}, "E": {}, "F": [], "G": {}, "I": {}}
     approve_all = False
     pos, in_d = 0, False
     while pos < len(s):
@@ -365,6 +390,10 @@ def parse_review2(text):
             res["B"] = ("text", tm.group(1))
         elif name == "C_NONE":
             res["C"] = ("none",)
+        elif name == "I_NONE":
+            res["I"][int(tm.group(1))] = ("none",)
+        elif name == "I_SWAP":
+            res["I"][int(tm.group(1))] = ("swap", int(tm.group(2)))
         elif name == "G":
             res["G"][int(tm.group(1))] = tm.group(2)
         elif name == "A":
@@ -392,7 +421,7 @@ def parse_review2(text):
     return res
 
 
-def validate_review2(res, draft, warnings, cfg):
+def validate_review2(res, draft, warnings, cfg, img=None):
     """응답이 현재 요청과 맞는지(번호 범위, 글자 수) 검사한다."""
     from .glossary import EDIT_MAX
     smax = cfg["summary_chars"][1]
@@ -425,6 +454,12 @@ def validate_review2(res, draft, warnings, cfg):
             raise ReviewError(f"D {lab}={val}: 대안이 {len(a['title_alternatives']['ab'.index(val)])}자로 한도 {cfg['article_title_max']}자를 넘습니다.")
         if kind == "text" and not 1 <= len(val.strip()) <= cfg["article_title_max"]:
             raise ReviewError(f"D {lab} 직접 입력은 {cfg['article_title_max']}자 이내로 쓰세요(현재 {len(val.strip())}자).")
+    items = {n: c for n, _, _, c in image_items(draft, img)}
+    for n, act in res["I"].items():
+        if n not in items:
+            raise ReviewError(f"I{n}: 해당 대표 이미지 항목이 없습니다.")
+        if act[0] == "swap" and not 1 <= act[1] <= len(items[n]):
+            raise ReviewError(f"I{n}=M{act[1]}: 후보가 없습니다. M1~M{len(items[n])} 중에서 고르세요." if items[n] else f"I{n}=M{act[1]}: 이 기사에는 이미지 후보가 없습니다.")
     for n in res["F"]:
         if not 1 <= n <= len(draft.get("more") or []):
             raise ReviewError(f"F{n}: 해당 더 볼 거리 항목이 없습니다.")
@@ -451,10 +486,11 @@ def apply_fix(draft, fix):
     return False
 
 
-def apply_review2(draft, res, warnings):
+def apply_review2(draft, res, warnings, img=None):
     """A·B·C·D·E·F·G를 원고에 반영한다(B의 수정 지시는 st['b_revise']로 돌려주고 호출 쪽이 모델로 처리). 반환: 통계 dict."""
     st = {"A_custom": False, "B_custom": False, "b_revise": None, "d_changed": 0, "d_total": len(draft["articles"]),
-          "e_fix": 0, "e_keep": 0, "e_total": len(warnings), "d_ids": [], "f_removed": 0, "g_edited": 0, "C_none": False}
+          "e_fix": 0, "e_keep": 0, "e_total": len(warnings), "d_ids": [], "f_removed": 0, "g_edited": 0, "C_none": False,
+          "i_changed": 0, "image_swaps": []}
     for key, field, cands in (("A", "issue_title", "issue_title_candidates"), ("B", "summary", "summary_candidates")):
         kind, val = res[key]
         if kind == "revise":              # 수정 지시: 지금 총론(1순위)을 기준으로 다시 쓴다
@@ -484,6 +520,21 @@ def apply_review2(draft, res, warnings):
         gone = set(res["F"])
         draft["more"] = [m for j, m in enumerate(draft.get("more") or [], 1) if j not in gone]
         st["f_removed"] = len(gone)
+    for n, i, _, cands in image_items(draft, img):     # I: 이미지를 빼거나 다른 후보로 바꾼다(바꾼 이미지의 설명은 호출 쪽이 새로 쓴다)
+        act = res["I"].get(n)
+        if act is None:
+            continue
+        a = draft["articles"][i]
+        if act[0] == "none":
+            if a.get("image"):
+                a["image"] = None
+                st["i_changed"] += 1
+        else:
+            cand = cands[act[1] - 1]
+            if not a.get("image") or a["image"]["media_ref"] != cand["media_ref"]:
+                a["image"] = {"media_ref": cand["media_ref"], "caption": ""}
+                st["image_swaps"].append((i, cand))
+                st["i_changed"] += 1
     news = new_terms(draft)
     for n, text in res["G"].items():        # G: 고칠 풀이만. 나머지 모델 제안은 그대로 확정
         news[n - 1]["meaning"], news[n - 1]["source"] = text.strip(), "editor"

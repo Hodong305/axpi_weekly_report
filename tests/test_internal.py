@@ -35,7 +35,7 @@ def make_record(url, title, publisher, date, paras, source_type="company_officia
             "author": author, "language": lang, "source_type": source_type, "published_date": date, "published_at": None,
             "change_at": None, "change_note": None,
             "discovery": [{"route": "llm_search", "agent": "claude", "source_id": None, "query": "q"}],
-            "event_key": None, "track": track, "topic_hints": [], "source_tier": tier,
+            "event_key": None, "track": track, "topic_hints": [], "source_tier": tier, "media": [],
             "body": {"scope": "article", "extent": "full", "scope_note": None, "extractor": "test", "blocks": blocks,
                      "lead_ids": ref.lead_ids(blocks, 40), "utf8_bytes": n, "sha256": sha},
             "status": "complete", "reason_codes": [],
@@ -68,8 +68,8 @@ def sample_records():
     return sorted([d1, d2, d3, d4, d5, d6], key=lambda r: r["doc_id"])
 
 
-def make_package(tmp, records, week=WEEK, revision=1, mutate_manifest=None):
-    doc = {"schema_version": "4.5", "phase": "intake", "revision": revision, "issue_week": week, "window_weeks": 1,
+def make_package(tmp, records, week=WEEK, revision=1, mutate_manifest=None, media_files=None):
+    doc = {"schema_version": "4.6", "phase": "intake", "revision": revision, "issue_week": week, "window_weeks": 1,
            "window_start": "2026-11-22T00:00:00+09:00", "window_end_exclusive": "2026-11-29T00:00:00+09:00",
            "generated_at": "2026-11-29T02:00:00+09:00",
            "generator": {"name": "mtcax-collector", "version": "0.1.0", "registry_version": "t", "config_version": "1"},
@@ -84,8 +84,14 @@ def make_package(tmp, records, week=WEEK, revision=1, mutate_manifest=None):
     gz.write_bytes(gzip.compress(json.dumps(doc, ensure_ascii=False).encode("utf-8"), mtime=0))
     rp = pkg / f"mtc-ax-{tag}-report-r{revision}.md"
     rp.write_text("# 리포트\n", encoding="utf-8")
-    files = [{"name": p.name, "bytes": len(p.read_bytes()), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()} for p in (gz, rp)]
-    manifest = {"schema_version": "4.5", "issue_week": week, "revision": revision, "window_weeks": 1,
+    paths = [gz, rp]
+    if media_files:       # 이미지 묶음(zip): 이름 → 바이트
+        from collector.media import write_zip
+        zp = pkg / f"mtc-ax-{tag}-media-r{revision}.zip"
+        write_zip(zp, list(media_files.items()))
+        paths.append(zp)
+    files = [{"name": p.name, "bytes": len(p.read_bytes()), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()} for p in paths]
+    manifest = {"schema_version": "4.6", "issue_week": week, "revision": revision, "window_weeks": 1,
                 "summary": doc["summary"], "files": files, "warnings": [], "generated_at": "2026-11-29T02:00:00+09:00"}
     if mutate_manifest:
         mutate_manifest(manifest)
@@ -194,7 +200,13 @@ class FakeClient:
                "body": body, "evidence_ids": [f"{doc}/P1"]}
         if core:
             out.update(watch="후속 지표를 확인할 필요가 있다.", key_figures=[])
+            m = re.search(r"\[이미지 후보\]\n(\[.*\])", user)
+            if m:      # 이미지 후보가 있으면 첫 후보를 고르고 설명을 새로 쓴다
+                out["image"] = {"media_ref": json.loads(m.group(1))[0]["media_ref"], "caption": "기사의 핵심 장면을 보여 주는 도식"}
         return out
+
+    def r_s6_image_caption(self, user):
+        return {"caption": "바꾼 이미지를 새로 설명한 문장"}
 
     def r_s6_more(self, user):
         info = json.loads(re.search(r"\[작성 지침\]\n(\{.*\})", user).group(1))
@@ -271,7 +283,7 @@ def test_s1_bad_hash_bytes_and_schema(tmp_path):
     # 해시는 맞지만 7.3 코드 검사에 걸리는 경우: doc_id를 망가뜨린 intake
     recs = sample_records()
     recs[0]["doc_id"] = "url1_" + "0" * 64
-    doc = {"schema_version": "4.5", "phase": "intake", "revision": 1, "issue_week": WEEK, "window_weeks": 1,
+    doc = {"schema_version": "4.6", "phase": "intake", "revision": 1, "issue_week": WEEK, "window_weeks": 1,
            "window_start": "2026-11-22T00:00:00+09:00", "window_end_exclusive": "2026-11-29T00:00:00+09:00",
            "generated_at": "2026-11-29T02:00:00+09:00",
            "generator": {"name": "x", "version": "1", "registry_version": "1", "config_version": "1"},
@@ -302,7 +314,7 @@ def test_pipeline_aborts_on_bad_package(tmp_path):
 # 프롬프트·LLM 클라이언트 ------------------------------------------------------------
 
 def test_step_prompts_match_design_doc():
-    doc = (ROOT / "docs" / "MTC-AX-Unified-Design-v4.5.md").read_text(encoding="utf-8")
+    doc = (ROOT / "docs" / "MTC-AX-Unified-Design-v4.6.md").read_text(encoding="utf-8")
     for tag, step in (("1단계 프롬프트", "s2_fit"), ("2단계 프롬프트", "s4_score")):
         m = re.search(r"~~~text\n\[" + tag + r"\]\n(.*?)~~~", doc, re.S)
         assert STEPS[step] == m.group(1).strip()
@@ -703,9 +715,9 @@ def sample_draft():
 
 
 def test_parse_review2_valid():
-    assert rv.parse_review2("승인") == {"A": ("pick", 1), "B": ("pick", 1), "C": None, "D": {}, "E": {}, "F": [], "G": {}}
+    assert rv.parse_review2("승인") == {"A": ("pick", 1), "B": ("pick", 1), "C": None, "D": {}, "E": {}, "F": [], "G": {}, "I": {}}
     r = rv.parse_review2("A2 B1 C1 D 핵심1=a E1=수정")
-    assert r == {"A": ("pick", 2), "B": ("pick", 1), "C": ("pick", 1), "D": {"핵심1": ("pick", "a")}, "E": {"E1": "수정"}, "F": [], "G": {}}
+    assert r == {"A": ("pick", 2), "B": ("pick", 1), "C": ("pick", 1), "D": {"핵심1": ("pick", "a")}, "E": {"E1": "수정"}, "F": [], "G": {}, "I": {}}
     r = rv.parse_review2('A:"직접 쓴 헤드라인" B:"직접 쓴 총론" C:없음 D 핵심1=b, 단신1:"새 제목" E1=유지 E2=수정 G2:"설비 이상 감지"')
     assert r["A"] == ("text", "직접 쓴 헤드라인") and r["B"] == ("text", "직접 쓴 총론") and r["C"] == ("none",)
     assert r["D"] == {"핵심1": ("pick", "b"), "단신1": ("text", "새 제목")} and r["E"] == {"E1": "유지", "E2": "수정"} and r["G"] == {2: "설비 이상 감지"}
@@ -936,7 +948,7 @@ def test_full_run_outputs(tmp_path):
     # draft.yaml 키
     d = yaml.safe_load((tmp_path / "review" / f"{WEEK}-draft.yaml").read_text(encoding="utf-8"))
     assert list(d) == ["issue_week", "issue_title", "issue_title_candidates", "summary", "summary_candidates", "punch", "punch_candidates", "glossary", "articles", "more", "excluded_count", "review_log"]
-    assert list(d["articles"][0]) == ["event_id", "slot", "title", "title_alternatives", "tags", "body", "watch", "key_figures", "credits", "evidence_ids"]
+    assert list(d["articles"][0]) == ["event_id", "slot", "title", "title_alternatives", "tags", "body", "watch", "key_figures", "image", "credits", "evidence_ids"]
     assert list(d["articles"][2]) == ["event_id", "slot", "title", "title_alternatives", "tags", "body", "credits", "evidence_ids"]    # 단신
     assert d["articles"][0]["credits"][0].startswith("Lam Research, 「Lam expands fleet analytics」, 2026-11-24 (영문)")
     assert [r["review"] for r in d["review_log"]] == ["①", "②", "발송 확인"]
@@ -1161,8 +1173,8 @@ def test_fingerprint_change_warning(tmp_path):
     assert sorted(state["fp_changes"]) == ["design_version", "steps_sha256"]
     rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
     fp = rows[WEEK]
-    assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.5" and fp["fp_internal_version"]
-    assert fp["fp_collector_version"] == "0.1.0" and fp["config_version"] == "3"
+    assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.6" and fp["fp_internal_version"]
+    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "4"
 
 
 def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):

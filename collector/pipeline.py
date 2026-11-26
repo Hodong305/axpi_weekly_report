@@ -14,9 +14,10 @@ from .candidates import load_candidate_files, load_manual_urls
 from .fetch import Fetched, Fetcher, now_kst
 from .ref import KST, weekly_window
 from .registry import crawl_source
+from . import media as media_mod
 from .report import write_report
 from .settings import TOPIC_CODES, file_name
-from .validate import check, summarize
+from .validate import check, dir_lookup, summarize
 
 STATUS_RANK = {"complete": 0, "drop": 1, "partial": 2}
 TEMP_FAIL = {"FETCH_FAILED", "ACCESS_BLOCKED"}
@@ -100,6 +101,12 @@ def load_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def _media_cands(media_cands, rec, f, cfg):
+    """complete이고 이미지 정책 대상인 새 본문(HTML)에서 이미지 후보를 뽑아 둔다."""
+    if rec["status"] == "complete" and rec["source_type"] in cfg["collection"]["media_source_types"] and not f.is_pdf:
+        media_cands[rec["doc_id"]] = media_mod.extract_candidates(f.content, f.final_url, cfg)
+
+
 def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=False):
     cfg = settings.c
     start, end = weekly_window(issue_week, weeks)
@@ -149,6 +156,7 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
 
         # pass1
         records, meta = {}, {}
+        media_cands = {}      # doc_id → 이미지 후보(내려받기 전). 이번 실행에서 새로 받은 본문에서만 만든다
         for did in sorted(groups):
             g = groups[did]
             pid = did if did in prev else alias_to_prev.get(did)
@@ -169,6 +177,7 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
             if rec["doc_id"] in overrides and rec["doc_id"] != did:
                 rec, where = build_record(g, f, 1, settings, window, overrides.get(rec["doc_id"]))
             _put(records, rec, meta, g)
+            _media_cands(media_cands, rec, f, cfg)
         pass1 = copy.deepcopy(records)
         log(f"  pass1: {summarize(list(pass1.values()))}")
 
@@ -192,6 +201,7 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
             if where == "FUTURE":
                 continue
             new["attempts"] = sort_attempts(rec["attempts"] + new["attempts"])
+            _media_cands(media_cands, new, f, cfg)
             replace = new["status"] in ("complete", "drop") or new["body"]["utf8_bytes"] > rec["body"]["utf8_bytes"]
             if replace:
                 if new["doc_id"] != did:
@@ -219,6 +229,8 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
             rep = dids[0]
             for d in dids[1:]:
                 alias = records.pop(d)
+                if d in media_cands and rep not in media_cands:
+                    media_cands[rep] = media_cands[d]
                 for a in alias["attempts"]:
                     a["observation"] = "별칭 URL: " + a["observation"]
                 records[rep] = merge_same_doc(records[rep], alias)
@@ -246,13 +258,35 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
                 c["status"], c["reason_codes"] = "partial", ["MERGE_CONFLICT"]
                 c["body"]["extent"] = "partial"
             records[pid]["attempts"] = sort_attempts(p["attempts"] + records[pid]["attempts"])
+        # 이미지 내려받기(4.4): 이번에 새로 받은 complete 레코드만. 이전 revision에서 가져온 레코드는 다시 받지 않는다
+        media_dir = out_dir / "media"
+        n_media = 0
+        for did, r in records.items():
+            r.setdefault("media", [])
+            if r["status"] != "complete" or r["source_type"] not in cfg["collection"]["media_source_types"]:
+                r["media"] = []
+                continue
+            pv = prev.get(did)
+            if pv and pv["status"] == "complete" and pv["body"]["sha256"] == r["body"]["sha256"]:
+                # 같은 본문이면 이전 revision의 이미지를 그대로 쓴다(파일은 out/{주차}/media/에 이미 있다)
+                r["media"] = [m for m in pv.get("media", []) if (out_dir / m["file"]).is_file()]
+            elif did in media_cands:
+                items, fails = media_mod.download(fetcher, media_cands[did], did, media_dir, cfg)
+                r["media"] = items
+                n_media += len(items)
+                for url, status, why in fails:
+                    r["attempts"] = sort_attempts(r["attempts"] + [{"pass": 1, "agent": "script", "at": now_kst(), "url": url,
+                                                                    "http_status": status, "observation": f"이미지 제외: {why}"}])
+            else:
+                r["media"] = [m for m in r["media"] if (out_dir / m["file"]).is_file()]
+        log(f"  이미지: {n_media}장 새로 받음")
     finally:
         fetcher.close()
 
     # 재조사 기록
     resurvey = build_resurvey(records, meta, stats["llm_files"])
 
-    base = {"schema_version": "4.5", "revision": revision, "issue_week": issue_week, "window_weeks": weeks,
+    base = {"schema_version": "4.6", "revision": revision, "issue_week": issue_week, "window_weeks": weeks,
             "window_start": start.isoformat(), "window_end_exclusive": end.isoformat(),
             "generated_at": now_kst(),
             "generator": {"name": "mtcax-collector", "version": __version__,
@@ -273,7 +307,7 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
     lead_min = cfg["extraction"]["lead_min_chars"]
     all_errors = {}
     for phase, d in docs.items():
-        errs, warns = check(d, lead_min, cfg["thresholds"]["intake_min"] if phase == "intake" else None)
+        errs, warns = check(d, lead_min, cfg["thresholds"]["intake_min"] if phase == "intake" else None, dir_lookup(out_dir))
         all_errors[phase] = (errs, warns)
         path = out_dir / file_name(issue_week, phase, revision)
         path.write_text(json.dumps(d, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
@@ -317,7 +351,7 @@ def package(settings, issue_week):
     intake = out_dir / file_name(issue_week, "intake", rev)
     report = out_dir / file_name(issue_week, "report", rev, "md")
     doc = load_json(intake)
-    errs, warns = check(doc, settings.c["extraction"]["lead_min_chars"], settings.c["thresholds"]["intake_min"])
+    errs, warns = check(doc, settings.c["extraction"]["lead_min_chars"], settings.c["thresholds"]["intake_min"], dir_lookup(out_dir))
     if errs:
         raise SystemExit("intake 검증 실패로 패키징하지 않습니다:\n" + "\n".join(errs[:30]))
     pkg = out_dir / "package"
@@ -329,13 +363,19 @@ def package(settings, issue_week):
     raw.write_bytes(intake.read_bytes())
     rep = pkg / report.name
     rep.write_bytes(report.read_bytes())
+    zpath = pkg / file_name(issue_week, "media", rev, "zip")
+    media_files = sorted({m["file"] for r in doc["records"] for m in r["media"]})
+    if media_files:      # 이미지가 있을 때만 묶음을 만든다(압축 없이 묶음: 이미지는 이미 압축돼 있다)
+        media_mod.write_zip(zpath, [(n, (out_dir / n).read_bytes()) for n in media_files])
+    elif zpath.exists():
+        zpath.unlink()
     files = []
-    for p in (gz, raw, rep):
+    for p in (gz, raw, rep) + ((zpath,) if media_files else ()):
         b = p.read_bytes()
         files.append({"name": p.name, "bytes": len(b), "sha256": hashlib.sha256(b).hexdigest()})
-    manifest = {"schema_version": "4.5", "issue_week": issue_week, "revision": rev,
+    manifest = {"schema_version": "4.6", "issue_week": issue_week, "revision": rev,
                 "window_weeks": doc["window_weeks"], "summary": doc["summary"], "files": files,
                 "warnings": warns, "generated_at": now_kst()}
     mf = pkg / file_name(issue_week, "manifest", rev)
     mf.write_text(json.dumps(manifest, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    return [gz, raw, rep, mf], warns
+    return [gz, raw, rep, mf] + ([zpath] if media_files else []), warns

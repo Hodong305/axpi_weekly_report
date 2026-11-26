@@ -10,3 +10,4 @@ PyYAML>=6.0
 jsonschema[format-nongpl]>=4.20
 # 선택: 자바스크립트 렌더링·봇 차단 페이지 재시도(pass2). 설치 후 `playwright install chromium`
 # playwright>=1.45
+Pillow>=10.0

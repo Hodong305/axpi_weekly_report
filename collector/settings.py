@@ -6,8 +6,8 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-SCHEMA_PATH = ROOT / "schema" / "MTC-AX-collection-v4.5.schema.json"
-SCHEMA_VERSION = "4.5"
+SCHEMA_PATH = ROOT / "schema" / "MTC-AX-collection-v4.6.schema.json"
+SCHEMA_VERSION = "4.6"
 TOPIC_CODES = ["T1_CHIPMAKER", "T2_EQUIPMENT", "T3_SOLUTION", "T4_PHYSICAL_AI"]
 TOPIC_SHORT = {"T1": "T1_CHIPMAKER", "T2": "T2_EQUIPMENT", "T3": "T3_SOLUTION", "T4": "T4_PHYSICAL_AI"}
 PROMPT_TOPICS = ["T1", "T2", "T3", "T4", "B"]

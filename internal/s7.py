@@ -1,7 +1,7 @@
 """S7 원고 자동 검사 실행(설계서 9.7): 자동 보정 → 재생성 1회 → 남은 문제는 경고(검토 요청 ②의 [E]). 약어 풀이 용어 모으기와 제안(G)도 여기서 한다."""
 from . import checks, glossary
 from .draft import apply_header, gen_article, gen_glossary, gen_header, gen_more, more_item_for, _glossary_user, GLOSSARY_SCHEMA
-from .evidence import prune_invalid_evidence
+from .evidence import prune_invalid_evidence, prune_invalid_images
 from .review import article_labels
 
 
@@ -74,6 +74,8 @@ def run_s7(judge, draft, events, records, cfg, issue_type, counts, failed_gen=()
     for e in prune_invalid_evidence(draft, by_id, records):
         warns.append({"scope": "기사", "quote": e[:40], "kind": "근거 ID",
                       "message": "재생성 후에도 실재하지 않는 근거 ID를 삭제함", "fix": None})
+    for ref in prune_invalid_images(draft, by_id, records, cfg):
+        warns.append({"scope": "기사", "quote": ref[:40], "kind": "이미지", "message": "재생성 후에도 후보에 없는 대표 이미지를 뺐습니다", "fix": None})
     warns += checks.autofix(draft, records)
     labels = {i: lab for lab, i in article_labels(draft).items()}
     # 글자 수 한도를 넘는 후보·대안은 빼지 않고 남긴다. 검토 요청 ②가 사유와 함께 보여 주고, 고를 수 없게 한다.

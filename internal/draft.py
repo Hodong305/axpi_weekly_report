@@ -22,11 +22,20 @@ ARTICLE_SCHEMA = {          # 단신(선택 항목 figure: 오른쪽 수치 배�
                    "body": {"type": "string", "minLength": 1}, "figure": {"anyOf": [{"type": "null"}, FIGURE_SCHEMA]},
                    "evidence_ids": {"type": "array", "items": {"type": "string"}}}}
 
-CORE_ARTICLE_SCHEMA = {     # 핵심: 본문 + MTC가 볼 것(watch) + 수치 카드(key_figures 0~3개)
+IMAGE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["media_ref", "caption"],
+                "properties": {"media_ref": {"type": "string"}, "caption": {"type": "string", "minLength": 1}}}
+
+CORE_ARTICLE_SCHEMA = {     # 핵심: 본문 + MTC가 볼 것(watch) + 수치 카드(key_figures 0~3개) + 대표 이미지(image, 후보가 있을 때)
     "type": "object", "additionalProperties": False,
     "required": ["event_id", "title", "title_alternatives", "body", "watch", "key_figures", "evidence_ids"],
     "properties": {**{k: v for k, v in ARTICLE_SCHEMA["properties"].items() if k != "figure"},
-                   "watch": {"type": "string", "minLength": 1}, "key_figures": {"type": "array", "maxItems": 3, "items": FIGURE_SCHEMA}}}
+                   "watch": {"type": "string", "minLength": 1}, "key_figures": {"type": "array", "maxItems": 3, "items": FIGURE_SCHEMA},
+                   "image": {"anyOf": [{"type": "null"}, IMAGE_SCHEMA]}}}
+
+IMAGE_CAPTION_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["caption"],
+                        "properties": {"caption": {"type": "string", "minLength": 1}}}
+
+DEFAULT_MEDIA_TYPES = ("company_official", "standards_body", "research_lab")
 
 MORE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["ref", "line", "evidence_ids"],
                "properties": {"ref": {"type": "string"}, "line": {"type": "string", "minLength": 1},
@@ -36,6 +45,25 @@ TOPIC_LABEL = {"T1_CHIPMAKER": "칩메이커", "T2_EQUIPMENT": "장비사", "T3_
                "B": "기반기술 전이 사례"}
 MATURITY_LABEL = {20: "양산·상시 운영", 15: "현장 실증·적용", 10: "도입 계획", 5: "구상·연구"}
 EVIDENCE_LABEL = {25: "독립 검증·기관 확정", 20: "운영사 발표", 15: "당사자 발표", 5: "언론 보도"}
+
+
+def image_candidates(ev, records, cfg):
+    """대표 이미지 후보(9.8): 사건 자료 중 이미지 정책 대상(source_type이 media_source_types)의 media[]를 doc_id 순·자료 안 순서로 펼친다.
+    라벨은 펼친 순서의 M1, M2…(한 자료뿐이면 자료의 이미지 ID와 같다). 이미지 파일 내용은 모델에 주지 않는다."""
+    policy = set(cfg.get("media_source_types") or DEFAULT_MEDIA_TYPES)
+    out = []
+    for d in sorted(ev["doc_ids"]):
+        rec = records.get(d)
+        if rec is None or rec["source_type"] not in policy:
+            continue
+        for m in rec.get("media") or []:
+            out.append({"label": f"M{len(out) + 1}", "media_ref": f"{d}#{m['id']}", "doc_id": d, "kind": m["kind"], "caption": m["caption"],
+                        "alt": m["alt"], "width": m["width"], "height": m["height"], "file": m["file"], "mime": m["mime"]})
+    return out
+
+
+def find_candidate(cands, media_ref):
+    return next((c for c in cands if c["media_ref"] == media_ref), None)
 
 
 def make_tags(ev, slot):
@@ -102,6 +130,8 @@ def _article_user(judge, ev, slot, records, cfg, feedback):
     if slot == "core":
         info["watch_글자수_한도"] = cfg["watch_chars"]
         info["key_figures_최대"] = 3
+        if image_candidates(ev, records, cfg):
+            info["이미지_설명_글자수_한도"] = cfg["image_caption_chars"]
     if led["verdict"] == "SAME_WITH_CHANGE":
         info["후속"] = {"지난_게재_호": led.get("issue"), "새로_확인된_변화": led.get("changes")}
     parts = ["[작성 지침]\n" + json.dumps(info, ensure_ascii=False)]
@@ -110,6 +140,10 @@ def _article_user(judge, ev, slot, records, cfg, feedback):
                                                                   "unresolved", "evidence")}, ensure_ascii=False)
                                   if sc else "(자동 채점 없음)"))
     parts += [judge.source(records[d]) for d in ev["doc_ids"]]
+    cands = image_candidates(ev, records, cfg) if slot == "core" else []
+    if cands:        # 이미지 후보 목록(파일 내용은 주지 않는다): 원문 캡션·대체 텍스트와 크기만
+        parts.append("[이미지 후보]\n" + json.dumps([{"media_ref": c["media_ref"], "kind": c["kind"], "caption": c["caption"],
+                                                      "alt": c["alt"], "size": f"{c['width']}x{c['height']}"} for c in cands], ensure_ascii=False))
     if feedback:
         parts.append(judge.phrase("x_regen") + "\n" + feedback)
     return "\n".join(parts)
@@ -128,6 +162,12 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
             errs.append("근거 ID가 없음")
         if slot == "core":
             errs += key_figure_errors(obj["key_figures"], obj["evidence_ids"], records)
+            img = obj.get("image")
+            if img:
+                if find_candidate(image_candidates(ev, records, cfg), img["media_ref"]) is None:
+                    errs.append(f"이미지 후보에 없는 media_ref: {img['media_ref']}")
+                if len(img["caption"].strip()) > cfg["image_caption_chars"]:
+                    errs.append(f"이미지 설명이 {len(img['caption'].strip())}자로 한도 {cfg['image_caption_chars']}자를 넘음")
         elif obj.get("figure"):
             errs += key_figure_errors([obj["figure"]], obj["evidence_ids"], records)
         return errs
@@ -147,6 +187,8 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
     if slot == "core":
         art["watch"] = r["watch"].strip()
         art["key_figures"] = [{"value": k["value"].strip(), "label": k["label"].strip()} for k in r["key_figures"]]
+        img = r.get("image")
+        art["image"] = {"media_ref": img["media_ref"], "caption": img["caption"].strip()} if img else None
     elif r.get("figure"):
         art["figure"] = {"value": r["figure"]["value"].strip(), "label": r["figure"]["label"].strip()}
     art["credits"] = build_credits(r["evidence_ids"], ev["rep_doc_id"], records)
@@ -360,6 +402,24 @@ def generate_draft(judge, events, records, issue_week, cfg, issue_type, counts, 
     draft["review_log"] = []
     ordered = {k: draft[k] for k in DRAFT_KEYS}
     return ordered, failed
+
+
+# 대표 이미지 설명 다시 쓰기(검토 요청 ②에서 이미지를 바꿨을 때) ----------------------------------------
+
+def gen_image_caption(judge, article, cand, cfg):
+    """바꾼 이미지의 설명을 기사 내용과 후보의 원문 캡션·대체 텍스트를 보고 새로 쓴다. 실패하면 None."""
+    user = ("[작성 지침]\n" + json.dumps({"설명_글자수_한도": cfg["image_caption_chars"]}, ensure_ascii=False)
+            + "\n[기사] " + json.dumps({"title": article["title"], "body": article["body"]}, ensure_ascii=False)
+            + "\n[이미지 후보] " + json.dumps({"media_ref": cand["media_ref"], "kind": cand["kind"], "caption": cand["caption"], "alt": cand["alt"]},
+                                           ensure_ascii=False))
+
+    def validate(obj):
+        n = len(obj["caption"].strip())
+        return [f"설명이 {n}자로 한도 {cfg['image_caption_chars']}자를 넘음"] if n > cfg["image_caption_chars"] else []
+    try:
+        return judge.ask("s6_image_caption", user, IMAGE_CAPTION_SCHEMA, validate)["caption"].strip()
+    except AutoJudgeFailed:
+        return None
 
 
 # 용어 풀이 제안 -----------------------------------------------------------------------

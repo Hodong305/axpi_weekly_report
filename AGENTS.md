@@ -1,7 +1,7 @@
 # 사외 수집 운영 절차 (모든 실행 주체 공통)
 
 이 저장소의 사외 수집은 사람이 직접 하든 Claude Code·Codex·Gemini CLI 같은 에이전트가 하든 **아래 절차와 명령만으로** 진행한다.
-기준 문서는 `docs/MTC-AX-Unified-Design-v4.5.md`이고, 결과 형식은 `schema/MTC-AX-collection-v4.5.schema.json`이다.
+기준 문서는 `docs/MTC-AX-Unified-Design-v4.6.md`이고, 결과 형식은 `schema/MTC-AX-collection-v4.6.schema.json`이다.
 
 ## 에이전트가 지켜야 할 규칙
 
@@ -42,7 +42,7 @@
    ```
    실패 건은 다음 주에 다시 시도하지 않는다. 이번 실행에서 처리하지 않으면 그대로 끝난다.
 8. 패키징·발송: `python -m collector package --issue-week YYYY-Www --send`
-   → `out/YYYY-Www/package/`에 압축 intake, 원본 intake, 리포트, manifest를 만들고 `mail.local.yaml`의 사내 주소로 바로 보낸다.
+   → `out/YYYY-Www/package/`에 압축 intake, 원본 intake, 리포트, manifest(공식 발표 이미지가 있으면 이미지 묶음 zip도)를 만들고 `mail.local.yaml`의 사내 주소로 바로 보낸다.
    - 처음 한 번: `mail.local.example.yaml`을 `mail.local.yaml`로 복사해 채우고, 비밀번호는 환경변수(기본 `MTCAX_SMTP_PASSWORD`)에 넣는다.
    - 첫 주는 `python -m collector send --issue-week YYYY-Www --dry-run`으로 먼저 확인한다.
    - 이미 보낸 revision은 다시 보내지 않는다. 재발송은 사용자가 요청할 때만 `--resend`.

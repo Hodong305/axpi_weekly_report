@@ -16,3 +16,15 @@ def prune_invalid_evidence(draft, events_by_id, records):
         removed += [e for e in m["evidence_ids"] if e not in keep]
         m["evidence_ids"] = keep
     return removed
+
+
+def prune_invalid_images(draft, events_by_id, records, cfg):
+    """재생성 후에도 후보에 없거나 정책 대상이 아닌 대표 이미지는 뺀다(검사는 경고로 남는다). 뺀 media_ref 목록을 반환."""
+    from .draft import find_candidate, image_candidates
+    dropped = []
+    for a in draft["articles"]:
+        img = a.get("image")
+        if img and find_candidate(image_candidates(events_by_id[a["event_id"]], records, cfg), img["media_ref"]) is None:
+            dropped.append(img["media_ref"])
+            a["image"] = None
+    return dropped

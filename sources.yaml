@@ -1,4 +1,4 @@
-# 발행처 레지스트리 (설계서 v4.5 4.2). 항목을 바꾸면 registry_version을 올린다.
+# 발행처 레지스트리 (설계서 v4.6 4.2). 항목을 바꾸면 registry_version을 올린다.
 #
 # method
 #   rss        : feed_url의 RSS/Atom을 순회한다.

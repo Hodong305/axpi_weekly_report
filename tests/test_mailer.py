@@ -68,7 +68,7 @@ def env(tmp_path, monkeypatch):
     (pkg / base).write_bytes(raw)
     (pkg / (base + ".gz")).write_bytes(gzip.compress(raw))
     (pkg / file_name(WEEK, "report", 1, "md")).write_text("# 리포트\n", encoding="utf-8")
-    manifest = {"schema_version": "4.5", "issue_week": WEEK, "revision": 1, "window_weeks": 1,
+    manifest = {"schema_version": "4.6", "issue_week": WEEK, "revision": 1, "window_weeks": 1,
                 "summary": {"records": 7, "complete": 6, "partial": 1, "drop": 0, "paywall": 0},
                 "files": [], "warnings": ["K10 complete 6건 < intake_min 10"]}
     (pkg / file_name(WEEK, "manifest", 1)).write_text(json.dumps(manifest), encoding="utf-8")

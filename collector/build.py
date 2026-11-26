@@ -194,7 +194,7 @@ def build_record(group, fetched, pass_no, settings, window, override=None, manua
         "discovery": sorted_discovery(group["discovery"]),
         "event_key": None, "track": track, "topic_hints": topics,
         "source_tier": (src or {}).get("source_tier", "unverified"),
-        "body": body, "status": status, "reason_codes": reason, "attempts": attempts,
+        "body": body, "media": [], "status": status, "reason_codes": reason, "attempts": attempts,
     }
     if rec["change_at"]:
         rec["change_note"] = "발행처 표기 수정 시각(dateModified)"
@@ -227,6 +227,6 @@ def failed_record(group, pass_no, error_obs, at):
         "change_at": None, "change_note": None, "discovery": sorted_discovery(group["discovery"]),
         "event_key": None, "track": group.get("track", "A"),
         "topic_hints": [t for t in TOPIC_CODES if t in group.get("topic_hints", [])], "source_tier": "unverified",
-        "body": empty_body(), "status": "partial", "reason_codes": ["FETCH_FAILED"],
+        "body": empty_body(), "media": [], "status": "partial", "reason_codes": ["FETCH_FAILED"],
         "attempts": [{"pass": pass_no, "agent": "script", "at": at, "url": url, "http_status": None, "observation": error_obs}],
     }

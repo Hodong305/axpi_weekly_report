@@ -63,7 +63,7 @@ class Pipeline:
     def __init__(self, settings, judge, io=None, clock=None, fresh=False):
         self.fresh = fresh
         self.s = settings
-        self.cfg = settings.internal
+        self.cfg = {**settings.internal, "media_source_types": settings.config["collection"]["media_source_types"]}
         self.judge = judge
         if judge is not None and settings.llm_cfg.get("max_input_chars"):
             judge.max_input_chars = settings.llm_cfg["max_input_chars"]
@@ -160,7 +160,11 @@ class Pipeline:
 
     @property
     def records(self):
-        return self.pkg.records
+        """반입 자료. 이미지 묶음이 없으면 이미지 후보를 쓰지 않도록 media를 비운 사본을 돌려준다."""
+        recs = self.pkg.records
+        if self.pkg.media_zip is None and any(r.get("media") for r in recs.values()):
+            return {d: dict(r, media=[]) for d, r in recs.items()}
+        return recs
 
     def save(self):
         self.state["updated_at"] = self.clock()
@@ -208,7 +212,7 @@ class Pipeline:
     # S1~S5 -----------------------------------------------------------------------
 
     def step_S1(self):
-        self.step_header("S1")
+        self.step_header("S1", self.pkg.media_note if self.pkg.media_zip is None and "없어" in self.pkg.media_note else "")
         self.refresh_fingerprint()
         if self.state["fp_changes"]:
             self.io.write(fingerprint.notice(self.state["fp_changes"]))
@@ -422,6 +426,21 @@ class Pipeline:
 
     # 검토 요청 ② -----------------------------------------------------------------------
 
+    def image_map(self, d):
+        """핵심 기사별 대표 이미지 후보 {articles 인덱스: 후보 목록}. 이미지 묶음이 없으면 후보가 없다."""
+        by_id = {e["event_id"]: e for e in self.state["events"]}
+        return {i: draftmod.image_candidates(by_id[a["event_id"]], self.records, self.cfg)
+                for i, a in enumerate(d["articles"]) if a["slot"] == "core"}
+
+    def fix_swapped_images(self, d, swaps):
+        """검토 요청 ②에서 바꾼 이미지의 설명을 모델로 새로 쓴다. 실패하면 후보의 대체 텍스트를 줄여 쓰고 알린다."""
+        for i, cand in swaps:
+            cap = draftmod.gen_image_caption(self.judge, d["articles"][i], cand, self.cfg)
+            if not cap:
+                cap = checks.strip_urls((cand["alt"] or cand["caption"] or "이미지")[: self.cfg["image_caption_chars"]])[0]
+                self.io.write(f"오류: {i + 1}번째 기사의 이미지 설명 자동 작성에 실패해 원문 설명을 줄여 넣었습니다. 발송 전에 확인하세요.")
+            d["articles"][i]["image"]["caption"] = cap
+
     def final_warnings(self, d):
         """② 적용 뒤 원고를 다시 검사한다(모델 호출 없음)."""
         if self.state["issue_type"] == "현황호":
@@ -452,11 +471,11 @@ class Pipeline:
         warns = self.state["warnings"]
 
         def render_fn():
-            return rv.render_review2(self.week, d, warns, self.cfg)
+            return rv.render_review2(self.week, d, warns, self.cfg, self.image_map(d))
 
         def handle(text):
             res = rv.parse_review2(text)
-            rv.validate_review2(res, d, warns, self.cfg)
+            rv.validate_review2(res, d, warns, self.cfg, self.image_map(d))
             return res, text
 
         pend = self.state.get("pending_review")
@@ -464,7 +483,8 @@ class Pipeline:
             text, stats, instruction, b_rev = pend["text"], pend["stats"], pend["instruction"], pend["c_rev"]
         else:
             res, text = self.loop_review("R2", render_fn, handle)
-            stats = rv.apply_review2(d, res, warns)
+            stats = rv.apply_review2(d, res, warns, self.image_map(d))
+            self.fix_swapped_images(d, stats.pop("image_swaps"))
             instruction, b_rev = stats["b_revise"], 0
             save_draft(self.s.draft_path(self.week), d)
         while instruction is not None:
@@ -554,6 +574,14 @@ class Pipeline:
                 parts.append(f"{label} {n(cond)}건")
         return ", ".join(parts) + "."
 
+    def load_image(self, media_ref):
+        """발송본에 넣을 이미지: (원본 바이트, 발행처). 이미지 묶음이 없거나 항목이 없으면 None."""
+        doc_id, _, mid = media_ref.partition("#")
+        rec = self.pkg.records.get(doc_id)
+        m = next((x for x in (rec or {}).get("media") or [] if x["id"] == mid), None)
+        data = self.pkg.image_bytes(m["file"]) if m else None
+        return (data, rec["publisher"]) if data else None
+
     def corrections(self):
         p = self.s.review_path(self.week, "corrections.json")
         return json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
@@ -577,11 +605,13 @@ class Pipeline:
                "theme": self.cfg.get("newsletter_theme", "A"),
                "period_short": render.period_short(self.pkg.doc["window_start"], self.pkg.doc["window_end_exclusive"]),
                "issue_no": metrics.issue_number(self.s.pilot_csv, self.week), "n_docs": len(self.records)}
-        html_doc, text_doc = render.build(d, ctx)
+        ctx.update(image_loader=self.load_image, image_max_kb=self.cfg["image_max_kb"], newsletter_from=self.cfg.get("newsletter_from", ""))
+        built = render.build_all(d, ctx)
         out = self.s.out_dir(self.week)
         out.mkdir(parents=True, exist_ok=True)
-        (out / "newsletter.html").write_text(html_doc, encoding="utf-8")
-        (out / "newsletter.txt").write_text(text_doc, encoding="utf-8")
+        (out / "newsletter.html").write_text(built["html_preview"], encoding="utf-8")       # 미리 보기: 이미지를 data URI로 내장
+        (out / "newsletter.txt").write_text(built["text"], encoding="utf-8")
+        (out / "newsletter.eml").write_bytes(render.build_eml(d, ctx, built).as_bytes())     # 기본 발송 파일: 편집자가 열어 수신자를 넣고 보낸다
         # 발송 확정: 이번 호에서 확정한 새 용어(모델 제안·편집자 입력)를 glossary.yaml에 덧붙인다(주석·순서 보존)
         new_terms = [(g["term"], g["meaning"]) for g in d.get("glossary") or [] if g["source"] != "glossary" and g.get("meaning")]
         if new_terms:
@@ -592,4 +622,4 @@ class Pipeline:
         row.update({"fp_" + k: v for k, v in self.state["fingerprint"].items()})
         metrics.upsert_row(self.s.pilot_csv, row)
         self.goto("DONE")
-        self.io.write(f"발송본: {out / 'newsletter.html'}")
+        self.io.write(f"발송본: {out / 'newsletter.eml'} (미리 보기 {out / 'newsletter.html'})")

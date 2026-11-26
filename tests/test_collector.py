@@ -242,7 +242,7 @@ def test_two_week_window(site):
 def test_design_doc_code_matches_reference():
     """설계서 6장의 코드 블록이 collector/ref.py와 글자 그대로 같아야 한다."""
     import re
-    doc = (ROOT / "docs" / "MTC-AX-Unified-Design-v4.5.md").read_text(encoding="utf-8")
+    doc = (ROOT / "docs" / "MTC-AX-Unified-Design-v4.6.md").read_text(encoding="utf-8")
     src = (ROOT / "collector" / "ref.py").read_text(encoding="utf-8")
     blocks = re.findall(r"~~~python\n(.*?)~~~", doc, re.S)
     assert len(blocks) == 3

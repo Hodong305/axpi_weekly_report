@@ -345,7 +345,7 @@ def test_config_v3_keys():
         assert gone not in cfg
     assert cfg["summary_chars"] == [100, 170] and cfg["punch_chars"] == 120 and cfg["article_title_max"] == 36
     assert cfg["newsletter_name"] == "FAB4 위클리" and cfg["newsletter_theme"] == "A" and "네 박자" in cfg["newsletter_tagline"]
-    assert settings_mod.load().config["config_version"] == "3"
+    assert settings_mod.load().config["config_version"] == "4"
 
 
 def test_step_prompts_carry_v3_rules():

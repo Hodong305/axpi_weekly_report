@@ -11,7 +11,7 @@ import re
 import unicodedata
 
 from .common import evidence_errors, evidence_text, figure_value_errors
-from .draft import format_credit
+from .draft import find_candidate, format_credit, image_candidates
 from .review import article_labels
 
 _URL_CHARS = r"[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]"
@@ -238,6 +238,8 @@ def autofix(draft, records):
         for k in list(a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else []):
             k["value"], k["label"] = clean(k["value"], labels[i], "수치 카드"), clean(k["label"], labels[i], "수치 카드")
         a["title_alternatives"] = [clean(t, labels[i], "제목 대안") for t in a["title_alternatives"]]
+        if a.get("image"):
+            a["image"]["caption"] = clean(a["image"]["caption"], labels[i], "이미지 설명")
         # 출처 정보: 코드가 자료 메타데이터로 만든 형식으로 항상 되돌린다(자동 보정)
         docs = []
         for e in a["evidence_ids"]:
@@ -268,6 +270,8 @@ def length_violations(draft, cfg, issue_type):
         lo, hi = cfg["core_chars"] if a["slot"] == "core" else cfg["brief_chars"]
         if not lo <= len(a["body"]) <= hi:
             v.append((("article", i), f"본문 {len(a['body'])}자, 허용 {lo}~{hi}자"))
+        if a.get("image") and len(a["image"]["caption"]) > cfg["image_caption_chars"]:
+            v.append((("article", i), f"이미지 설명 {len(a['image']['caption'])}자 > 한도 {cfg['image_caption_chars']}자"))
         if a["slot"] == "core" and len(a.get("watch") or "") > cfg["watch_chars"]:
             v.append((("article", i), f"MTC가 볼 것 {len(a['watch'])}자 > 한도 {cfg['watch_chars']}자"))
     for j, m in enumerate(draft.get("more") or []):
@@ -296,6 +300,15 @@ def hard_violations(draft, events_by_id, records, cfg, issue_type):
             v.append((("article", i), "근거 ID", "; ".join(errs) or "근거 ID가 없음"))
         src = _source_text(ev, records)
         all_src += "\n" + src
+        img = a.get("image")
+        if img:      # 후보 실재·정책 대상 여부, 설명이 원문 캡션을 옮기지 않았는지(활용 원칙 3)
+            cand = find_candidate(image_candidates(ev, records, cfg), img["media_ref"])
+            if cand is None:
+                v.append((("article", i), "이미지", f"후보에 없거나 이미지 정책 대상이 아닌 media_ref: {img['media_ref']}"))
+            else:
+                hit = verbatim_hit(img["caption"], norm(" ".join(x for x in (cand["caption"], cand["alt"]) if x)), run)
+                if hit:
+                    v.append((("article", i), "원문 연속 일치", f"이미지 설명이 원문 캡션과 {run}자 이상 같음: \"{hit[:40]}…\""))
         for fld in ("title", "body", "watch"):
             if not a.get(fld):
                 continue

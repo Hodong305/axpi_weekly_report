@@ -8,7 +8,7 @@ from .pipeline import ConsoleIO, Pipeline
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="python -m internal", description="사내 소식지 파이프라인(설계서 v4.5 9장)")
+    p = argparse.ArgumentParser(prog="python -m internal", description="사내 소식지 파이프라인(설계서 v4.6 9장)")
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--data-root", default=argparse.SUPPRESS, help="review/·ledger/·out_internal/·log/ 를 둘 폴더(기본: 저장소 루트)")
     p.add_argument("--data-root", default=None, help=argparse.SUPPRESS)

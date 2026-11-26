@@ -1,5 +1,8 @@
 """설계서 7.3 코드 검사(K1~K11). 사외 패키징 직전과 사내 반입 직후에 같은 코드로 실행한다."""
+import hashlib
 import json
+import zipfile
+from pathlib import Path
 
 import jsonschema
 
@@ -21,8 +24,28 @@ def _disc_key(d):
     return (d["route"], d["agent"], d["source_id"] or "", d["query"] or "")
 
 
-def check(doc, lead_min_chars, intake_min=None):
-    """반환: (errors, warnings). errors가 비어야 통과."""
+def dir_lookup(root):
+    """파일 이름(media/…) → 바이트. root 폴더 아래에서 찾는다(없으면 None)."""
+    root = Path(root)
+
+    def look(name):
+        p = root / name
+        return p.read_bytes() if p.is_file() else None
+    return look
+
+
+def zip_lookup(zip_path):
+    """패키지의 이미지 묶음(zip) 안에서 파일을 찾는다."""
+    z = zipfile.ZipFile(zip_path)
+    names = set(z.namelist())
+
+    def look(name):
+        return z.read(name) if name in names else None
+    return look
+
+
+def check(doc, lead_min_chars, intake_min=None, media_lookup=None):
+    """반환: (errors, warnings). errors가 비어야 통과. media_lookup(파일 이름)이 있으면 K12의 파일 검사도 한다."""
     errors, warnings = [], []
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     v = jsonschema.Draft202012Validator(schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER)
@@ -77,6 +100,23 @@ def check(doc, lead_min_chars, intake_min=None):
             errors.append(f"K11 {tag} discovery 정렬·중복 오류")
         if doc["phase"] == "pass2" and not any(a["pass"] == 2 for a in r["attempts"]):
             errors.append(f"K9 {tag} pass2 레코드에 2차 시도 없음")
+
+    for i, r in enumerate(recs):      # K12 이미지 후보
+        tag = f"[{i}] {r['doc_id'][:17]}"
+        if r["media"] and r["status"] != "complete":
+            errors.append(f"K12 {tag} complete가 아닌 레코드에 media가 있음")
+        for n, m in enumerate(r["media"], 1):
+            if m["id"] != f"M{n}":
+                errors.append(f"K12 {tag} media ID 순번 오류: {m['id']} (기대 M{n})")
+                break
+            if not m["file"].startswith(f"media/{r['doc_id'][:12]}-{m['id']}."):
+                errors.append(f"K12 {tag} {m['id']} 파일 경로가 규칙(media/{{doc_id 앞 12자}}-M#.확장자)과 다름: {m['file']}")
+            if media_lookup is not None:
+                data = media_lookup(m["file"])
+                if data is None:
+                    errors.append(f"K12 {tag} {m['id']} 파일이 패키지에 없음: {m['file']}")
+                elif len(data) != m["bytes"] or hashlib.sha256(data).hexdigest() != m["sha256"]:
+                    errors.append(f"K12 {tag} {m['id']} 바이트 수·해시 불일치: {m['file']}")
 
     if summarize(recs) != doc["summary"]:
         errors.append(f"K8 summary 불일치: 기대 {summarize(recs)}")

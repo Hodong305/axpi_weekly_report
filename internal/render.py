@@ -2,12 +2,16 @@
 HTML은 internal/templates/newsletter.html(표 기반, 인라인 스타일, 최대 폭 680px)을 작은 치환기로 채우고, 색은 templates/themes.yaml의
 테마(A|B|C)에서 가져온다. 구조는 하나이고 색만 다르다. 의존성 없음.
 템플릿 문법: {{키}}(HTML 이스케이프 치환), {{{키}}}(코드가 만든 HTML 그대로), <!--IF 키-->…<!--END 키-->(값이 참일 때), <!--LOOP 키-->…<!--END 키-->(목록 반복)."""
+import base64
 import html
+import io
 import re
+from email.message import EmailMessage
 from datetime import date, timedelta
 from pathlib import Path
 
 import yaml
+from PIL import Image
 
 from .checks import strip_urls
 from .draft import TOPIC_LABEL
@@ -62,11 +66,44 @@ def fill(template, ctx):
     return _VAR.sub(lambda m: html.escape(_s(ctx.get(m.group(1), "")), quote=True), out)
 
 
+_DATA_URI = re.compile(r"data:image/(?:jpeg|png);base64,[A-Za-z0-9+/=]+")
+_IMG = re.compile(r"<img\b[^>]*>", re.I)
+_IMG_SRC = re.compile(r'\bsrc="(cid:[^"]+|data:image/(?:jpeg|png);base64,[A-Za-z0-9+/=]+)"')
+
+
 def verify_static(doc):
-    low = doc.lower()
-    for bad in ("http", "<a ", "<script", "<img", "<link", "<iframe", "@import", "url("):
+    """외부 스크립트·원격 이미지·링크 금지. 이미지는 cid: 또는 data: 주소로 내장된 것만 허용한다(base64 안에는 어떤 글자열이든 우연히 나올 수 있어 검사에서 뺀다)."""
+    for tag in _IMG.findall(doc):
+        if not _IMG_SRC.search(tag):
+            raise ValueError(f"발송본의 이미지는 cid: 또는 data: 로 내장된 것만 허용됩니다: {tag[:60]}")
+    low = _DATA_URI.sub("data:", doc).lower()
+    low = _IMG.sub("", low)      # <img> 태그는 위에서 검사했다
+    for bad in ("http", "<a ", "<script", "<link", "<iframe", "@import", "url("):
         if bad in low:
             raise ValueError(f"발송본에 허용되지 않는 요소가 있습니다: {bad}")
+
+
+def prepare_image(data, max_kb, width=624):
+    """발송본용 이미지: 표시 폭(624px)보다 넓으면 줄이고, 파일 크기가 max_kb 이하가 되도록 품질·크기를 낮춘다. 반환: (바이트, mime, 가로, 세로)"""
+    im = Image.open(io.BytesIO(data))
+    im.load()
+    if im.width > width:
+        im = im.resize((width, max(1, round(im.height * width / im.width))), Image.LANCZOS)
+    if im.mode != "RGB":
+        im = im.convert("RGBA")
+        bg = Image.new("RGB", im.size, (255, 255, 255))
+        bg.paste(im, mask=im.split()[-1])
+        im = bg
+    limit, q = max_kb * 1024, 82
+    while True:
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=q, optimize=True)
+        if buf.tell() <= limit or (q <= 40 and im.width <= 200):
+            return buf.getvalue(), "image/jpeg", im.width, im.height
+        if q > 40:
+            q -= 8
+        else:
+            im = im.resize((max(1, round(im.width * 0.85)), max(1, round(im.height * 0.85))), Image.LANCZOS)
 
 
 # 내용 -------------------------------------------------------------------------
@@ -75,6 +112,14 @@ def chip(theme, code, size="12px"):
     fg, bg = theme["topic"][code]
     return (f'<span style="display:inline-block;background:{bg};color:{fg};font-weight:bold;padding:3px 10px;border-radius:999px;'
             f'font-size:{size};">{TOPIC_ICON[code]} {TOPIC_NAME[code]}</span>')
+
+
+def _img_src(im, mode):
+    if not im:
+        return ""
+    if mode == "eml":
+        return "cid:" + im["cid"]
+    return f"data:{im['mime']};base64," + base64.b64encode(im["data"]).decode("ascii")
 
 
 def _followup(ev):
@@ -109,6 +154,33 @@ def to_plain(segs):
 
 
 def build(draft, ctx):
+    """미리 보기용 HTML(이미지는 data URI)과 텍스트본. 반환: (html, text)"""
+    r = build_all(draft, ctx)
+    return r["html_preview"], r["text"]
+
+
+def build_all(draft, ctx):
+    """발송본 전체. 반환: {"html_eml"(이미지는 cid:), "html_preview"(data URI), "text", "images": [(cid, 바이트, mime)]}.
+    ctx["image_loader"](media_ref) → (원본 바이트, 발행처) 또는 None. 없으면 이미지 없이 만든다. ctx["image_max_kb"] 기본 300."""
+    images, imgs = [], {}
+    loader = ctx.get("image_loader")
+    for i, a in enumerate(draft["articles"]):
+        img = a.get("image")
+        got = loader(img["media_ref"]) if (img and loader and a["slot"] == "core") else None
+        if got:
+            data, mime, w, h = prepare_image(got[0], ctx.get("image_max_kb", 300))
+            cid = f"img{len(images) + 1}@newsletter"
+            images.append((cid, data, mime))
+            imgs[i] = {"cid": cid, "data": data, "mime": mime, "caption": img["caption"], "credit": got[1]}
+    out = {"images": images}
+    for mode in ("eml", "preview"):
+        html_doc, text = _build(draft, ctx, imgs, mode)
+        out["html_" + mode] = html_doc
+    out["text"] = text
+    return out
+
+
+def _build(draft, ctx, imgs, mode):
     """ctx: issue_week, period, period_short, issue_type, counts{pass_docs,published}, events, status_rows, corrections, note,
     issue_no, n_docs, newsletter_name, newsletter_tagline, newsletter_team, theme. 반환: (html, text)"""
     themes = load_themes()
@@ -140,7 +212,9 @@ def build(draft, ctx):
                 "watch_html": to_html(segs[("articles", i, "watch")]) if ("articles", i, "watch") in segs else "",
                 "credit": " / ".join(a["credits"]), "has_figures": bool(figs),
                 "figures": [{"value": k["value"], "label": k["label"], "w": w} for k in figs],
-                "fig_value": fig["value"] if fig else "", "fig_label": fig["label"] if fig else ""}
+                "fig_value": fig["value"] if fig else "", "fig_label": fig["label"] if fig else "",
+                "image_src": _img_src(imgs.get(i), mode), "image_caption": imgs[i]["caption"] if i in imgs else "",
+                "image_credit": imgs[i]["credit"] if i in imgs else ""}
     groups = []
     for j, m in enumerate(more):
         code = TOPIC_CODE.get(m["topic"], "B")
@@ -169,10 +243,11 @@ def build(draft, ctx):
          "has_corr": bool(corr), "corrections": [{"text": c} for c in corr], "excluded_count": draft.get("excluded_count", 0)}
     out_html = fill(TEMPLATE.read_text(encoding="utf-8"), t)
     verify_static(out_html)
-    return out_html, build_text(draft, ctx, t, segs, core, brief, groups, gl, note)
+    return out_html, build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs)
 
 
-def build_text(draft, ctx, t, segs, core, brief, groups, gl, note):
+def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None):
+    imgs = imgs or {}
     L = [f"{ctx['newsletter_name']} · 제{ctx['issue_no']}호 · {ctx['issue_week']}", ctx["newsletter_tagline"],
          f"대상 기간 {ctx['period']}", "🏭 칩메이커 · ⚙️ 장비사 · 📊 제조 솔루션 · 🤖 Physical AI", "",
          "[이번 주 헤드라인]", draft["issue_title"], "", "[한 줄 요약]", draft["summary"], ""]
@@ -191,6 +266,8 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note):
         L.append((f"({fu}) " if fu else "") + a["title"])
         if a.get("tags"):
             L.append("  꼬리표: " + " · ".join(a["tags"]))
+        if i in imgs:
+            L.append(f"  [이미지] {imgs[i]['caption']} · 이미지 · {imgs[i]['credit']}")
         L.append(to_plain(segs[("articles", i, "body")]))
         figs = (a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else [])
         if figs:
@@ -224,3 +301,19 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note):
           f"{ctx['counts']['published']}건을 골랐고, 사내 AI가 초안을 쓰고 편집자가 검토했습니다. 원문 링크는 보안 정책상 싣지 않으니 출처의 발행처·제목으로 검색해 보세요.",
           f"이 밖에 검토했으나 싣지 않은 자료는 {t['excluded_count']}건입니다.", "의견·제보·정정은 이 메일에 회신해 주세요."]
     return "\n".join(_s(x) for x in L) + "\n"
+
+
+def build_eml(draft, ctx, built):
+    """newsletter.eml: multipart/related(HTML + 텍스트 대체본, 이미지는 cid로 내장). 제목 = 소식지 이름 + 헤드라인. 수신자는 비운다(편집자가 정한다)."""
+    msg = EmailMessage()
+    msg["Subject"] = f"{ctx['newsletter_name']} {draft['issue_title']}"
+    if ctx.get("newsletter_from"):
+        msg["From"] = ctx["newsletter_from"]
+    msg["X-Unsent"] = "1"       # 메일 프로그램이 보내지 않은 초안으로 연다
+    msg.set_content(built["text"])
+    msg.add_alternative(built["html_eml"], subtype="html")
+    html_part = msg.get_payload()[1]
+    for cid, data, mime in built["images"]:
+        maintype, subtype = mime.split("/")
+        html_part.add_related(data, maintype, subtype, cid=f"<{cid}>")
+    return msg

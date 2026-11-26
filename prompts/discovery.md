@@ -1,4 +1,4 @@
-# LLM 후보 탐색 프롬프트 (설계서 v4.5 4.5)
+# LLM 후보 탐색 프롬프트 (설계서 v4.6 4.5)
 
 이 파일의 `PROMPT START`~`PROMPT END` 사이가 Claude·GPT·Gemini 공통 프롬프트다.
 직접 복사하지 말고 `python -m collector prompt --issue-week YYYY-Www`로 값을 채운 파일을 만들어 쓴다.
