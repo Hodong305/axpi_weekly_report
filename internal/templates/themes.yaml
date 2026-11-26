@@ -239,3 +239,65 @@ S:
   punch_twist: "#111111"
   watch_bg: "#f2f2f2"
   watch_ink: "#111111"
+S2:
+  name: S2 · 스위스 볼드(네이비·코랄 시안, v4.7)
+  template: newsletter-s.html        # S와 같은 구조, 색만 다르다
+  show_body: true
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#ff7a59"
+  bg: "#e8ebf2"
+  hero: "#14213d"
+  hero2: "#14213d"
+  hero_text: "#ffffff"
+  hero_sub: "#c3c9d4"
+  accent: "#ff7a59"
+  ink: "#14213d"
+  soft: "#f3f4f6"
+  card_border: "#14213d"
+  radius: 0px
+  topic:
+    T1: ["#14213d", "#ff7a59"]
+    T2: ["#14213d", "#ff7a59"]
+    T3: ["#14213d", "#ff7a59"]
+    T4: ["#14213d", "#ff7a59"]
+    B: ["#14213d", "#ff7a59"]
+  punch_bg: "#ff7a59"
+  punch_border: "#14213d"
+  punch_big: "#14213d"
+  punch_label: "#14213d"
+  punch_text: "#14213d"
+  punch_twist: "#14213d"
+  watch_bg: "#f3f4f6"
+  watch_ink: "#14213d"
+S3:
+  name: S3 · 스위스 볼드(딥그린·라임 시안, v4.7)
+  template: newsletter-s.html        # S와 같은 구조, 색만 다르다
+  show_body: true
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#c5f04a"
+  bg: "#e7ece9"
+  hero: "#0d3b2e"
+  hero2: "#0d3b2e"
+  hero_text: "#ffffff"
+  hero_sub: "#c3c9d4"
+  accent: "#c5f04a"
+  ink: "#0d3b2e"
+  soft: "#f3f4f6"
+  card_border: "#0d3b2e"
+  radius: 0px
+  topic:
+    T1: ["#0d3b2e", "#c5f04a"]
+    T2: ["#0d3b2e", "#c5f04a"]
+    T3: ["#0d3b2e", "#c5f04a"]
+    T4: ["#0d3b2e", "#c5f04a"]
+    B: ["#0d3b2e", "#c5f04a"]
+  punch_bg: "#c5f04a"
+  punch_border: "#0d3b2e"
+  punch_big: "#0d3b2e"
+  punch_label: "#0d3b2e"
+  punch_text: "#0d3b2e"
+  punch_twist: "#0d3b2e"
+  watch_bg: "#f3f4f6"
+  watch_ink: "#0d3b2e"

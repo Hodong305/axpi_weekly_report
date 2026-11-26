@@ -91,7 +91,7 @@
       <!--END has_points-->
       <!--IF has_figures-->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;"><tr>
-        <!--LOOP figures--><td width="{{w}}%" style="padding:3px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:{{topic_bg}};border-radius:10px;padding:10px 4px;text-align:center;"><div style="font-size:20px;font-weight:800;color:{{topic_fg}};">{{value}}</div><div style="font-size:11.5px;color:#6b7280;">{{label}}</div></td></tr></table></td><!--END figures-->
+        <!--LOOP figures--><td width="{{w}}%" style="padding:3px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:{{topic_bg}};border-radius:10px;padding:10px 4px;text-align:center;"><div style="font-size:20px;font-weight:800;color:{{topic_fg}};">{{value}}</div><div style="font-size:11.5px;color:#6b7280;">{{label}}</div><!--IF why--><div style="font-size:11.5px;line-height:1.45;color:{{ink}};margin-top:4px;padding:0 4px;"><b>왜 중요</b> · {{why}}</div><!--END why--></td></tr></table></td><!--END figures-->
       </tr></table>
       <!--END has_figures-->
       <!--IF show_body-->

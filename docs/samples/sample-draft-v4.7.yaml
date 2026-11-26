@@ -2,94 +2,159 @@
 # python tools/render_sample.py 로 B3(현행)·B4·B5 발송본을 out_internal/samples/에 만든다.
 issue_week: 2026-W48
 issue_title: 결함은 에이전트가 쫓고, 서브팹은 로봇개가 돈다
-issue_title_candidates: [결함은 에이전트가 쫓고, 서브팹은 로봇개가 돈다, 몇 시간이 몇 분으로…팹 AI가 현장을 돈다, 에이전트와 로봇개, 팹 운영을 나눠 맡다]
+issue_title_candidates:
+- 결함은 에이전트가 쫓고
+- 서브팹은 로봇개가 돈다
+- 몇 시간이 몇 분으로…팹 AI가 현장을 돈다
+- 에이전트와 로봇개
+- 팹 운영을 나눠 맡다
 summary: 결함 원인을 찾던 몇 시간은 에이전트의 몇 분이 됐고, 서브팹 점검은 로봇이 맡기 시작했다. 다만 ‘몇 분’과 ‘99%’가 무엇을 잰 숫자인지는 아직 비공개다.
 summary_candidates: []
 punch:
-  big: "99%"
+  big: 99%
   label: 이번 주 가장 놀라운 숫자
-  text: 로봇개가 서브팹 점검 임무를 끝까지 마친 비율.
-  twist: 결함을 찾아낸 비율이 아니다. 검출률은 아직 공개되지 않았다.
-  evidence_id: sample/P1
+  text: GlobalFoundries의 로봇개 Spot이 서브팹 점검 임무를 중간에 멈추지 않고 끝까지 마친 비율이다.
+  twist: 로봇이 현장을 안정적으로 돈다는 뜻이지, 이상을 99% 잡아냈다는 뜻은 아니다. 검출률은 아직 공개되지 않았다.
+  evidence_id: sample/P2
 punch_candidates: []
 glossary:
-  - {term: RCA, meaning: 근본 원인 분석, source: glossary}
-  - {term: 서브팹, meaning: 클린룸 아래층의 배관·전력·가스 설비 공간, source: glossary}
-  - {term: AMHS, meaning: 웨이퍼를 자동으로 실어 나르는 팹 물류 시스템, source: glossary}
+- term: RCA
+  meaning: 근본 원인 분석
+  source: glossary
+- term: 서브팹
+  meaning: 클린룸 아래층의 배관·전력·가스 설비 공간
+  source: glossary
+- term: AMHS
+  meaning: 웨이퍼를 자동으로 실어 나르는 팹 물류 시스템
+  source: glossary
 articles:
-  - event_id: EVT-SAMPLE-01
-    slot: core
-    title: 수 시간 걸리던 결함 원인 찾기, 삼성 AI 에이전트는 ‘수 분’
-    title_alternatives: []
-    tags: [칩메이커, 현장 실증·적용, 운영사 발표]
-    deck: 삼성전자, 웨이퍼 결함 원인 분석에 AI 에이전트 적용…분석 시간 수 시간 → 수 분
-    points:
-      what: 웨이퍼 결함 RCA를 에이전트가 먼저 수행하고 엔지니어가 검토
-      how_much: 원인 분석 시간 수 시간 → 수 분
-      scope: 운영사 발표 · 적용 라인 수와 정확도는 비공개
-    body: 삼성전자가 웨이퍼 결함의 원인 분석을 AI 에이전트에 맡기는 체계를 팹에 적용했다. 에이전트가 설비 로그와 계측 데이터를 묶어 원인 후보를 먼저 제시하면 엔지니어가 확인하는 방식이다. 회사는 분석 시간이 수 시간에서 수 분으로 줄었다고 밝혔지만, 적용 공정과 정확도 지표는 공개하지 않았다.
-    watch: 에이전트가 낸 원인 후보 중 엔지니어가 채택한 비율이 공개되는지 본다.
-    key_figures:
-      - {value: 수 시간 → 수 분, label: 결함 원인 분석 소요}
-    image: null
-    credits: ["삼성전자 반도체 뉴스룸, 「(견본) 결함 분석 에이전트 적용」, 2026-11-18"]
-    evidence_ids: [sample/P1]
-  - event_id: EVT-SAMPLE-02
-    slot: core
-    title: 로봇개가 서브팹 9만 건 점검…GF, Spot을 팹 4곳으로
-    title_alternatives: []
-    tags: [Physical AI, 현장 실증·적용, 운영사 발표]
-    deck: GlobalFoundries, 로봇개 Spot의 서브팹 점검을 팹 4곳으로 확대…누적 9만 건
-    points:
-      what: 4족 로봇 Spot이 서브팹 설비 순회 점검을 수행
-      how_much: 누적 점검 임무 9만 건 이상, 임무 성공률 99%
-      scope: 실증 뒤 확대 단계 · 결함 검출률은 비공개
-    body: GlobalFoundries가 4족 보행 로봇 Spot으로 서브팹 설비의 열화상·소음·계기 판독 점검을 돌려 왔고, 적용 팹을 전 세계 4곳으로 넓힌다고 밝혔다. 누적 점검 임무는 9만 건을 넘었다. 공개된 99%는 임무를 끝까지 마친 비율이며, 이상을 찾아낸 비율은 밝히지 않았다.
-    watch: 로봇 경보가 실제 정비 지시로 이어진 비율이 나오는지 확인한다.
-    key_figures:
-      - {value: "90,000+", label: 누적 점검 임무}
-      - {value: "99%", label: 임무 성공률 ≠ 검출률}
-      - {value: 4곳, label: 확대 대상 팹}
-    image: null
-    credits: ["GlobalFoundries, 「(견본) 서브팹 로봇 점검 확대」, 2026-11-20 (영문)"]
-    evidence_ids: [sample/P2]
-  - event_id: EVT-SAMPLE-03
-    slot: brief
-    title: 장비사 A, 챔버 간 공정 편차를 AI로 자동 보정
-    title_alternatives: []
-    tags: [장비사]
-    body: 같은 공정 챔버끼리의 결과 차이를 계측 데이터로 학습해 레시피를 자동 보정하는 기능을 고객 팹에 내놨다.
-    figure: {value: 30%, label: 편차 감소(공급사 주장)}
-    credits: ["장비사 A, 「(견본) 챔버 매칭 AI」, 2026-11-17 (영문)"]
-    evidence_ids: [sample/P3]
-  - event_id: EVT-SAMPLE-04
-    slot: brief
-    title: 솔루션 기업 B, 팹 물류 AMHS 배차에 강화학습 적용
-    title_alternatives: []
-    tags: [제조 솔루션]
-    body: 웨이퍼 운반 차량의 배차를 강화학습으로 정해 반송 대기 시간을 줄였다고 밝혔다. 적용 팹은 공개하지 않았다.
-    credits: ["솔루션 기업 B, 「(견본) AMHS 배차 최적화」, 2026-11-19 (영문)"]
-    evidence_ids: [sample/P4]
-  - event_id: EVT-SAMPLE-05
-    slot: brief
-    title: 칩메이커 C, 계측 데이터 기반 가상 계측 라인 확대
-    title_alternatives: []
-    tags: [칩메이커]
-    body: 실측 없이 공정 결과를 예측하는 가상 계측을 식각 공정 라인 전체로 넓힌다는 계획을 내놨다(도입 계획 단계).
-    credits: ["전자신문(홍길동), 「(견본) 가상 계측 확대」, 2026-11-21"]
-    evidence_ids: [sample/P5]
-  - event_id: EVT-SAMPLE-06
-    slot: brief
-    title: 로봇 기업 D, 클린룸용 협동 로봇팔 인증 획득
-    title_alternatives: []
-    tags: [Physical AI]
-    body: 웨이퍼 캐리어를 다루는 협동 로봇팔이 클린룸 청정도 인증을 받아 팹 반입 조건을 갖췄다.
-    credits: ["로봇 기업 D, 「(견본) 클린룸 인증」, 2026-11-16 (영문)"]
-    evidence_ids: [sample/P6]
+- event_id: EVT-SAMPLE-01
+  slot: core
+  title: 수 시간 걸리던 결함 원인 찾기, 삼성 AI 에이전트는 ‘수 분’
+  title_alternatives: []
+  tags:
+  - 칩메이커
+  - 현장 실증·적용
+  - 운영사 발표
+  deck: 삼성전자, 웨이퍼 결함 원인 분석에 AI 에이전트 적용…분석 시간 수 시간 → 수 분
+  points:
+    what: 삼성전자는 웨이퍼 결함이 생겼을 때 원인을 찾는 RCA 작업을 AI 에이전트가 먼저 수행하고, 엔지니어가 그 결과를 검토하는 방식으로 바꿨다.
+    how_much: 엔지니어가 수 시간 걸려 하던 원인 분석이 수 분으로 줄어, 같은 인력으로 훨씬 많은 결함을 당일 안에 살펴볼 수 있게 된다.
+    scope: 회사 발표 기준이며, 적용한 공정과 라인 수, 에이전트가 원인을 맞힌 비율은 공개하지 않았다.
+  body: 지금까지 결함 원인 분석은 엔지니어가 설비 로그, 계측 결과, 공정 이력을 하나씩 대조하는 수작업이었다. 에이전트는 이 데이터를 한꺼번에 묶어 원인 후보와 근거를 정리해 제시하고, 엔지니어는 후보를 확인하거나 버리는 역할을 맡는다. 회사는 이 방식을 일부 팹에 적용했다고 밝혔지만, 어떤 공정부터 썼는지와 기존 분석 도구와의 연결 방식은 설명하지
+    않았다. 사람이 최종 판단을 맡는 구조라 오판 위험은 줄였지만, 엔지니어 검토 시간은 별도로 든다.
+  watch: 에이전트가 낸 원인 후보 중 엔지니어가 채택한 비율이 공개되는지 본다.
+  key_figures:
+  - value: 수 시간 → 수 분
+    label: 결함 원인 분석 소요
+    why: 엔지니어 1명이 하루에 볼 수 있는 결함 수가 크게 는다
+  image: null
+  credits:
+  - 삼성전자 반도체 뉴스룸, 「(견본) 결함 분석 에이전트 적용」, 2026-11-18
+  evidence_ids:
+  - sample/P1
+- event_id: EVT-SAMPLE-02
+  slot: core
+  title: 로봇개가 서브팹 9만 건 점검…GF, Spot을 팹 4곳으로
+  title_alternatives: []
+  tags:
+  - Physical AI
+  - 현장 실증·적용
+  - 운영사 발표
+  deck: GlobalFoundries, 로봇개 Spot의 서브팹 점검을 팹 4곳으로 확대…누적 9만 건
+  points:
+    what: GlobalFoundries는 4족 보행 로봇 Spot이 서브팹의 배관·전력·가스 설비를 돌며 열화상·소음·계기 판독 점검을 하도록 했다.
+    how_much: 누적 점검 임무가 9만 건을 넘었고 임무 성공률은 99%로, 사람이 돌던 반복 순찰을 로봇이 상당 부분 대신하고 있다는 뜻이다.
+    scope: 운영사 발표이며 적용 팹을 4곳으로 넓히는 단계다. 로봇이 실제 이상을 찾아낸 비율과 정비로 이어진 건수는 밝히지 않았다.
+  body: 서브팹은 클린룸 아래층에 있는 설비 공간으로, 넓고 위험해 사람이 정해진 경로를 반복해 도는 점검이 많다. 로봇은 정해진 경로를 돌며 계기 바늘을 읽고, 열화상으로 과열을 찾고, 평소와 다른 소음을 기록해 운영 시스템에 올린다. 회사는 첫 팹에서의 실증 결과를 바탕으로 다른 팹 3곳에도 같은 방식을 들여온다고 밝혔다. 로봇 경보가 정비 지시로 이어지는
+    절차와 사람 순찰을 얼마나 줄였는지는 아직 공개되지 않았다.
+  watch: 로봇 경보가 실제 정비 지시로 이어진 비율이 나오는지 확인한다.
+  key_figures:
+  - value: 90,000+
+    label: 누적 점검 임무
+    why: 일회성 시범이 아니라 상시 운영 규모
+  - value: 99%
+    label: 임무 성공률 ≠ 검출률
+    why: 로봇이 멈추지 않는다는 뜻, 결함 검출과 무관
+  - value: 4곳
+    label: 확대 대상 팹
+    why: 한 팹 실증에서 여러 팹 표준으로
+  image: null
+  credits:
+  - GlobalFoundries, 「(견본) 서브팹 로봇 점검 확대」, 2026-11-20 (영문)
+  evidence_ids:
+  - sample/P2
+- event_id: EVT-SAMPLE-03
+  slot: brief
+  title: 장비사 A, 챔버 간 공정 편차를 AI로 자동 보정
+  title_alternatives: []
+  tags:
+  - 장비사
+  body: 같은 공정 챔버끼리의 결과 차이를 계측 데이터로 학습해 레시피를 자동 보정하는 기능을 고객 팹에 내놨다.
+  figure:
+    value: 30%
+    label: 편차 감소(공급사 주장)
+  credits:
+  - 장비사 A, 「(견본) 챔버 매칭 AI」, 2026-11-17 (영문)
+  evidence_ids:
+  - sample/P3
+  image: null
+- event_id: EVT-SAMPLE-04
+  slot: brief
+  title: 솔루션 기업 B, 팹 물류 AMHS 배차에 강화학습 적용
+  title_alternatives: []
+  tags:
+  - 제조 솔루션
+  body: 웨이퍼 운반 차량의 배차를 강화학습으로 정해 반송 대기 시간을 줄였다고 밝혔다. 적용 팹은 공개하지 않았다.
+  credits:
+  - 솔루션 기업 B, 「(견본) AMHS 배차 최적화」, 2026-11-19 (영문)
+  evidence_ids:
+  - sample/P4
+  image: null
+- event_id: EVT-SAMPLE-05
+  slot: brief
+  title: 칩메이커 C, 계측 데이터 기반 가상 계측 라인 확대
+  title_alternatives: []
+  tags:
+  - 칩메이커
+  body: 실측 없이 공정 결과를 예측하는 가상 계측을 식각 공정 라인 전체로 넓힌다는 계획을 내놨다(도입 계획 단계).
+  credits:
+  - 전자신문(홍길동), 「(견본) 가상 계측 확대」, 2026-11-21
+  evidence_ids:
+  - sample/P5
+  image: null
+- event_id: EVT-SAMPLE-06
+  slot: brief
+  title: 로봇 기업 D, 클린룸용 협동 로봇팔 인증 획득
+  title_alternatives: []
+  tags:
+  - Physical AI
+  body: 웨이퍼 캐리어를 다루는 협동 로봇팔이 클린룸 청정도 인증을 받아 팹 반입 조건을 갖췄다.
+  credits:
+  - 로봇 기업 D, 「(견본) 클린룸 인증」, 2026-11-16 (영문)
+  evidence_ids:
+  - sample/P6
+  image: null
 more:
-  - {ref: s1, topic: T1_CHIPMAKER, line: "칩메이커 E, 수율 데이터 플랫폼 통합 계획 발표 (보도)", credit: "디일렉, 「(견본) 수율 플랫폼」, 2026-11-18", evidence_ids: []}
-  - {ref: s2, topic: T2_EQUIPMENT, line: "장비사 F, 예지보전 모델 고객 팹 시범 적용 (보도)", credit: "EE Times, 「(견본) 예지보전」, 2026-11-19 (영문)", evidence_ids: []}
-  - {ref: s3, topic: T3_SOLUTION, line: "웨이퍼 맵 결함 분류에 비전 트랜스포머 적용 연구 (논문)", credit: "arXiv, 「(견본) 웨이퍼 맵 분류」, 2026-11-17 (영문)", evidence_ids: []}
-  - {ref: s4, topic: B, line: "자동차 공장 비전 검사 모델의 반도체 후공정 전이 사례 (보도)", credit: "Reuters, 「(견본) 비전 검사 전이」, 2026-11-20 (영문)", evidence_ids: []}
+- ref: s1
+  topic: T1_CHIPMAKER
+  line: 칩메이커 E, 수율 데이터 플랫폼 통합 계획 발표 (보도)
+  credit: 디일렉, 「(견본) 수율 플랫폼」, 2026-11-18
+  evidence_ids: []
+- ref: s2
+  topic: T2_EQUIPMENT
+  line: 장비사 F, 예지보전 모델 고객 팹 시범 적용 (보도)
+  credit: EE Times, 「(견본) 예지보전」, 2026-11-19 (영문)
+  evidence_ids: []
+- ref: s3
+  topic: T3_SOLUTION
+  line: 웨이퍼 맵 결함 분류에 비전 트랜스포머 적용 연구 (논문)
+  credit: arXiv, 「(견본) 웨이퍼 맵 분류」, 2026-11-17 (영문)
+  evidence_ids: []
+- ref: s4
+  topic: B
+  line: 자동차 공장 비전 검사 모델의 반도체 후공정 전이 사례 (보도)
+  credit: Reuters, 「(견본) 비전 검사 전이」, 2026-11-20 (영문)
+  evidence_ids: []
 excluded_count: 21
 review_log: []

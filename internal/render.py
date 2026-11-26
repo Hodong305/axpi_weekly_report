@@ -261,7 +261,7 @@ def _build(draft, ctx, imgs, mode):
                 "tags": [{"text": t} for t in (a.get("tags") or [])[1:]], "body_html": to_html(segs[("articles", i, "body")]),
                 "watch_html": to_html(segs[("articles", i, "watch")]) if ("articles", i, "watch") in segs else "",
                 "credit": " / ".join(a["credits"]), "has_figures": bool(figs),
-                "figures": [{"value": k["value"], "label": k["label"], "w": w} for k in figs],
+                "figures": [{"value": k["value"], "label": k["label"], "why": k.get("why") or "", "w": w} for k in figs],
                 "fig_value": fig["value"] if fig else "", "fig_label": fig["label"] if fig else "",
                 "image_src": _img_src(imgs.get(i), mode), "image_caption": imgs[i]["caption"] if i in imgs else "",
                 "image_credit": imgs[i]["credit"] if i in imgs else ""}
@@ -344,7 +344,7 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
             L.append(to_plain(segs[("articles", i, "body")]))
         figs = (a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else [])
         if figs:
-            L.append("  수치: " + " / ".join(f"{k['value']} {k['label']}" for k in figs))
+            L.append("  수치: " + " / ".join(f"{k['value']} {k['label']}" + (f"(왜 중요: {k['why']})" if k.get("why") else "") for k in figs))
         if ("articles", i, "watch") in segs:
             L.append(f"  MTC가 볼 것 · {to_plain(segs[('articles', i, 'watch')])}")
         L.extend([f"  출처 · {tc['credit']}", ""])

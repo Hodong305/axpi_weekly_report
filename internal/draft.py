@@ -28,18 +28,22 @@ IMAGE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["m
 POINTS_SCHEMA = {          # v4.7 핵심 요점 3줄: 무엇이 바뀌었나 · 얼마나 · 어디까지 확인됐나(라벨은 코드가 붙인다)
     "type": "object", "additionalProperties": False, "required": ["what", "how_much", "scope"],
     "properties": {k: {"type": "string", "minLength": 1} for k in ("what", "how_much", "scope")}}
-POINT_LABELS = (("what", "무엇이"), ("how_much", "얼마나"), ("scope", "어디까지"))
+POINT_LABELS = (("what", "무슨 일"), ("how_much", "얼마나"), ("scope", "어디까지"))
+
+CORE_FIGURE_SCHEMA = {      # 핵심 수치 카드: why(왜 중요한지)는 v4.7 추가, 선택(이전 응답 호환)
+    "type": "object", "additionalProperties": False, "required": ["value", "label"],
+    "properties": {**FIGURE_SCHEMA["properties"], "why": {"type": "string"}}}
 
 CORE_ARTICLE_SCHEMA = {     # 핵심: 한 줄 핵심(deck) + 요점(points) + 본문 + MTC가 볼 것(watch) + 수치 카드(key_figures 0~3개) + 대표 이미지(image, 후보가 있을 때)
     "type": "object", "additionalProperties": False,
     "required": ["event_id", "title", "title_alternatives", "body", "watch", "key_figures", "evidence_ids"],
     "properties": {**{k: v for k, v in ARTICLE_SCHEMA["properties"].items() if k != "figure"},
                    "deck": {"type": "string", "minLength": 1}, "points": POINTS_SCHEMA,
-                   "watch": {"type": "string", "minLength": 1}, "key_figures": {"type": "array", "maxItems": 3, "items": FIGURE_SCHEMA},
+                   "watch": {"type": "string", "minLength": 1}, "key_figures": {"type": "array", "maxItems": 3, "items": CORE_FIGURE_SCHEMA},
                    "image": {"anyOf": [{"type": "null"}, IMAGE_SCHEMA]}}}
 # deck·points는 v4.7에서 추가한 키다. 프롬프트는 항상 쓰라고 하지만 스키마에서는 선택으로 두고, 빠지면 코드가 본문으로 대신한다(fallback_deck).
 
-DECK_MAX, POINT_MAX = 60, 36
+DECK_MAX, POINT_MAX, WHY_MAX = 60, 90, 40
 
 IMAGE_CAPTION_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["caption"],
                         "properties": {"caption": {"type": "string", "minLength": 1}}}
@@ -141,6 +145,7 @@ def _article_user(judge, ev, slot, records, cfg, feedback):
         info["요점_한줄_글자수_한도"] = cfg.get("point_chars", POINT_MAX)
         info["watch_글자수_한도"] = cfg["watch_chars"]
         info["key_figures_최대"] = 3
+        info["수치_why_글자수_한도"] = cfg.get("figure_why_chars", WHY_MAX)
         if image_candidates(ev, records, cfg):
             info["이미지_설명_글자수_한도"] = cfg["image_caption_chars"]
     if led["verdict"] == "SAME_WITH_CHANGE":
@@ -200,7 +205,8 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
         pts = r.get("points")
         art["points"] = {k: pts[k].strip() for k, _ in POINT_LABELS} if pts else None
         art["watch"] = r["watch"].strip()
-        art["key_figures"] = [{"value": k["value"].strip(), "label": k["label"].strip()} for k in r["key_figures"]]
+        art["key_figures"] = [{"value": k["value"].strip(), "label": k["label"].strip(), **({"why": k["why"].strip()} if (k.get("why") or "").strip() else {})}
+                              for k in r["key_figures"]]
         img = r.get("image")
         art["image"] = {"media_ref": img["media_ref"], "caption": img["caption"].strip()} if img else None
     elif r.get("figure"):

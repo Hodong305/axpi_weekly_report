@@ -241,6 +241,8 @@ def autofix(draft, records):
             a["points"][pk] = clean(a["points"][pk], labels[i], "요점")
         for k in list(a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else []):
             k["value"], k["label"] = clean(k["value"], labels[i], "수치 카드"), clean(k["label"], labels[i], "수치 카드")
+            if k.get("why"):
+                k["why"] = clean(k["why"], labels[i], "수치 카드")
         a["title_alternatives"] = [clean(t, labels[i], "제목 대안") for t in a["title_alternatives"]]
         if a.get("image"):
             a["image"]["caption"] = clean(a["image"]["caption"], labels[i], "이미지 설명")
@@ -278,7 +280,10 @@ def length_violations(draft, cfg, issue_type):
             v.append((("article", i), f"이미지 설명 {len(a['image']['caption'])}자 > 한도 {cfg['image_caption_chars']}자"))
         if a["slot"] == "core" and len(a.get("watch") or "") > cfg["watch_chars"]:
             v.append((("article", i), f"MTC가 볼 것 {len(a['watch'])}자 > 한도 {cfg['watch_chars']}자"))
-        dmax, pmax = cfg.get("deck_chars", 40), cfg.get("point_chars", 36)
+        dmax, pmax, wmax = cfg.get("deck_chars", 60), cfg.get("point_chars", 90), cfg.get("figure_why_chars", 40)
+        for k in a.get("key_figures") or []:
+            if len(k.get("why") or "") > wmax:
+                v.append((("article", i), f"수치 카드 '{k['value']}'의 의미 {len(k['why'])}자 > 한도 {wmax}자"))
         if a["slot"] == "core" and len(a.get("deck") or "") > dmax:
             v.append((("article", i), f"한 줄 핵심 {len(a['deck'])}자 > 한도 {dmax}자"))
         for pk, pt in (a.get("points") or {}).items():
@@ -303,6 +308,7 @@ def article_fields(a):
     """검사 대상 글 칸: [(경로 꼬리, 텍스트)]. 요점은 ("points", 키)."""
     out = [((f,), a[f]) for f in ("title", "deck", "body", "watch") if a.get(f)]
     out += [(("points", k), v) for k, v in (a.get("points") or {}).items() if v]
+    out += [(("key_figures", n, "why"), k["why"]) for n, k in enumerate(a.get("key_figures") or []) if k.get("why")]
     return out
 
 

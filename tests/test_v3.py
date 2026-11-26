@@ -166,9 +166,9 @@ def test_header_input_is_final_drafts_and_punch_validation():
 def test_header_checks_summary_range_and_punch_length():
     draft, by_id, recs, d = articles_ctx(fill("정상 본문", 200))
     draft["summary"] = fill("총론", 50)
-    draft["punch"] = {"big": "30%", "label": "x", "text": "가" * 80, "twist": "나" * 60, "evidence_id": f"{d}/P1"}
+    draft["punch"] = {"big": "30%", "label": "x", "text": "가" * 100, "twist": "나" * 80, "evidence_id": f"{d}/P1"}
     msgs = [m for _, m in checks.length_violations(draft, CFG, "정규호")]
-    assert any("총론 50자" in m for m in msgs) and any("이번 주 한 방" in m and "140자" in m for m in msgs)
+    assert any("총론 50자" in m for m in msgs) and any("이번 주 한 방" in m and "180자" in m for m in msgs)
     assert not any("총론" in m for _, m in checks.length_violations(dict(draft, summary=fill("총론", 100)), CFG, "정규호"))
     assert not any("총론" in m for _, m in checks.length_violations(dict(draft, summary=fill("총론", 50)), CFG, "현황호"))
     draft["punch"]["big"] = "99%"                                               # 근거에 없는 big → 근거 위반
@@ -345,7 +345,7 @@ def test_config_v3_keys():
     cfg = settings_mod.load().internal
     for gone in ("one_line_max", "abstract_chars", "hook_chars"):
         assert gone not in cfg
-    assert cfg["summary_chars"] == [70, 120] and cfg["punch_chars"] == 120 and cfg["article_title_max"] == 36
+    assert cfg["summary_chars"] == [70, 120] and cfg["punch_chars"] == 160 and cfg["article_title_max"] == 36
     assert cfg["newsletter_name"] == "MTC AX Tech Brief" and cfg["newsletter_theme"] == "B4" and "팹 AI 브리프" in cfg["newsletter_tagline"]
     assert cfg["newsletter_team"].endswith("AX/PI팀")
     assert settings_mod.load().config["config_version"] == "6"

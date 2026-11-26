@@ -48,12 +48,13 @@ internal:
   article_title_max: 36
   issue_title_max: 30         # 이번 주 헤드라인
   summary_chars: [70, 120]    # 한 줄 요약(총론). v4.7에서 줄임(100~170 → 70~120)
-  punch_chars: 120            # 이번 주 한 방(text+twist, big 제외)
-  core_chars: [150, 220]      # 핵심 본문(자세히). v4.7에서 줄임(220~300 → 150~220): 요점은 points가 맡는다
+  punch_chars: 160            # 이번 주 한 방(text+twist, big 제외). v4.7: 무엇을 잰 숫자인지·왜 중요한지 두 문장
+  core_chars: [200, 320]      # 핵심 본문(자세히: 배경·방식·조건 2~3문장). 요점 3문장(points)과 겹치지 않게
   brief_chars: [45, 75]       # 단신 한 문장. v4.7에서 줄임(60~95 → 45~75)
-  issue_body_max: 1600        # 한 방 + 핵심(한 줄 핵심·요점·본문·MTC가 볼 것) + 단신 합계. v4.7에서 줄임(2000 → 1600)
+  issue_body_max: 2800        # 한 방 + 핵심(한 줄 핵심·요점·본문·MTC가 볼 것·수치 의미) + 단신 합계
   deck_chars: 60              # 핵심 기사 한 줄 핵심(30초 브리핑에도 쓴다). 주체와 사건을 밝힌 완결 문장
-  point_chars: 36             # 핵심 기사 요점 한 줄(무엇이 · 얼마나 · 어디까지 확인)
+  point_chars: 90             # 핵심 기사 요점 한 문장(무슨 일 · 얼마나 · 어디까지). 명사형 조각이 아닌 완결 문장
+  figure_why_chars: 40        # 수치 카드의 "왜 중요"(비교 기준·의미)
   read_chars_per_min: 500     # 읽는 시간 표시용 분당 글자 수
   verbatim_max_run: 30
   brief_max: 6                # 단신 최대 건수(핵심이 3건이면 -1)
