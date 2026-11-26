@@ -6,7 +6,7 @@ AGENTS = ["claude", "gpt", "gemini", "script", "manual"]
 COLUMNS = (["issue_week", "issue_type", "config_version", "collected", "intake_complete", "intake_partial", "intake_drop",
             "intake_paywall", "resurvey_run", "manual_attempts", "pass_docs", "events", "published", "core", "brief",
             "core_eligible", "r1_approved_as_is", "r1_changed", "r1_change_ratio", "r1_lifted", "r1_lowered",
-            "r1_ledger_changes", "r1_invalid_responses", "r2_A_custom", "r2_B_custom", "r2_C_revisions", "r2_d_changed",
+            "r1_ledger_changes", "r1_invalid_responses", "r2_A_custom", "r2_B_custom", "r2_B_revisions", "r2_d_changed",
             "r2_d_total", "r2_title_replace_rate", "warnings_total", "warnings_fix_chosen", "review1_sec", "review2_sec",
             "review3_sec", "review_sec_total"]
            + [f"agent_{a}_{k}" for a in AGENTS for k in ("complete", "unique")]
@@ -42,7 +42,7 @@ def build_row(state, doc, log, config_version):
            "r1_lifted": r1.get("lifted", ""), "r1_lowered": r1.get("lowered", ""),
            "r1_ledger_changes": r1.get("ledger_changes", ""), "r1_invalid_responses": invalid,
            "r2_A_custom": int(r2.get("A_custom", False)), "r2_B_custom": int(r2.get("B_custom", False)),
-           "r2_C_revisions": r2.get("c_revisions", 0), "r2_d_changed": r2.get("d_changed", 0),
+           "r2_B_revisions": r2.get("b_revisions", 0), "r2_d_changed": r2.get("d_changed", 0),
            "r2_d_total": r2.get("d_total", 0),
            "r2_title_replace_rate": round(r2.get("d_changed", 0) / r2["d_total"], 3) if r2.get("d_total") else 0,
            "warnings_total": r2.get("e_total", 0), "warnings_fix_chosen": r2.get("e_fix", 0),

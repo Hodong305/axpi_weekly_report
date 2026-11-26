@@ -1,20 +1,29 @@
 """S8 발송본 생성(설계서 9.8): 외부 스크립트·원격 이미지·링크가 없는 정적 HTML과 텍스트본.
-HTML은 internal/templates/newsletter.html(표 기반, 인라인 스타일)을 작은 치환기로 채운다. 의존성 없음.
-템플릿 문법: {{키}}(HTML 이스케이프 치환), <!--IF 키-->…<!--END 키-->(값이 참일 때), <!--LOOP 키-->…<!--END 키-->(목록 반복)."""
+HTML은 internal/templates/newsletter.html(표 기반, 인라인 스타일, 최대 폭 680px)을 작은 치환기로 채우고, 색은 templates/themes.yaml의
+테마(A|B|C)에서 가져온다. 구조는 하나이고 색만 다르다. 의존성 없음.
+템플릿 문법: {{키}}(HTML 이스케이프 치환), {{{키}}}(코드가 만든 HTML 그대로), <!--IF 키-->…<!--END 키-->(값이 참일 때), <!--LOOP 키-->…<!--END 키-->(목록 반복)."""
 import html
 import re
 from datetime import date, timedelta
 from pathlib import Path
 
+import yaml
+
 from .checks import strip_urls
 from .draft import TOPIC_LABEL
+from .glossary import annotate, gloss_fields
 
-TEMPLATE = Path(__file__).resolve().parent / "templates" / "newsletter.html"
-TOPIC_COLOR = {"칩메이커": ("#e0ecff", "#1d4ed8"), "장비사": ("#f3e8ff", "#7e22ce"), "제조 솔루션": ("#ddf4f1", "#0f766e"),
-               "Physical AI": ("#fdeee4", "#b4501b"), "기반기술 전이 사례": ("#f1f2f4", "#4b5563")}
-MATURITY_COLOR = ("#e7f6ec", "#1a7f37")
-EVIDENCE_COLOR = ("#f1f2f4", "#4b5563")
-TOPIC_NAME = {"T1_CHIPMAKER": "칩메이커", "T2_EQUIPMENT": "반도체 장비사", "T3_SOLUTION": "장비사 외 제조 솔루션 공급사", "T4_PHYSICAL_AI": "Physical AI"}
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+TEMPLATE = TEMPLATE_DIR / "newsletter.html"
+LABEL_CODE = {v: k for k, v in {"T1": "칩메이커", "T2": "장비사", "T3": "제조 솔루션", "T4": "Physical AI", "B": "기반기술 전이 사례"}.items()}
+TOPIC_CODE = {"T1_CHIPMAKER": "T1", "T2_EQUIPMENT": "T2", "T3_SOLUTION": "T3", "T4_PHYSICAL_AI": "T4", "B": "B"}
+TOPIC_ICON = {"T1": "🏭", "T2": "⚙️", "T3": "📊", "T4": "🤖", "B": "🧪"}
+TOPIC_NAME = {"T1": "칩메이커", "T2": "장비사", "T3": "제조 솔루션", "T4": "Physical AI", "B": "기반기술 전이 사례"}
+GLOSS_STYLE = "color:#7a8597;font-size:12.5px;"
+
+
+def load_themes():
+    return yaml.safe_load((TEMPLATE_DIR / "themes.yaml").read_text(encoding="utf-8"))
 
 
 def _s(text):
@@ -28,9 +37,16 @@ def period_text(window_start, window_end_exclusive):
     return f"{s.isoformat()} ~ {e.isoformat()}"
 
 
+def period_short(window_start, window_end_exclusive):
+    s = date.fromisoformat(window_start[:10])
+    e = date.fromisoformat(window_end_exclusive[:10]) - timedelta(days=1)
+    return f"{s.month}.{s.day} ~ {e.month}.{e.day}"
+
+
 # 치환기 ------------------------------------------------------------------------
 
 _BLOCK = re.compile(r"<!--(IF|LOOP) (\w+)-->(.*?)<!--END \2-->", re.S)
+_RAW = re.compile(r"\{\{\{(\w+)\}\}\}")
 _VAR = re.compile(r"\{\{(\w+)\}\}")
 
 
@@ -42,6 +58,7 @@ def fill(template, ctx):
             return fill(inner, ctx) if v else ""
         return "".join(fill(inner, {**ctx, **item}) for item in (v or []))
     out = _BLOCK.sub(block, template)
+    out = _RAW.sub(lambda m: str(ctx.get(m.group(1), "")), out)
     return _VAR.sub(lambda m: html.escape(_s(ctx.get(m.group(1), "")), quote=True), out)
 
 
@@ -54,12 +71,10 @@ def verify_static(doc):
 
 # 내용 -------------------------------------------------------------------------
 
-def _tags(tags, slot):
-    out = []
-    for i, t in enumerate(tags):
-        bg, fg = (TOPIC_COLOR.get(t, EVIDENCE_COLOR) if i == 0 else MATURITY_COLOR if i == 1 else EVIDENCE_COLOR)
-        out.append({"text": t, "bg": bg, "fg": fg})
-    return out
+def chip(theme, code, size="12px"):
+    fg, bg = theme["topic"][code]
+    return (f'<span style="display:inline-block;background:{bg};color:{fg};font-weight:bold;padding:3px 10px;border-radius:999px;'
+            f'font-size:{size};">{TOPIC_ICON[code]} {TOPIC_NAME[code]}</span>')
 
 
 def _followup(ev):
@@ -69,93 +84,143 @@ def _followup(ev):
     return ""
 
 
-def more_groups(more):
-    groups = []
-    for m in more:
-        head = TOPIC_LABEL.get(m["topic"], m["topic"] or "기타")
-        if not groups or groups[-1]["heading"] != head:
-            groups.append({"heading": head, "fg": TOPIC_COLOR.get(head, EVIDENCE_COLOR)[1], "items": []})
-        groups[-1]["items"].append({"line": m["line"], "credit": m["credit"]})
-    return groups
+def name_html(name, accent):
+    """이름의 첫 숫자에 강조색을 입힌다(예: FAB4 위클리). 숫자가 없으면 그대로."""
+    m = re.search(r"\d+", name)
+    if not m:
+        return html.escape(name)
+    return html.escape(name[:m.start()]) + f'<span style="color:{accent};">{m.group()}</span>' + html.escape(name[m.end():])
+
+
+def glossed(draft):
+    """첫 등장에 풀이를 붙인 조각들. 반환: {칸 키: [(조각, 풀이 또는 None)]}  (제목·헤드라인·총론에는 붙이지 않는다)"""
+    meanings = {g["term"]: g["meaning"] for g in draft.get("glossary") or [] if g.get("meaning")}
+    fields = [(k, _s(t)) for k, t in gloss_fields(draft)]
+    segs, _ = annotate(fields, meanings)
+    return segs
+
+
+def to_html(segs):
+    return "".join(html.escape(t) + (f'<span style="{GLOSS_STYLE}">({html.escape(m)})</span>' if m else "") for t, m in segs)
+
+
+def to_plain(segs):
+    return "".join(t + (f"({m})" if m else "") for t, m in segs)
 
 
 def build(draft, ctx):
-    """ctx: issue_week, period, issue_type, counts{pass_docs,published}, events, status_rows, corrections, note,
-    issue_no, n_docs, newsletter_name. 반환: (html, text)"""
+    """ctx: issue_week, period, period_short, issue_type, counts{pass_docs,published}, events, status_rows, corrections, note,
+    issue_no, n_docs, newsletter_name, newsletter_tagline, newsletter_team, theme. 반환: (html, text)"""
+    themes = load_themes()
+    key = ctx.get("theme", "A")
+    if key not in themes:
+        raise ValueError(f"알 수 없는 테마: {key} (A|B|C)")
+    th = themes[key]
     by_id = {e["event_id"]: e for e in ctx["events"]}
+    segs = glossed(draft)
     note = ""
     if ctx["issue_type"] == "축약호":
         note = f"축약호: 최종 통과 문서 {ctx['counts']['pass_docs']}건, 게재 사건 {ctx['counts']['published']}건. {ctx['note']}"
-    core = [a for a in draft["articles"] if a["slot"] == "core"]
-    brief = [a for a in draft["articles"] if a["slot"] == "brief"]
+    core = [(i, a) for i, a in enumerate(draft["articles"]) if a["slot"] == "core"]
+    brief = [(i, a) for i, a in enumerate(draft["articles"]) if a["slot"] == "brief"]
     more = draft.get("more") or []
-    hook = draft.get("hook")
+    punch = draft.get("punch")
 
-    def art(a):
+    def code_of(a):
+        return LABEL_CODE.get((a.get("tags") or [""])[0], "B")
+
+    def art(i, a):
+        code = code_of(a)
+        fg, bg = th["topic"][code]
         figs = a.get("key_figures") or []
-        w = max(1, 100 // max(1, len(figs)) - 2)
-        return {"title": a["title"], "body": a["body"], "watch": a.get("watch") or "", "followup": _followup(by_id.get(a["event_id"])),
-                "tags": _tags(a.get("tags") or [], a["slot"]), "credit": " / ".join(a["credits"]),
-                "figures": [{"value": k["value"], "label": k["label"], "w": w} for k in figs], "has_figures": bool(figs)}
-    core_ctx, brief_ctx = [art(a) for a in core], [art(a) for a in brief]
-    groups = more_groups(more)
+        w = max(1, 100 // max(1, len(figs)))
+        fig = a.get("figure")
+        return {"title": a["title"], "followup": _followup(by_id.get(a["event_id"])), "topic_chip": chip(th, code), "topic_fg": fg, "topic_bg": bg,
+                "tags": [{"text": t} for t in (a.get("tags") or [])[1:]], "body_html": to_html(segs[("articles", i, "body")]),
+                "watch_html": to_html(segs[("articles", i, "watch")]) if ("articles", i, "watch") in segs else "",
+                "credit": " / ".join(a["credits"]), "has_figures": bool(figs),
+                "figures": [{"value": k["value"], "label": k["label"], "w": w} for k in figs],
+                "fig_value": fig["value"] if fig else "", "fig_label": fig["label"] if fig else ""}
+    groups = []
+    for j, m in enumerate(more):
+        code = TOPIC_CODE.get(m["topic"], "B")
+        head = TOPIC_NAME[code]
+        if not groups or groups[-1]["heading"] != head:
+            groups.append({"heading": head, "icon": TOPIC_ICON[code], "fg": th["topic"][code][0], "items": []})
+        groups[-1]["items"].append({"line_html": to_html(segs[("more", j, "line")]), "credit": m["credit"]})
     status = [{"name": n, "result": r} for n, r in ctx["status_rows"]] if ctx["issue_type"] == "현황호" else []
     corr = [f"{c.get('event_key', '')} 이전 표현 「{c['before']}」 → 수정 표현 「{c['after']}」 ({c.get('date', '')})" for c in ctx.get("corrections") or []]
-    t = {"title_tag": f"{draft['issue_title']}", "newsletter_name": ctx["newsletter_name"], "issue_no": ctx["issue_no"],
-         "issue_week": ctx["issue_week"], "period": ctx["period"], "n_docs": ctx["n_docs"], "n_pub": ctx["counts"]["published"],
-         "issue_title": draft["issue_title"], "one_line": draft["one_line"], "note": note, "abstract": draft["abstract"],
-         "hook": bool(hook), "hook_q": hook["question"] if hook else "", "hook_a": hook["answer"] if hook else "",
+    gl = [g for g in draft.get("glossary") or [] if g.get("meaning")]
+    big = punch["big"] if punch else ""
+    t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark")},
+         "hero_dark": th["hero_dark"], "hero_light": not th["hero_dark"],
+         "title_tag": f"{ctx['newsletter_name']} {ctx['issue_week']} {draft['issue_title']}", "name": ctx["newsletter_name"],
+         "name_html": name_html(ctx["newsletter_name"], th["accent"]), "tagline": ctx["newsletter_tagline"], "team": ctx["newsletter_team"],
+         "issue_no": ctx["issue_no"], "issue_week": ctx["issue_week"], "period_short": ctx["period_short"], "period": ctx["period"],
+         "masthead_chips": [{"chip": chip(th, c, "11.5px")} for c in ("T1", "T2", "T3", "T4")],
+         "n_docs": ctx["n_docs"], "n_pub": ctx["counts"]["published"], "note": note,
+         "issue_title": draft["issue_title"], "summary": draft["summary"],
+         "punch": bool(punch), "punch_big_text": big, "punch_big_size": 40 if len(big) <= 6 else 26 if len(big) <= 12 else 20,
+         "punch_label_text": punch["label"] if punch else "", "punch_text_body": punch["text"] if punch else "",
+         "punch_twist_body": punch["twist"] if punch else "",
          "has_status": bool(status), "status_rows": status, "status_note": ctx["note"] if status else "",
-         "has_core": bool(core_ctx), "core": core_ctx, "has_brief": bool(brief_ctx), "brief": brief_ctx,
-         "has_more": bool(groups), "more": groups, "has_corr": bool(corr), "corrections": [{"text": c} for c in corr],
-         "excluded_count": draft.get("excluded_count", 0)}
+         "has_core": bool(core), "core": [art(i, a) for i, a in core], "has_brief": bool(brief), "brief": [art(i, a) for i, a in brief],
+         "has_more": bool(groups), "more": groups, "has_gloss": bool(gl), "glossary": [{"term": g["term"], "meaning": g["meaning"]} for g in gl],
+         "has_corr": bool(corr), "corrections": [{"text": c} for c in corr], "excluded_count": draft.get("excluded_count", 0)}
     out_html = fill(TEMPLATE.read_text(encoding="utf-8"), t)
     verify_static(out_html)
-    return out_html, build_text(draft, ctx, t, groups)
+    return out_html, build_text(draft, ctx, t, segs, core, brief, groups, gl, note)
 
 
-def build_text(draft, ctx, t, groups):
-    L = [f"{ctx['newsletter_name']} · 제{ctx['issue_no']}호 · {ctx['issue_week']}",
-         f"대상 기간 {ctx['period']} · 검토 문서 {ctx['n_docs']}건 · 게재 {ctx['counts']['published']}건", "",
-         draft["issue_title"], draft["one_line"], ""]
-    if t["note"]:
-        L += [t["note"], ""]
-    L += ["[이번 주 요약]", draft["abstract"], ""]
-    if draft.get("hook"):
-        L += ["[팹 판단 한 컷]", f"Q. {draft['hook']['question']}", f"A. {draft['hook']['answer']}", ""]
+def build_text(draft, ctx, t, segs, core, brief, groups, gl, note):
+    L = [f"{ctx['newsletter_name']} · 제{ctx['issue_no']}호 · {ctx['issue_week']}", ctx["newsletter_tagline"],
+         f"대상 기간 {ctx['period']}", "🏭 칩메이커 · ⚙️ 장비사 · 📊 제조 솔루션 · 🤖 Physical AI", "",
+         "[이번 주 헤드라인]", draft["issue_title"], "", "[한 줄 요약]", draft["summary"], ""]
+    if note:
+        L += [note, ""]
+    p = draft.get("punch")
+    if p:
+        L += [f"[{p['label']}]", f"{p['big']} — {p['text']}", p["twist"], ""]
     if t["has_status"]:
         L.append("[네 분야 조사 결과]")
         L += [f"- {r['name']}: {r['result']}" for r in t["status_rows"]]
         L += [f"0건 사유: {ctx['note']}", ""]
 
-    def article(a):
-        fu = a["followup"]
+    def article(i, a, tc):
+        fu = tc["followup"]
         L.append((f"({fu}) " if fu else "") + a["title"])
-        if a["tags"]:
-            L.append("  꼬리표: " + " · ".join(x["text"] for x in a["tags"]))
-        L.append(a["body"])
-        if a["figures"]:
-            L.append("  수치: " + " / ".join(f"{k['value']} {k['label']}" for k in a["figures"]))
-        if a["watch"]:
-            L.append(f"  MTC가 볼 것 · {a['watch']}")
-        L.extend([f"  출처 · {a['credit']}", ""])
+        if a.get("tags"):
+            L.append("  꼬리표: " + " · ".join(a["tags"]))
+        L.append(to_plain(segs[("articles", i, "body")]))
+        figs = (a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else [])
+        if figs:
+            L.append("  수치: " + " / ".join(f"{k['value']} {k['label']}" for k in figs))
+        if ("articles", i, "watch") in segs:
+            L.append(f"  MTC가 볼 것 · {to_plain(segs[('articles', i, 'watch')])}")
+        L.extend([f"  출처 · {tc['credit']}", ""])
     if t["has_core"]:
-        L.append("[핵심 기사]")
-        for a in t["core"]:
-            article(a)
+        L.append("[이번 주 핵심]")
+        for (i, a), tc in zip(core, t["core"]):
+            article(i, a, tc)
     if t["has_brief"]:
         L.append("[단신]")
-        for a in t["brief"]:
-            article(a)
+        for (i, a), tc in zip(brief, t["brief"]):
+            article(i, a, tc)
     if groups:
         L.append("[더 볼 거리]")
+        j = 0
         for g in groups:
             L.append(f"<{g['heading']}>")
             for it in g["items"]:
-                L += [f"- {it['line']}", f"  {it['credit']}"]
+                L += [f"- {to_plain(segs[('more', j, 'line')])}", f"  {it['credit']}"]
+                j += 1
         L.append("")
+    if gl:
+        L.append("[이번 호 용어 사전]")
+        L += [f"- {g['term']}: {g['meaning']}" for g in gl] + [""]
     if t["has_corr"]:
         L += ["[정정]"] + [c["text"] for c in t["corrections"]] + [""]
-    L += ["이 소식지는 공개 자료를 요약·재구성했으며, 사내 AI가 초안을 쓰고 편집자가 검토했습니다. 원문 링크는 사내 보안 정책에 따라 싣지 않습니다.",
-          f"이 밖에 검토했으나 싣지 않은 자료는 {t['excluded_count']}건입니다.", "의견·정정 요청은 이 메일에 회신해 주세요. · MTC AX/PI팀"]
+    L += [f"{ctx['newsletter_name']}는 {ctx['newsletter_team']}팀이 매주 화요일 보내는 제조 AI 동향 소식지입니다. 이번 호는 공개 자료 {ctx['n_docs']}건을 검토해 "
+          f"{ctx['counts']['published']}건을 골랐고, 사내 AI가 초안을 쓰고 편집자가 검토했습니다. 원문 링크는 보안 정책상 싣지 않으니 출처의 발행처·제목으로 검색해 보세요.",
+          f"이 밖에 검토했으나 싣지 않은 자료는 {t['excluded_count']}건입니다.", "의견·제보·정정은 이 메일에 회신해 주세요."]
     return "\n".join(_s(x) for x in L) + "\n"

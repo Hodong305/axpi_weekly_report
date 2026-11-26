@@ -822,7 +822,8 @@ review_log: []             # 검토 요청 응답과 적용 결과
 | `internal/filellm.py` | 파일 모드(`internal.llm.backend: file`): 모델 호출마다 `review/{issue_week}-llm/{번호}-{단계}.request.json`을 쓰고 같은 번호의 `.response.json`을 읽는다. 응답이 없으면 종료 코드 3, 비대화형에서 검토 요청에 답이 없으면 종료 코드 4 |
 | `internal/fingerprint.py`, `llm.py`의 `ResponseCache` | 9.11: 실행 지문(직전 호와 비교), 응답 저장(`review/{issue_week}-llm-cache.jsonl`) |
 | `tests/regression/`, `tests/test_regression.py` | 11장 회귀 사례 5종의 고정 입력·모델 응답·기대 결과. `python tests/regression/run.py`로 비교(`--update`로 갱신) |
-| `internal/render.py`, `internal/templates/newsletter.html`, `metrics.py`, `pipeline.py` | S8 정적 HTML·텍스트(`out_internal/{issue_week}/`; 템플릿을 작은 치환기로 채움), 시범 지표(`log/pilot.csv`), 상태 기계 |
+| `internal/glossary.py`, `glossary.yaml` | 약어·용어 풀이: 이번 호 첫 등장 풀이, 모르는 약어 찾기(S7), `s6_glossary` 제안, 발송 확정 때 `glossary.yaml`에 덧붙임(주석·순서 보존) |
+| `internal/render.py`, `internal/templates/newsletter.html`·`themes.yaml`, `metrics.py`, `pipeline.py` | S8 정적 HTML·텍스트(`out_internal/{issue_week}/`; 템플릿을 작은 치환기로 채움), 시범 지표(`log/pilot.csv`), 상태 기계 |
 | `ledger/events.jsonl` | 사건 대장(7.2). S8에서만 갱신 |
 
 `review/`, `out_internal/`, `ledger/`, `log/`는 실행 결과이므로 저장소에 올리지 않는다(`.gitignore`).

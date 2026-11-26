@@ -253,13 +253,23 @@ def _cands(prefix, cands, limit=None):
     return " / ".join(f"{prefix}{i} {c}{over_note(c, limit)}" + (" (권장)" if i == 1 else "") for i, c in enumerate(cands, 1))
 
 
+def new_terms(draft):
+    """검토 요청 ②의 [G] 대상: glossary.yaml에 아직 없는 용어(모델 제안·편집자 입력)."""
+    return [g for g in draft.get("glossary") or [] if g["source"] != "glossary"]
+
+
+def _punch_line(i, p):
+    return f"C{i} {p['big']} · {p['text']} / {p['twist']}" + (" (권장)" if i == 1 else "")
+
+
 def render_review2(issue_week, draft, warnings, cfg=None):
     cfg = cfg or {}
+    from .draft import TOPIC_LABEL
     lines = [f"{BAR} 검토 요청 ② 머리부·제목 · {issue_week} {BAR}",
-             "[A 호 타이틀]   " + _cands("A", draft["issue_title_candidates"], cfg.get("issue_title_max")),
-             "[B 한 줄 요약]  " + _cands("B", draft["one_line_candidates"], cfg.get("one_line_max")),
-             "[C 주간 요약 초안]"]
-    lines += ["  " + ln for ln in draft["abstract"].strip().splitlines()]
+             "[A 이번 주 헤드라인]  " + _cands("A", draft["issue_title_candidates"], cfg.get("issue_title_max")),
+             "[B 한 줄 요약(총론)]  " + _cands("B", draft["summary_candidates"], (cfg.get("summary_chars") or [0, 0])[1]),
+             "[C 이번 주 한 방]     " + (" / ".join(_punch_line(i, p) for i, p in enumerate(draft.get("punch_candidates") or [], 1))
+                                      or "(없음)")]
     lines.append("[D 기사 제목]   (현재 제목 | 대안 a | 대안 b)")
     for lab, i in article_labels(draft).items():
         a = draft["articles"][i]
@@ -269,8 +279,14 @@ def render_review2(issue_week, draft, warnings, cfg=None):
     if not draft.get("more"):
         lines.append("  (없음)")
     for j, m in enumerate(draft.get("more") or [], 1):
-        from .draft import TOPIC_LABEL
         lines.append(f"  F{j} {TOPIC_LABEL.get(m['topic'], m['topic'] or '기타')} · {m['line']}")
+    lines.append("[G 새 용어 풀이]")
+    news = new_terms(draft)
+    if not news:
+        lines.append("  (없음)")
+    for n, g in enumerate(news, 1):
+        mean = g["meaning"] or "(제안 실패 — G%d:\"풀이\"로 직접 입력)" % n
+        lines.append(f"  G{n} {g['term']} = {mean} ({'모델 제안' if g['source'] == 'model' else '편집자 입력'})")
     lines.append("[E 자동 검사 경고]")
     if not warnings:
         lines.append("  (없음)")
@@ -280,10 +296,11 @@ def render_review2(issue_week, draft, warnings, cfg=None):
             s += f" → 수정안: \"{w['fix']['new']}\""
         lines.append(s)
     lines += ["",
-              "[선택] 예: A2 B1 C승인 D 핵심1=a E1=수정",
-              " - A: A1~A3, 또는 A:\"직접 쓴 타이틀\"",
-              " - B: B1~B2, 또는 B:\"직접 쓴 한 줄\"",
-              " - C: C승인, 또는 C:\"수정 지시 또는 대체 문단\"",
+              "[선택] 예: A2 B1 C1 D 핵심1=a E1=수정 G2:\"설비 이상 감지·분류 시스템\"",
+              " - A: A1~A3, 또는 A:\"직접 쓴 헤드라인\"",
+              " - B: B1~B2, B:\"직접 쓴 총론\", 또는 B:수정 \"수정 지시\"",
+              " - C: C1~C2, 또는 C:없음",
+              " - G: 고칠 풀이만. 예: G2:\"직접 쓴 풀이\". 생략하면 모델 제안 승인",
               " - D: 바꿀 기사만. 생략하면 현재 제목 유지",
               " - E: 경고마다 수정 또는 유지. 생략하면 수정안 적용",
               " - F: 뺄 항목만. 예: F3=빼기, F7=빼기. 생략하면 모두 싣는다",
@@ -294,12 +311,14 @@ def render_review2(issue_week, draft, warnings, cfg=None):
 
 _Q = r"[\"“”]([^\"“”]*)[\"“”]"
 _TOK = [
-    ("C_OK", re.compile(r"C\s*승인")),
-    ("C_TXT", re.compile(r"C\s*[:：]\s*" + _Q)),
+    ("B_REV", re.compile(r"B\s*[:：]\s*수정\s*" + _Q)),
     ("A_TXT", re.compile(r"A\s*[:：]\s*" + _Q)),
     ("B_TXT", re.compile(r"B\s*[:：]\s*" + _Q)),
+    ("C_NONE", re.compile(r"C\s*[:：]\s*없음")),
+    ("G", re.compile(r"G(\d+)\s*[:：]\s*" + _Q)),
     ("A", re.compile(r"A([1-9])(?!\w)")),
     ("B", re.compile(r"B([1-9])(?!\w)")),
+    ("C", re.compile(r"C([1-9])(?!\w)")),
     ("E", re.compile(r"E(\d+)\s*=\s*(수정|유지)")),
     ("F", re.compile(r"F(\d+)\s*=\s*빼기")),
     ("D", re.compile(r"D(?=[\s,]|$)")),
@@ -309,11 +328,13 @@ _D_ITEM = re.compile(r"(핵심|단신)\s*(\d+)\s*(?:=\s*([abAB])(?![\w])|[:=]\s*
 
 
 def parse_review2(text):
-    """반환: {"A":..,"B":..,"C":..,"D":{라벨:..},"E":{id:..}}. A·B·C는 확정돼야 한다('승인'이면 권장안·초안)."""
+    """반환: {"A","B","C","D":{라벨:..},"E":{id:..},"F":[번호],"G":{번호:풀이}}.
+    A·B는 확정돼야 한다. '승인'은 A·B 권장안(C는 현재 한 방, D는 현재 제목, G는 모델 제안)을 그대로 확정한다.
+    B: ("pick", n) | ("text", 문장) | ("revise", 지시), C: ("pick", n) | ("none",) | None(현재 유지)"""
     s = (text or "").strip()
     if not s:
-        raise ReviewError("응답이 비어 있습니다. 예: A2 B1 C승인, 또는 승인")
-    res = {"A": None, "B": None, "C": None, "D": {}, "E": {}, "F": []}
+        raise ReviewError("응답이 비어 있습니다. 예: A2 B1 C1, 또는 승인")
+    res = {"A": None, "B": None, "C": None, "D": {}, "E": {}, "F": [], "G": {}}
     approve_all = False
     pos, in_d = 0, False
     while pos < len(s):
@@ -334,20 +355,24 @@ def parse_review2(text):
             if tm:
                 break
         else:
-            raise ReviewError(f"해석할 수 없는 응답입니다: '{s[pos:pos + 20]}' — 예: A2 B1 C승인 D 핵심1=a E1=수정")
+            raise ReviewError(f"해석할 수 없는 응답입니다: '{s[pos:pos + 20]}' — 예: A2 B1 C1 D 핵심1=a E1=수정 G2:\"풀이\"")
         pos = tm.end()
-        if name == "C_OK":
-            res["C"] = ("approve",)
-        elif name == "C_TXT":
-            res["C"] = ("text", tm.group(1))
+        if name == "B_REV":
+            res["B"] = ("revise", tm.group(1))
         elif name == "A_TXT":
             res["A"] = ("text", tm.group(1))
         elif name == "B_TXT":
             res["B"] = ("text", tm.group(1))
+        elif name == "C_NONE":
+            res["C"] = ("none",)
+        elif name == "G":
+            res["G"][int(tm.group(1))] = tm.group(2)
         elif name == "A":
             res["A"] = ("pick", int(tm.group(1)))
         elif name == "B":
             res["B"] = ("pick", int(tm.group(1)))
+        elif name == "C":
+            res["C"] = ("pick", int(tm.group(1)))
         elif name == "E":
             res["E"][f"E{int(tm.group(1))}"] = tm.group(2)
         elif name == "F":
@@ -361,17 +386,18 @@ def parse_review2(text):
     if approve_all:
         res["A"] = res["A"] or ("pick", 1)
         res["B"] = res["B"] or ("pick", 1)
-        res["C"] = res["C"] or ("approve",)
-    missing = [k for k in "ABC" if res[k] is None]
+    missing = [k for k in "AB" if res[k] is None]
     if missing:
-        raise ReviewError(f"{'·'.join(missing)}를 확정하지 않았습니다. A·B·C는 반드시 정해야 합니다(전부 권장안이면 '승인').")
+        raise ReviewError(f"{'·'.join(missing)}를 확정하지 않았습니다. A·B는 반드시 정해야 합니다(전부 권장안이면 '승인').")
     return res
 
 
 def validate_review2(res, draft, warnings, cfg):
     """응답이 현재 요청과 맞는지(번호 범위, 글자 수) 검사한다."""
-    for key, cands, mx, name in (("A", draft["issue_title_candidates"], cfg["issue_title_max"], "호 타이틀"),
-                                 ("B", draft["one_line_candidates"], cfg["one_line_max"], "한 줄 요약")):
+    from .glossary import EDIT_MAX
+    smax = cfg["summary_chars"][1]
+    for key, cands, mx, name in (("A", draft["issue_title_candidates"], cfg["issue_title_max"], "헤드라인"),
+                                 ("B", draft["summary_candidates"], smax, "총론")):
         kind, val = res[key][0], res[key][1] if len(res[key]) > 1 else None
         if kind == "pick" and not 1 <= val <= len(cands):
             raise ReviewError(f"{key}{val}은(는) 없습니다. {key}1~{key}{len(cands)} 중에서 고르세요.")
@@ -379,6 +405,15 @@ def validate_review2(res, draft, warnings, cfg):
             raise ReviewError(f"{key}{val}은(는) {len(cands[val - 1])}자로 {name} 한도 {mx}자를 넘습니다. 다른 후보나 직접 입력을 쓰세요.")
         if kind == "text" and not 1 <= len(val.strip()) <= mx:
             raise ReviewError(f"{key} 직접 입력({name})은 {mx}자 이내로 쓰세요(현재 {len(val.strip())}자).")
+        if kind == "revise" and not val.strip():
+            raise ReviewError("B:수정 뒤에 수정 지시를 쓰세요. 예: B:수정 \"결함 얘기를 앞에 두세요\"")
+    if res["C"] and res["C"][0] == "pick":
+        n = res["C"][1]
+        cands = draft.get("punch_candidates") or []
+        if not cands:
+            raise ReviewError(f"C{n}: 이번 주 한 방 후보가 없습니다. C:없음으로 답하거나 C는 생략하세요.")
+        if not 1 <= n <= len(cands):
+            raise ReviewError(f"C{n}은(는) 없습니다. C1~C{len(cands)} 중에서 고르세요.")
     labels = article_labels(draft)
     for lab, (kind, val) in res["D"].items():
         if lab not in labels:
@@ -393,6 +428,11 @@ def validate_review2(res, draft, warnings, cfg):
     for n in res["F"]:
         if not 1 <= n <= len(draft.get("more") or []):
             raise ReviewError(f"F{n}: 해당 더 볼 거리 항목이 없습니다.")
+    for n, text in res["G"].items():
+        if not 1 <= n <= len(new_terms(draft)):
+            raise ReviewError(f"G{n}: 해당 새 용어가 없습니다.")
+        if not 1 <= len(text.strip()) <= EDIT_MAX:
+            raise ReviewError(f"G{n} 풀이는 {EDIT_MAX}자 이내로 쓰세요(현재 {len(text.strip())}자).")
     ids = {w["id"] for w in warnings}
     for e in res["E"]:
         if e not in ids:
@@ -412,15 +452,25 @@ def apply_fix(draft, fix):
 
 
 def apply_review2(draft, res, warnings):
-    """A·B·D·E를 원고에 반영한다(C의 수정 지시는 호출 쪽이 모델로 처리). 반환: 통계 dict."""
-    st = {"A_custom": False, "B_custom": False, "d_changed": 0, "d_total": len(draft["articles"]),
-          "e_fix": 0, "e_keep": 0, "e_total": len(warnings), "d_ids": [], "f_removed": 0}
-    for key, field, cands in (("A", "issue_title", "issue_title_candidates"), ("B", "one_line", "one_line_candidates")):
+    """A·B·C·D·E·F·G를 원고에 반영한다(B의 수정 지시는 st['b_revise']로 돌려주고 호출 쪽이 모델로 처리). 반환: 통계 dict."""
+    st = {"A_custom": False, "B_custom": False, "b_revise": None, "d_changed": 0, "d_total": len(draft["articles"]),
+          "e_fix": 0, "e_keep": 0, "e_total": len(warnings), "d_ids": [], "f_removed": 0, "g_edited": 0, "C_none": False}
+    for key, field, cands in (("A", "issue_title", "issue_title_candidates"), ("B", "summary", "summary_candidates")):
         kind, val = res[key]
+        if kind == "revise":              # 수정 지시: 지금 총론(1순위)을 기준으로 다시 쓴다
+            st["b_revise"] = val.strip()
+            continue
         chosen = val.strip() if kind == "text" else draft[cands][val - 1]
         st[f"{key}_custom"] = kind == "text"
         draft[cands] = [chosen] + [c for c in draft[cands] if c != chosen]
         draft[field] = chosen
+    if res["C"]:
+        if res["C"][0] == "none":
+            draft["punch"], st["C_none"] = None, True
+        else:
+            cands = draft["punch_candidates"]
+            draft["punch"] = cands[res["C"][1] - 1]
+            draft["punch_candidates"] = [draft["punch"]] + [c for c in cands if c is not draft["punch"]]
     labels = article_labels(draft)
     for lab, (kind, val) in res["D"].items():
         a = draft["articles"][labels[lab]]
@@ -434,6 +484,10 @@ def apply_review2(draft, res, warnings):
         gone = set(res["F"])
         draft["more"] = [m for j, m in enumerate(draft.get("more") or [], 1) if j not in gone]
         st["f_removed"] = len(gone)
+    news = new_terms(draft)
+    for n, text in res["G"].items():        # G: 고칠 풀이만. 나머지 모델 제안은 그대로 확정
+        news[n - 1]["meaning"], news[n - 1]["source"] = text.strip(), "editor"
+        st["g_edited"] += 1
     for w in warnings:
         choice = res["E"].get(w["id"], "수정")    # 생략하면 수정안 적용
         w["decision"] = choice
@@ -447,12 +501,12 @@ def apply_review2(draft, res, warnings):
     return st
 
 
-def render_c_confirm(abstract):
-    return "\n".join([f"{BAR} C 재수정 확인 {BAR}"] + ["  " + ln for ln in abstract.strip().splitlines()]
+def render_b_confirm(summary):
+    return "\n".join([f"{BAR} B 재수정 확인 {BAR}"] + ["  " + ln for ln in summary.strip().splitlines()]
                      + [" 1) 승인 (권장)  2) 다시 수정: …", "응답:"])
 
 
-def parse_c_confirm(text):
+def parse_b_confirm(text):
     t = (text or "").strip()
     if re.fullmatch(r"1\s*\)?", t):
         return ("approve", None)
@@ -467,10 +521,10 @@ def parse_c_confirm(text):
 # ③ 발송 확인 -----------------------------------------------------------------
 
 def render_review3(issue_week, s):
-    """s: title, one_line, abstract_len, core, brief, body_len, body_max, sources, warnings"""
+    """s: title, summary, summary_len, core, brief, body_len, body_max, sources, warnings"""
     return "\n".join([
         f"{BAR} 발송 확인 · {issue_week} {BAR}",
-        f"{s['title']} / {s['one_line']} / 주간 요약 {s['abstract_len']}자 / 핵심 {s['core']} · 단신 {s['brief']} / "
+        f"{s['title']} / {s['summary']} / 총론 {s['summary_len']}자 / 핵심 {s['core']} · 단신 {s['brief']} / "
         f"본문 {s['body_len']:,}자(한도 {s['body_max']:,}) / 출처 {s['sources']}건 / 경고 {s['warnings']}",
         " 1) 발송본 생성·확정 (권장)",
         " 2) 검토 ②로 돌아가기",

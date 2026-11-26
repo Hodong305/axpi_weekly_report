@@ -10,7 +10,7 @@
 import re
 import unicodedata
 
-from .common import evidence_errors, evidence_text
+from .common import evidence_errors, evidence_text, figure_value_errors
 from .draft import format_credit
 from .review import article_labels
 
@@ -53,11 +53,11 @@ def verbatim_hit(text, source_norm, run):
 
 # 숫자 ------------------------------------------------------------------------
 
-_NUM = re.compile(r"\d[\d,]*(?:\.\d+)?")
-_EN_NUM = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}
+from .common import _EN_NUM, _NUM, _num_in, _num_re, _numval  # noqa: E402,F401  (숫자 검사 도구는 common에 있다)
+
 # 한정어 그룹: 근거(영문·한글)에서 찾는 말(앞·뒤)과, 원고에서 같은 뜻으로 인정하는 말(앞·뒤), 수정안에 넣을 한글 한정어.
 # 원고의 한정어는 숫자 앞뒤 어느 쪽에 있어도 된다(한국어는 "90,000건 넘게"처럼 뒤에 붙는 경우가 많다).
-_OVER_OK = (["more than", "over", "at least", "최소", "초과"], ["넘게", "넘는", "넘어", "이상", "초과"])
+_OVER_OK = (["more than", "over", "at least", "최소", "초과"], ["넘게", "넘는", "넘어", "이상", "초과", "+"])
 _QUAL = {  # 그룹: (근거 앞, 근거 뒤, 원고 앞, 원고 뒤, 수정안 한정어)
     "max": (["up to", "as much as", "최대", "최고"], ["이하", "까지"],
             ["up to", "as much as", "최대", "최고"], ["까지", "이하"], "최대"),
@@ -68,21 +68,6 @@ _QUAL = {  # 그룹: (근거 앞, 근거 뒤, 원고 앞, 원고 뒤, 수정안 
     "under": (["less than", "under"], ["미만"], ["less than", "under", "미만"], ["미만", "이하"], None),
 }
 _AFTER_YEO = re.compile(r"\s*[%％]?\s*여(?![가-힣])")     # "30여 건"의 '여'(한 글자라 따로 검사)
-
-
-def _numval(tok):
-    return tok.replace(",", "")
-
-
-def _num_re(tok):
-    return re.compile(rf"(?<![\d.]){re.escape(_numval(tok))}(?![\d]|\.\d)")
-
-
-def _num_in(tok, text):
-    v = _numval(tok)
-    if _num_re(tok).search(text.replace(",", "")):
-        return True
-    return v.isdigit() and 1 <= int(v) <= 10 and re.search(rf"\b{_EN_NUM[int(v)]}\b", text, re.I) is not None
 
 
 def _word_before(w, before):
@@ -117,7 +102,19 @@ def _qual_in_draft(group, text, start, end):
     return group == "approx" and bool(_AFTER_YEO.match(after))
 
 
-def number_warnings(field_text, pairs, target, scope):
+def _fix_text(group, old, figure):
+    """한정어를 넣은 수정안. 수치 카드는 '90,000+'처럼 짧게 고치고, 문장은 한정어를 앞뒤에 넣는다. 정할 수 없으면 None."""
+    if figure:
+        return {"max": "최대 " + old, "min": old + "+", "over": old + "+", "approx": "약 " + old, "under": old + " 미만"}.get(group)
+    if group in ("max", "min", "approx"):
+        return f"{_QUAL[group][4]} {old}"
+    if group == "over":
+        first, _, rest = old.partition(" ")
+        return f"{first} 넘게" + (f" {rest}" if rest else "")
+    return None
+
+
+def number_warnings(field_text, pairs, target, scope, figure=False):
     """field_text의 숫자가 근거 블록(pairs=[(근거 ID, 텍스트)])에 있는지, 한정어가 빠지지 않았는지 검사한다."""
     out = []
     joined = "\n".join(t for _, t in pairs)
@@ -126,7 +123,7 @@ def number_warnings(field_text, pairs, target, scope):
         tok = m.group()
         e1 = re.compile(r"\S*").match(field_text, m.start()).end()      # 단위가 붙은 어절 끝
         nxt = re.compile(r"\s+\S+").match(field_text, e1)                # 다음 어절 하나까지가 수정안 범위
-        old = field_text[m.start():(nxt.end() if nxt else e1)]
+        old = field_text[m.start():(e1 if figure else (nxt.end() if nxt else e1))]
         if not _num_in(tok, joined):
             fix = None
             if field_text[m.end():m.end() + 1] in ("%", "％"):
@@ -138,8 +135,8 @@ def number_warnings(field_text, pairs, target, scope):
             continue
         q = _qual_in_source(tok, joined)
         if q and not _qual_in_draft(q[0], field_text, m.start(), m.end()):
-            word = _QUAL[q[0]][4]
-            fix = {"target": target, "old": old, "new": f"{word} {old}"} if word and field_text.count(old) == 1 else None
+            new = _fix_text(q[0], old, figure)
+            fix = {"target": target, "old": old, "new": new} if new and field_text.count(old) == 1 else None
             eid = next((e for e, t in pairs if _num_re(tok).search(t.replace(",", ""))), first_id)
             out.append({"scope": scope, "quote": old, "kind": "숫자",
                         "message": f"근거 {eid}은(는) \"{q[1]}\" — 한정어 누락", "fix": fix})
@@ -225,19 +222,20 @@ def autofix(draft, records):
                           "message": f"{label}에서 URL·도메인 문자열을 자동 삭제함", "fix": None})
         return new
     labels = {i: lab for lab, i in article_labels(draft).items()}
-    for k in ("issue_title", "one_line", "abstract"):
+    for k in ("issue_title", "summary"):
         draft[k] = clean(draft[k], "머리부", k)
-    for k in ("issue_title_candidates", "one_line_candidates"):
-        draft[k] = [clean(c, "머리부", k) for c in draft[k]]
-    if draft.get("hook"):
-        draft["hook"]["question"] = clean(draft["hook"]["question"], "머리부", "hook")
-        draft["hook"]["answer"] = clean(draft["hook"]["answer"], "머리부", "hook")
+    for k in ("issue_title_candidates", "summary_candidates"):
+        draft[k] = [clean(c, "머리부", k) for c in draft.get(k) or []]
+    for p in [draft.get("punch")] + list(draft.get("punch_candidates") or []):
+        if p:
+            for k in ("big", "text", "twist"):
+                p[k] = clean(p[k], "머리부", f"한 방 {k}")
     for i, a in enumerate(draft["articles"]):
         a["title"] = clean(a["title"], labels[i], "제목")
         a["body"] = clean(a["body"], labels[i], "본문")
         if a.get("watch"):
             a["watch"] = clean(a["watch"], labels[i], "MTC가 볼 것")
-        for k in a.get("key_figures") or []:
+        for k in list(a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else []):
             k["value"], k["label"] = clean(k["value"], labels[i], "수치 카드"), clean(k["label"], labels[i], "수치 카드")
         a["title_alternatives"] = [clean(t, labels[i], "제목 대안") for t in a["title_alternatives"]]
         # 출처 정보: 코드가 자료 메타데이터로 만든 형식으로 항상 되돌린다(자동 보정)
@@ -254,18 +252,16 @@ def autofix(draft, records):
 
 
 def length_violations(draft, cfg, issue_type):
-    """글자 수 검사. 반환: [(대상, 메시지)] 대상은 ("article", i) 또는 ("header",)"""
+    """글자 수 검사. 반환: [(대상, 메시지)] 대상은 ("article", i), ("more", j) 또는 ("header",)"""
     v = []
-    amin, amax = cfg["abstract_chars"]
+    smin, smax = cfg["summary_chars"]
     if len(draft["issue_title"]) > cfg["issue_title_max"]:
-        v.append((("header",), f"호 타이틀 {len(draft['issue_title'])}자 > 한도 {cfg['issue_title_max']}자"))
-    if len(draft["one_line"]) > cfg["one_line_max"]:
-        v.append((("header",), f"한 줄 요약 {len(draft['one_line'])}자 > 한도 {cfg['one_line_max']}자"))
-    if issue_type != "현황호" and not amin <= len(draft["abstract"]) <= amax:
-        v.append((("header",), f"주간 요약 {len(draft['abstract'])}자, 허용 {amin}~{amax}자"))
-    h = draft.get("hook")
-    if h and len(h["question"]) + len(h["answer"]) > cfg["hook_chars"]:
-        v.append((("header",), f"팹 판단 한 컷 {len(h['question']) + len(h['answer'])}자 > 한도 {cfg['hook_chars']}자"))
+        v.append((("header",), f"헤드라인 {len(draft['issue_title'])}자 > 한도 {cfg['issue_title_max']}자"))
+    if issue_type != "현황호" and not smin <= len(draft["summary"]) <= smax:
+        v.append((("header",), f"총론 {len(draft['summary'])}자, 허용 {smin}~{smax}자"))
+    p = draft.get("punch")
+    if p and len(p["text"]) + len(p["twist"]) > cfg["punch_chars"]:
+        v.append((("header",), f"이번 주 한 방 {len(p['text']) + len(p['twist'])}자 > 한도 {cfg['punch_chars']}자(big 제외)"))
     for i, a in enumerate(draft["articles"]):
         if len(a["title"]) > cfg["article_title_max"]:
             v.append((("article", i), f"제목 {len(a['title'])}자 > 한도 {cfg['article_title_max']}자"))
@@ -282,9 +278,9 @@ def length_violations(draft, cfg, issue_type):
 
 
 def body_total(draft):
-    h = draft.get("hook")
-    """9.8의 4~6: 팹 판단 한 컷 + 핵심 본문·MTC가 볼 것 + 단신 본문(더 볼 거리·꼬리말은 넣지 않는다)"""
-    return ((len(h["question"]) + len(h["answer"]) if h else 0)
+    """9.8의 4~6: 이번 주 한 방(text+twist) + 핵심 본문·MTC가 볼 것 + 단신 본문(더 볼 거리·꼬리말은 넣지 않는다)"""
+    p = draft.get("punch")
+    return ((len(p["text"]) + len(p["twist"]) if p else 0)
             + sum(len(a["body"]) + len(a.get("watch") or "") for a in draft["articles"]))
 
 
@@ -315,13 +311,16 @@ def hard_violations(draft, events_by_id, records, cfg, issue_type):
         if hit:
             v.append((("more", j), "원문 연속 일치", f"한 줄 요약이 원문과 {run}자 이상 같음: \"{hit[:40]}…\""))
     if draft["articles"]:
-        text = draft["abstract"] + "\n" + (draft["hook"]["question"] + draft["hook"]["answer"] if draft.get("hook") else "")
+        p = draft.get("punch")
+        text = draft["summary"] + "\n" + (p["text"] + " " + p["twist"] if p else "")
         hit = verbatim_hit(text, all_src, run)
         if hit:
             v.append((("header",), "원문 연속 일치", f"머리부에 원문과 {run}자 이상 같은 구간: \"{hit[:40]}…\""))
-    h = draft.get("hook")
-    if h:
-        errs = evidence_errors([h["evidence_id"]], records)
+    p = draft.get("punch")
+    if p:
+        errs = evidence_errors([p["evidence_id"]], records)
+        if not errs:
+            errs = [f"한 방 big {e}" for e in figure_value_errors(p["big"], evidence_text(p["evidence_id"], records))]
         if errs:
             v.append((("header",), "근거 ID", "; ".join(errs)))
     return v
@@ -344,8 +343,10 @@ def soft_warnings(draft, events_by_id, records, cfg, issue_type):
             warns += number_warnings(a[fld], pairs, ["articles", i, fld], labels[i])
             warns += company_warnings(a[fld], src, labels[i])
         for k_i, k in enumerate(a.get("key_figures") or []):
-            warns += number_warnings(k["value"], pairs, ["articles", i, "key_figures", k_i, "value"], labels[i])
+            warns += number_warnings(k["value"], pairs, ["articles", i, "key_figures", k_i, "value"], labels[i], figure=True)
             warns += company_warnings(k["label"], src, labels[i])
+        if a.get("figure"):
+            warns += number_warnings(a["figure"]["value"], pairs, ["articles", i, "figure", "value"], labels[i], figure=True)
         if a["slot"] == "core" and ev["cap"] == "brief" and not ev["cap_override"]:
             warns.append({"scope": labels[i], "quote": a["title"], "kind": "게재 상한",
                           "message": f"게재 상한 위반: 상한 '단신'({' · '.join(ev['cap_reasons'])})인데 핵심으로 편성됨", "fix": None})
@@ -354,12 +355,17 @@ def soft_warnings(draft, events_by_id, records, cfg, issue_type):
     if len(bg) > 1:
         warns.append({"scope": "머리부", "quote": "", "kind": "게재 상한", "message": f"게재 상한 위반: 산업 배경 사건이 {len(bg)}건(최대 1건)",
                       "fix": None})
-    for fld in ("issue_title", "one_line", "abstract"):
+    for j, m in enumerate(draft.get("more") or []):       # 총론·한 방은 더 볼 거리 근거도 인용할 수 있다
+        all_pairs += [(e, evidence_text(e, records)) for e in m["evidence_ids"]]
+        all_src += "\n" + more_source(m, events_by_id, records)
+    for fld in ("issue_title", "summary"):
         warns += number_warnings(draft[fld], all_pairs, [fld], "머리부")
         warns += company_warnings(draft[fld], all_src, "머리부")
-    if draft.get("hook"):
-        for fld in ("question", "answer"):
-            warns += company_warnings(draft["hook"][fld], all_src, "머리부")
+    p = draft.get("punch")
+    if p:
+        for fld in ("text", "twist"):
+            warns += number_warnings(p[fld], all_pairs, ["punch", fld], "머리부")
+            warns += company_warnings(p[fld], all_src, "머리부")
     for j, m in enumerate(draft.get("more") or []):
         pairs = [(e, evidence_text(e, records)) for e in m["evidence_ids"]]
         warns += number_warnings(m["line"], pairs, ["more", j, "line"], f"F{j + 1}")

@@ -96,21 +96,21 @@ def test_missing_qualifier_still_warns():
 
 # 4. 제목 대안 -------------------------------------------------------------------
 
-LONG_A = "삼성 Defect Agent, 혐의 공정 탐색 수 분으로"       # 31자
-LONG_B = "Intel Foundry, AI 보조 공정 최적화 사례 공개"      # 33자
+LONG_A = "삼성 Defect Agent, 혐의 공정 탐색 수 시간에서 수 분으로 줄였다"        # 한도(36자) 초과
+LONG_B = "Intel Foundry, AI 보조 공정 최적화 사례를 학회에서 처음으로 공개했다"   # 한도(36자) 초과
 
 
 def test_overlong_alternatives_are_kept_and_shown_with_reason():
-    assert len(LONG_A) == 31 and len(LONG_B) == 33
+    assert len(LONG_A) > 36 and len(LONG_B) > 36
     draft, by_id, recs, d = articles_ctx(fill("정상 본문", 280))
-    draft["abstract"] = fill("요약", 260)
+    draft["summary"] = draft["summary_candidates"][0] = fill("총론", 130)
     draft["articles"][0]["title"] = "Lam 제목"
     draft["articles"][0]["title_alternatives"] = [LONG_A, LONG_B]
     draft["articles"][0]["evidence_ids"] = [f"{d}/P1"]
     out, warns = run_s7(Judge(FakeClient()), draft, list(by_id.values()), recs, CFG, "정규호", {})
     assert out["articles"][0]["title_alternatives"] == [LONG_A, LONG_B]       # 조용히 빼지 않는다
     text = rv.render_review2(WEEK, out, [], CFG)
-    assert f"{LONG_A} [한도 초과 31자>30]" in text and f"{LONG_B} [한도 초과 33자>30]" in text
+    assert f"{LONG_A} [한도 초과 {len(LONG_A)}자>36]" in text and f"{LONG_B} [한도 초과 {len(LONG_B)}자>36]" in text
     with pytest.raises(rv.ReviewError, match="한도"):
         rv.validate_review2(rv.parse_review2("승인 D 핵심1=a"), out, [], CFG)
     rv.validate_review2(rv.parse_review2("승인"), out, [], CFG)
@@ -128,7 +128,7 @@ def test_overlong_candidate_cannot_be_picked_and_first_overlong_is_demoted():
     d["issue_title_candidates"] = ["가" * 31, "정상 타이틀", "다른 타이틀"]
     assert "[한도 초과 31자>30]" in rv.render_review2(WEEK, d, [], CFG)
     with pytest.raises(rv.ReviewError, match="A1"):
-        rv.validate_review2(rv.parse_review2("A1 B1 C승인"), d, [], CFG)
+        rv.validate_review2(rv.parse_review2("A1 B1"), d, [], CFG)
 
 
 # 5. --answer 반복·이어 답하기 -------------------------------------------------------
@@ -175,32 +175,32 @@ def test_pending_cap_check_survives_resume(tmp_path, capsys):
     assert st["pending_review"] is None and sum(e["slot"] == "core" for e in st["events"]) == 2
 
 
-def test_pending_c_confirm_survives_resume(tmp_path, capsys):
+def test_pending_b_confirm_survives_resume(tmp_path, capsys):
     pkg = make_package(tmp_path, sample_records())
     client = FakeClient()
     noninteractive(tmp_path, client).start(pkg)
     assert noninteractive(tmp_path, client, ["1"]).resume() == 4                       # ② 요청까지
     capsys.readouterr()
-    assert noninteractive(tmp_path, client, ['A2 B1 C:"더 짧게"']).resume() == 4         # C 재수정 확인에서 멈춤
-    assert "━━ C 재수정 확인" in capsys.readouterr().out
+    assert noninteractive(tmp_path, client, ['A2 B:수정 "더 짧게"']).resume() == 4         # B 재수정 확인에서 멈춤
+    assert "━━ B 재수정 확인" in capsys.readouterr().out
     assert state_of(tmp_path)["pending_review"]["review"] == "R2"
     assert noninteractive(tmp_path, client, ["2: 한 번 더"]).resume() == 4               # 다시 수정 → 새 확인 질문
-    assert "━━ C 재수정 확인" in capsys.readouterr().out
+    assert "━━ B 재수정 확인" in capsys.readouterr().out
     assert noninteractive(tmp_path, client, ["1"]).resume() == 4                         # 승인 → 발송 확인으로
     out = capsys.readouterr().out
     assert "━━ 검토 요청 ② 머리부·제목" not in out and "━━ 발송 확인" in out
     st = state_of(tmp_path)
-    assert st["pending_review"] is None and st["metrics"]["r2"]["c_revisions"] == 2 and st["metrics"]["r2"]["A_custom"] is False
+    assert st["pending_review"] is None and st["metrics"]["r2"]["b_revisions"] == 2 and st["metrics"]["r2"]["A_custom"] is False
     import yaml
     d = yaml.safe_load((tmp_path / "review" / f"{WEEK}-draft.yaml").read_text(encoding="utf-8"))
-    assert d["issue_title"] == "현장 적용 범위 확대" and d["abstract"].startswith("수정된 주간 요약이다.")
+    assert d["issue_title"] == "현장 적용 범위 확대" and d["summary"].startswith("수정된 총론이다.")
 
 
-def test_c_confirm_answers_in_one_run(tmp_path, capsys):
+def test_b_confirm_answers_in_one_run(tmp_path, capsys):
     pkg = make_package(tmp_path, sample_records())
     client = FakeClient()
     noninteractive(tmp_path, client).start(pkg)
     noninteractive(tmp_path, client, ["1"]).resume()
     capsys.readouterr()
-    assert noninteractive(tmp_path, client, ['승인 C:"짧게"', "1"]).resume() == 4         # ② 응답 + C 확인을 한 번에 → 발송 확인에서 멈춤
+    assert noninteractive(tmp_path, client, ['승인 B:수정 "짧게"', "1"]).resume() == 4         # ② 응답 + B 확인을 한 번에 → 발송 확인에서 멈춤
     assert "━━ 발송 확인" in capsys.readouterr().out

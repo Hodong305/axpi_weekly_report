@@ -41,6 +41,18 @@ class Settings:
         return self.data_root / "ledger" / "events.jsonl"
 
     @property
+    def glossary_path(self):
+        """약어·용어 풀이 파일. 실제 운영에서는 저장소 루트의 glossary.yaml이고, data_root가 다르면 처음 쓸 때 저장소 것을 복사해 쓴다."""
+        return self.data_root / "glossary.yaml"
+
+    def ensure_glossary(self):
+        import shutil
+        if not self.glossary_path.exists():
+            self.glossary_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / "glossary.yaml", self.glossary_path)
+        return self.glossary_path
+
+    @property
     def pilot_csv(self):
         return self.data_root / "log" / "pilot.csv"
 

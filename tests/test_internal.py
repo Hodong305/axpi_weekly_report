@@ -203,11 +203,15 @@ class FakeClient:
 
     def r_s6_header(self, user):
         return {"issue_title_candidates": ["제조 현장 AI 확산 흐름", "현장 적용 범위 확대", "검증 단계 진입"],
-                "one_line_candidates": ["이번 주에는 현장 적용 범위를 넓힌 사례가 이어졌다.", "적용 범위 확대 사례를 정리했다."],
-                "abstract": fill("이번 주에는 제조 현장에서 적용 범위를 넓힌 사례가 이어졌다.", 260), "hook": None}
+                "summary_candidates": [fill("이번 주에는 제조 현장에서 적용 범위를 넓힌 사례가 이어졌다.", 130), fill("적용 범위 확대 사례를 정리했다.", 120)],
+                "punch_candidates": []}
 
-    def r_s6_abstract(self, user):
-        return {"abstract": fill("수정된 주간 요약이다.", 240)}
+    def r_s6_summary(self, user):
+        return {"summary": fill("수정된 총론이다.", 130)}
+
+    def r_s6_glossary(self, user):
+        info = json.loads(re.search(r"\[작성 지침\]\n(\{.*\})", user).group(1))
+        return {"term": info["term"], "meaning": "모델이 제안한 풀이", "evidence_ids": [f"{pick_doc(user)}/P1"]}
 
 
 def _seg(user, doc_id):
@@ -690,7 +694,7 @@ def test_render_review1_format():
 
 def sample_draft():
     return {"issue_week": WEEK, "issue_title": "타이틀1", "issue_title_candidates": ["타이틀1", "타이틀2", "타이틀3"],
-            "one_line": "한줄1", "one_line_candidates": ["한줄1", "한줄2"], "abstract": "요약 문단입니다.", "hook": None,
+            "summary": "총론1", "summary_candidates": ["총론1", "총론2"], "punch": None, "punch_candidates": [], "glossary": [],
             "articles": [{"event_id": "e1", "slot": "core", "title": "핵심 제목1", "title_alternatives": ["대안a", "대안b"], "body": "본문 30% 단축",
                           "credits": [], "evidence_ids": []},
                          {"event_id": "e2", "slot": "core", "title": "핵심 제목2", "title_alternatives": ["대안c", "대안d"], "body": "본문", "credits": [], "evidence_ids": []},
@@ -699,20 +703,23 @@ def sample_draft():
 
 
 def test_parse_review2_valid():
-    assert rv.parse_review2("승인") == {"A": ("pick", 1), "B": ("pick", 1), "C": ("approve",), "D": {}, "E": {}, "F": []}
-    r = rv.parse_review2("A2 B1 C승인 D 핵심1=a E1=수정")
-    assert r == {"A": ("pick", 2), "B": ("pick", 1), "C": ("approve",), "D": {"핵심1": ("pick", "a")}, "E": {"E1": "수정"}, "F": []}
-    r = rv.parse_review2('A:"직접 쓴 타이틀" B:"직접 쓴 한 줄" C:"단신 문장을 줄여라" D 핵심1=b, 단신1:"새 제목" E1=유지 E2=수정')
-    assert r["A"] == ("text", "직접 쓴 타이틀") and r["B"] == ("text", "직접 쓴 한 줄") and r["C"] == ("text", "단신 문장을 줄여라")
-    assert r["D"] == {"핵심1": ("pick", "b"), "단신1": ("text", "새 제목")} and r["E"] == {"E1": "유지", "E2": "수정"}
-    r = rv.parse_review2("A3 B2 C:“대체 문단입니다.”")
-    assert r["A"] == ("pick", 3) and r["C"] == ("text", "대체 문단입니다.")
+    assert rv.parse_review2("승인") == {"A": ("pick", 1), "B": ("pick", 1), "C": None, "D": {}, "E": {}, "F": [], "G": {}}
+    r = rv.parse_review2("A2 B1 C1 D 핵심1=a E1=수정")
+    assert r == {"A": ("pick", 2), "B": ("pick", 1), "C": ("pick", 1), "D": {"핵심1": ("pick", "a")}, "E": {"E1": "수정"}, "F": [], "G": {}}
+    r = rv.parse_review2('A:"직접 쓴 헤드라인" B:"직접 쓴 총론" C:없음 D 핵심1=b, 단신1:"새 제목" E1=유지 E2=수정 G2:"설비 이상 감지"')
+    assert r["A"] == ("text", "직접 쓴 헤드라인") and r["B"] == ("text", "직접 쓴 총론") and r["C"] == ("none",)
+    assert r["D"] == {"핵심1": ("pick", "b"), "단신1": ("text", "새 제목")} and r["E"] == {"E1": "유지", "E2": "수정"} and r["G"] == {2: "설비 이상 감지"}
+    r = rv.parse_review2('A3 B:수정 "결함 얘기를 앞에 두세요" C2')
+    assert r["A"] == ("pick", 3) and r["B"] == ("revise", "결함 얘기를 앞에 두세요") and r["C"] == ("pick", 2)
+    r = rv.parse_review2("A3 B:“대체 총론입니다.”")
+    assert r["B"] == ("text", "대체 총론입니다.")
     r = rv.parse_review2("승인 D 핵심2=A E1=유지")                       # 승인 + 부분 지정
     assert r["A"] == ("pick", 1) and r["D"] == {"핵심2": ("pick", "a")} and r["E"] == {"E1": "유지"}
     assert rv.parse_review2("A2 승인")["A"] == ("pick", 2)
+    assert rv.parse_review2("A2 B1")["C"] is None                       # C는 생략하면 현재 한 방 유지
 
 
-@pytest.mark.parametrize("bad", ["", "A2 B1", "C승인", "D 핵심1=a", "A2 B1 C승인 Q", "A2 B1 C승인 E1=삭제", "A2 B1 C승인 D 핵심1=c"])
+@pytest.mark.parametrize("bad", ["", "A2", "B1", "D 핵심1=a", "A2 B1 Q", "A2 B1 E1=삭제", "A2 B1 D 핵심1=c", "A2 B1 C:있음", "A2 B1 G2:풀이", "A2 B1 C승인"])
 def test_parse_review2_invalid(bad):
     with pytest.raises(rv.ReviewError) as e:
         rv.parse_review2(bad)
@@ -721,50 +728,82 @@ def test_parse_review2_invalid(bad):
 
 def test_validate_and_apply_review2():
     d = sample_draft()
+    d["punch_candidates"] = [{"big": "99%", "label": "이번 주 가장 놀라운 숫자", "text": "무엇의 숫자", "twist": "단 한계", "evidence_id": "x"},
+                             {"big": "수 분", "label": "이번 주 한 방", "text": "두 번째", "twist": "반전", "evidence_id": "y"}]
+    d["punch"] = d["punch_candidates"][0]
+    d["glossary"] = [{"term": "ADC", "meaning": "자동 결함 분류", "source": "model"}, {"term": "GF", "meaning": "GlobalFoundries", "source": "glossary"},
+                     {"term": "XYZ", "meaning": "", "source": "model"}]
     warns = [{"id": "E1", "scope": "핵심1", "quote": "30% 단축", "message": "m", "fix": {"target": ["articles", 0, "body"], "old": "30% 단축", "new": "최대 30% 단축"}},
              {"id": "E2", "scope": "핵심2", "quote": "", "message": "m2", "fix": None}]
     with pytest.raises(rv.ReviewError, match="A5"):
-        rv.validate_review2(rv.parse_review2("A5 B1 C승인"), d, warns, CFG)
+        rv.validate_review2(rv.parse_review2("A5 B1"), d, warns, CFG)
     with pytest.raises(rv.ReviewError, match="30자"):
-        rv.validate_review2(rv.parse_review2('A:"' + "가" * 31 + '" B1 C승인'), d, warns, CFG)
+        rv.validate_review2(rv.parse_review2('A:"' + "가" * 31 + '" B1'), d, warns, CFG)
     with pytest.raises(rv.ReviewError, match="E9"):
         rv.validate_review2(rv.parse_review2("승인 E9=수정"), d, warns, CFG)
     with pytest.raises(rv.ReviewError, match="단신3"):
         rv.validate_review2(rv.parse_review2("승인 D 단신3=a"), d, warns, CFG)
-    res = rv.parse_review2('A2 B:"내가 쓴 한 줄" C승인 D 핵심1=b, 단신1:"바꾼 제목" E2=유지')
+    with pytest.raises(rv.ReviewError, match="C3"):
+        rv.validate_review2(rv.parse_review2("승인 C3"), d, warns, CFG)
+    with pytest.raises(rv.ReviewError, match="G3"):                       # 새 용어는 모델 제안·편집자 입력만 번호가 붙는다(glossary 용어 제외)
+        rv.validate_review2(rv.parse_review2('승인 G3:"x"'), d, warns, CFG)
+    with pytest.raises(rv.ReviewError, match="40자"):
+        rv.validate_review2(rv.parse_review2('승인 G1:"' + "가" * 41 + '"'), d, warns, CFG)
+    res = rv.parse_review2('A2 B:"내가 쓴 총론" C2 D 핵심1=b, 단신1:"바꾼 제목" E2=유지 G2:"설비 이상 감지"')
     rv.validate_review2(res, d, warns, CFG)
     st = rv.apply_review2(d, res, warns)
     assert d["issue_title"] == "타이틀2" and d["issue_title_candidates"][0] == "타이틀2"
-    assert d["one_line"] == "내가 쓴 한 줄" and st["B_custom"] and not st["A_custom"]
+    assert d["summary"] == "내가 쓴 총론" and st["B_custom"] and not st["A_custom"] and st["b_revise"] is None
+    assert d["punch"]["big"] == "수 분" and d["punch_candidates"][0]["big"] == "수 분"
     assert d["articles"][0]["title"] == "대안b" and d["articles"][0]["title_alternatives"][0] == "핵심 제목1"
     assert d["articles"][2]["title"] == "바꾼 제목" and st["d_changed"] == 2
     assert d["articles"][0]["body"] == "본문 최대 30% 단축"          # E1은 생략 → 수정안 적용
     assert st["e_fix"] == 1 and st["e_keep"] == 1
+    assert d["glossary"][2] == {"term": "XYZ", "meaning": "설비 이상 감지", "source": "editor"} and st["g_edited"] == 1     # G2 = 두 번째 새 용어
+    assert d["glossary"][0]["meaning"] == "자동 결함 분류"                                                                      # 고치지 않은 모델 제안은 그대로
+    # C:없음 → 한 방 없음, B:수정 → 지시를 돌려준다
+    d2 = copy.deepcopy(sample_draft())
+    d2["punch_candidates"] = [d["punch"]]
+    d2["punch"] = d["punch"]
+    st2 = rv.apply_review2(d2, rv.parse_review2('승인 C:없음 B:수정 "더 짧게"'), [])
+    assert d2["punch"] is None and st2["C_none"] and st2["b_revise"] == "더 짧게" and d2["summary"] == "총론1"
 
 
 def test_render_review2_and_review3_format():
     d = sample_draft()
     warns = [{"id": "E1", "scope": "핵심2", "quote": "30% 단축", "message": '근거 url1_x/T1은 "최대 30%"', "fix": {"target": [], "old": "a", "new": "최대 30% 단축"}}]
-    t = rv.render_review2(WEEK, d, warns)
+    t = rv.render_review2(WEEK, d, warns, CFG)
     lines = t.splitlines()
     assert lines[0] == "━━ 검토 요청 ② 머리부·제목 · 2026-W49 ━━"
-    assert lines[1] == "[A 호 타이틀]   A1 타이틀1 (권장) / A2 타이틀2 / A3 타이틀3"
-    assert lines[2] == "[B 한 줄 요약]  B1 한줄1 (권장) / B2 한줄2"
+    assert lines[1] == "[A 이번 주 헤드라인]  A1 타이틀1 (권장) / A2 타이틀2 / A3 타이틀3"
+    assert lines[2] == "[B 한 줄 요약(총론)]  B1 총론1 (권장) / B2 총론2"
+    assert lines[3] == "[C 이번 주 한 방]     (없음)"
     assert "[D 기사 제목]   (현재 제목 | 대안 a | 대안 b)" in lines and "  핵심1  핵심 제목1 | 대안a | 대안b" in lines
     assert "  단신1  단신 제목1 | 대안e | 대안f" in lines
     assert '  E1 핵심2 "30% 단축" — 근거 url1_x/T1은 "최대 30%" → 수정안: "최대 30% 단축"' in lines
-    assert "[선택] 예: A2 B1 C승인 D 핵심1=a E1=수정" in lines and " - 전부 권장안이면: 승인" in lines and lines[-1] == "응답:"
-    r3 = rv.render_review3(WEEK, {"title": "T", "one_line": "O", "abstract_len": 250, "core": 2, "brief": 3, "body_len": 1362, "body_max": 1400,
+    assert "[선택] 예: A2 B1 C1 D 핵심1=a E1=수정 G2:\"설비 이상 감지·분류 시스템\"" in lines and " - 전부 권장안이면: 승인" in lines and lines[-1] == "응답:"
+    assert ' - B: B1~B2, B:"직접 쓴 총론", 또는 B:수정 "수정 지시"' in lines and " - C: C1~C2, 또는 C:없음" in lines
+    assert ' - G: 고칠 풀이만. 예: G2:"직접 쓴 풀이". 생략하면 모델 제안 승인' in lines
+    assert lines.index("[G 새 용어 풀이]") < lines.index("[E 자동 검사 경고]") and lines.index("[F 더 볼 거리]   (분야별 한 줄 요약 · 빼려면 F3=빼기)") < lines.index("[G 새 용어 풀이]")
+    d["punch_candidates"] = [{"big": "99%", "label": "x", "text": "로봇개 두 대가 점검 9만 건", "twist": "단, 검출률이 아니다", "evidence_id": "e"},
+                             {"big": "수 분", "label": "x", "text": "t2", "twist": "w2", "evidence_id": "e"}]
+    d["glossary"] = [{"term": "ADC", "meaning": "자동 결함 분류", "source": "model"}, {"term": "GF", "meaning": "x", "source": "glossary"},
+                     {"term": "XYZ", "meaning": "", "source": "model"}]
+    lines = rv.render_review2(WEEK, d, [], CFG).splitlines()
+    assert "[C 이번 주 한 방]     C1 99% · 로봇개 두 대가 점검 9만 건 / 단, 검출률이 아니다 (권장) / C2 수 분 · t2 / w2" in lines
+    assert "  G1 ADC = 자동 결함 분류 (모델 제안)" in lines and not any(l.startswith("  G") and "GF" in l for l in lines)
+    assert any(l.startswith("  G2 XYZ = (제안 실패") for l in lines)
+    r3 = rv.render_review3(WEEK, {"title": "T", "summary": "O", "summary_len": 250, "core": 2, "brief": 3, "body_len": 1362, "body_max": 2000,
                                    "sources": 8, "warnings": 0})
-    assert "핵심 2 · 단신 3 / 본문 1,362자(한도 1,400) / 출처 8건 / 경고 0" in r3 and " 1) 발송본 생성·확정 (권장)" in r3 and " 2) 검토 ②로 돌아가기" in r3
+    assert "핵심 2 · 단신 3 / 본문 1,362자(한도 2,000) / 출처 8건 / 경고 0" in r3 and " 1) 발송본 생성·확정 (권장)" in r3 and " 2) 검토 ②로 돌아가기" in r3
     assert rv.parse_choice("1") == 1 and rv.parse_choice("2)") == 2
     with pytest.raises(rv.ReviewError):
         rv.parse_choice("3")
-    assert rv.parse_c_confirm("1") == ("approve", None)
-    assert rv.parse_c_confirm("2: 더 짧게") == ("again", "더 짧게")
+    assert rv.parse_b_confirm("1") == ("approve", None)
+    assert rv.parse_b_confirm("2: 더 짧게") == ("again", "더 짧게")
     with pytest.raises(rv.ReviewError):
-        rv.parse_c_confirm("2")
-    assert " 1) 승인 (권장)  2) 다시 수정: …" in rv.render_c_confirm("문단")
+        rv.parse_b_confirm("2")
+    assert " 1) 승인 (권장)  2) 다시 수정: …" in rv.render_b_confirm("총론") and rv.render_b_confirm("총론").startswith("━━ B 재수정 확인")
 
 
 # S7 ------------------------------------------------------------------------------
@@ -790,8 +829,8 @@ def articles_ctx(body, evidence_text_override=None):
     ev, _, d = lam_event()
     ev["cap"] = "core"
     ev["slot"] = "core"
-    draft = {"issue_week": WEEK, "issue_title": "제목", "one_line": "한줄", "abstract": "요약", "hook": None, "issue_title_candidates": ["제목"],
-             "one_line_candidates": ["한줄"], "review_log": [],
+    draft = {"issue_week": WEEK, "issue_title": "제목", "summary": "총론", "punch": None, "punch_candidates": [], "glossary": [],
+             "issue_title_candidates": ["제목"], "summary_candidates": ["총론"], "review_log": [], "more": [], "excluded_count": 0,
              "articles": [{"event_id": ev["event_id"], "slot": "core", "title": "Lam 제목", "title_alternatives": [], "body": body, "credits": [],
                            "evidence_ids": [f"{d}/P1", f"{d}/P2"]}]}
     return draft, {ev["event_id"]: ev}, recs, d
@@ -839,8 +878,8 @@ def test_s7_regenerates_verbatim_once_then_warns():
     draft, by_id, recs, d = articles_ctx(fill("x", 280))
     src_text = recs[d]["body"]["blocks"][0]["text"]
     draft["articles"][0]["body"] = fill("보도: " + src_text[:60], 280)             # 원문 60자를 그대로 옮김
-    draft["issue_title_candidates"], draft["one_line_candidates"] = ["제목"], ["한줄"]
-    draft["abstract"] = fill("요약", 260)
+    draft["issue_title_candidates"], draft["summary_candidates"] = ["제목"], [fill("총론", 130)]
+    draft["summary"] = draft["summary_candidates"][0]
     calls = []
 
     def article(u):
@@ -864,7 +903,7 @@ def test_s7_invalid_evidence_regenerates_then_drops():
     from internal.s7 import run_s7
     draft, by_id, recs, d = articles_ctx(fill("정상 본문", 280))
     draft["articles"][0]["evidence_ids"] = [f"{d}/P1", f"{d}/P77"]
-    draft["abstract"] = fill("요약", 260)
+    draft["summary"] = draft["summary_candidates"][0] = fill("총론", 130)
     c = FakeClient({"s6_article": lambda u: {"event_id": next(iter(by_id)), "title": "Lam 제목", "title_alternatives": ["가", "나"],
                                               "body": fill("본문", 280), "evidence_ids": [f"{d}/P1"],
                                               "watch": "후속 지표 확인", "key_figures": []}})
@@ -896,7 +935,7 @@ def test_full_run_outputs(tmp_path):
     assert [r["total"] for r in by_slot["core"]] == ["95", "85"]
     # draft.yaml 키
     d = yaml.safe_load((tmp_path / "review" / f"{WEEK}-draft.yaml").read_text(encoding="utf-8"))
-    assert list(d) == ["issue_week", "issue_title", "issue_title_candidates", "one_line", "one_line_candidates", "abstract", "hook", "articles", "more", "excluded_count", "review_log"]
+    assert list(d) == ["issue_week", "issue_title", "issue_title_candidates", "summary", "summary_candidates", "punch", "punch_candidates", "glossary", "articles", "more", "excluded_count", "review_log"]
     assert list(d["articles"][0]) == ["event_id", "slot", "title", "title_alternatives", "tags", "body", "watch", "key_figures", "credits", "evidence_ids"]
     assert list(d["articles"][2]) == ["event_id", "slot", "title", "title_alternatives", "tags", "body", "credits", "evidence_ids"]    # 단신
     assert d["articles"][0]["credits"][0].startswith("Lam Research, 「Lam expands fleet analytics」, 2026-11-24 (영문)")
@@ -904,8 +943,8 @@ def test_full_run_outputs(tmp_path):
     # 발송본
     html = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
     assert "http" not in html.lower() and "<a " not in html.lower() and "<script" not in html.lower() and "<img" not in html.lower()
-    assert "<style" not in html.lower() and 'style="' in html and "이번 주 요약" in html and "출처 · " in html
-    assert html.index("핵심 기사") < html.index("단신") < html.index("이 밖에 검토했으나")
+    assert "<style" not in html.lower() and 'style="' in html and "이번 주 헤드라인" in html and "한 줄 요약" in html and "출처 · " in html
+    assert html.index("이번 주 핵심") < html.index("⚡ 단신") < html.index("이 밖에 검토했으나")
     assert "http" not in (tmp_path / "out_internal" / WEEK / "newsletter.txt").read_text(encoding="utf-8")
     # 대장
     led = [json.loads(l) for l in (tmp_path / "ledger" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -962,16 +1001,16 @@ def test_review1_edit_flow_with_cap_check_and_log(tmp_path):
 
 
 def test_review2_flow_with_c_revision_and_title_change(tmp_path):
-    pipe, client, io, pkg = make_pipeline(tmp_path, inputs=["1", 'A2 B1 C:"더 짧게" D 핵심1=a', "2: 다시 더 짧게", "1", "2", "승인", "1"])
+    pipe, client, io, pkg = make_pipeline(tmp_path, inputs=["1", 'A2 B:수정 "더 짧게" D 핵심1=a', "2: 다시 더 짧게", "1", "2", "승인", "1"])
     assert pipe.start(pkg) == 0
-    assert sum(l.startswith("━━ C 재수정 확인") for l in io.out) == 2
+    assert sum(l.startswith("━━ B 재수정 확인") for l in io.out) == 2
     assert sum(l.startswith("━━ 검토 요청 ② 머리부·제목") for l in io.out) == 2          # 발송 확인에서 2) 되돌아감
     d = yaml.safe_load((tmp_path / "review" / f"{WEEK}-draft.yaml").read_text(encoding="utf-8"))
     assert d["issue_title"] == "현장 적용 범위 확대" and d["articles"][0]["title"] == "대안 가"
-    assert d["abstract"].startswith("수정된 주간 요약이다.")
+    assert d["summary"].startswith("수정된 총론이다.")
     pilot = list(csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8")))[0]
-    assert pilot["r2_C_revisions"] == "2" and pilot["r2_d_changed"] == "1"       # ②로 돌아와도 지표는 누적된다
-    assert client.steps().count("s6_abstract") == 2
+    assert pilot["r2_B_revisions"] == "2" and pilot["r2_d_changed"] == "1"       # ②로 돌아와도 지표는 누적된다
+    assert client.steps().count("s6_summary") == 2
 
 
 def test_resume_after_interruption(tmp_path):
@@ -1123,7 +1162,7 @@ def test_fingerprint_change_warning(tmp_path):
     rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
     fp = rows[WEEK]
     assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.5" and fp["fp_internal_version"]
-    assert fp["fp_collector_version"] == "0.1.0" and fp["config_version"] == "2"
+    assert fp["fp_collector_version"] == "0.1.0" and fp["config_version"] == "3"
 
 
 def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):

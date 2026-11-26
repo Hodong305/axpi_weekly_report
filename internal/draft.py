@@ -1,29 +1,32 @@
 """S6 원고·머리부 초안(설계서 9.6) → review/{issue_week}-draft.yaml. 출처 정보(credits)는 코드가 자료 메타데이터로 만든다."""
 import json
+import re
 
 import yaml
 
-from .common import evidence_errors, short_week, trunc
+from .common import evidence_errors, evidence_text, figure_value_errors, short_week, trunc
+from .glossary import GLOSS_MAX
 from .llm import AutoJudgeFailed
 
 LANG_SUFFIX = {"ko": "", "en": "영문", "ja": "일문", "zh": "중문", "de": "독문", "fr": "불문", "es": "서문",
                "ru": "러문", "it": "이문", "nl": "네문", "pt": "포문"}
 
-ARTICLE_SCHEMA = {          # 단신
+FIGURE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["value", "label"],
+                 "properties": {"value": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}}}
+
+ARTICLE_SCHEMA = {          # 단신(선택 항목 figure: 오른쪽 수치 배지 하나)
     "type": "object", "additionalProperties": False,
     "required": ["event_id", "title", "title_alternatives", "body", "evidence_ids"],
     "properties": {"event_id": {"type": "string"}, "title": {"type": "string", "minLength": 1},
                    "title_alternatives": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
-                   "body": {"type": "string", "minLength": 1},
+                   "body": {"type": "string", "minLength": 1}, "figure": {"anyOf": [{"type": "null"}, FIGURE_SCHEMA]},
                    "evidence_ids": {"type": "array", "items": {"type": "string"}}}}
 
 CORE_ARTICLE_SCHEMA = {     # 핵심: 본문 + MTC가 볼 것(watch) + 수치 카드(key_figures 0~3개)
     "type": "object", "additionalProperties": False,
     "required": ["event_id", "title", "title_alternatives", "body", "watch", "key_figures", "evidence_ids"],
-    "properties": {**ARTICLE_SCHEMA["properties"], "watch": {"type": "string", "minLength": 1},
-                   "key_figures": {"type": "array", "maxItems": 3, "items": {
-                       "type": "object", "additionalProperties": False, "required": ["value", "label"],
-                       "properties": {"value": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}}}}}}
+    "properties": {**{k: v for k, v in ARTICLE_SCHEMA["properties"].items() if k != "figure"},
+                   "watch": {"type": "string", "minLength": 1}, "key_figures": {"type": "array", "maxItems": 3, "items": FIGURE_SCHEMA}}}
 
 MORE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["ref", "line", "evidence_ids"],
                "properties": {"ref": {"type": "string"}, "line": {"type": "string", "minLength": 1},
@@ -48,19 +51,23 @@ def make_tags(ev, slot):
                 tags.append(table[t[key]])
     return tags
 
-HEADER_SCHEMA = {
+PUNCH_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["big", "label", "text", "twist", "evidence_id"],
+                "properties": {k: {"type": "string"} for k in ("big", "label", "text", "twist", "evidence_id")}}
+
+HEADER_SCHEMA = {       # 후보 3/2/2. 한 방 후보가 없으면 빈 배열
     "type": "object", "additionalProperties": False,
-    "required": ["issue_title_candidates", "one_line_candidates", "abstract", "hook"],
+    "required": ["issue_title_candidates", "summary_candidates", "punch_candidates"],
     "properties": {
         "issue_title_candidates": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "string"}},
-        "one_line_candidates": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
-        "abstract": {"type": "string", "minLength": 1},
-        "hook": {"anyOf": [{"type": "null"}, {
-            "type": "object", "additionalProperties": False, "required": ["question", "answer", "evidence_id"],
-            "properties": {"question": {"type": "string"}, "answer": {"type": "string"}, "evidence_id": {"type": "string"}}}]}}}
+        "summary_candidates": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
+        "punch_candidates": {"type": "array", "maxItems": 2, "items": PUNCH_SCHEMA}}}
 
-ABSTRACT_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["abstract"],
-                   "properties": {"abstract": {"type": "string", "minLength": 1}}}
+SUMMARY_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["summary"],
+                  "properties": {"summary": {"type": "string", "minLength": 1}}}
+
+GLOSSARY_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["term", "meaning", "evidence_ids"],
+                   "properties": {"term": {"type": "string"}, "meaning": {"type": "string", "minLength": 1},
+                                  "evidence_ids": {"type": "array", "items": {"type": "string"}}}}
 
 
 # 출처 정보 --------------------------------------------------------------------
@@ -121,6 +128,8 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
             errs.append("근거 ID가 없음")
         if slot == "core":
             errs += key_figure_errors(obj["key_figures"], obj["evidence_ids"], records)
+        elif obj.get("figure"):
+            errs += key_figure_errors([obj["figure"]], obj["evidence_ids"], records)
         return errs
     schema = CORE_ARTICLE_SCHEMA if slot == "core" else ARTICLE_SCHEMA
     try:
@@ -138,22 +147,19 @@ def gen_article(judge, ev, slot, records, cfg, feedback=None):
     if slot == "core":
         art["watch"] = r["watch"].strip()
         art["key_figures"] = [{"value": k["value"].strip(), "label": k["label"].strip()} for k in r["key_figures"]]
+    elif r.get("figure"):
+        art["figure"] = {"value": r["figure"]["value"].strip(), "label": r["figure"]["label"].strip()}
     art["credits"] = build_credits(r["evidence_ids"], ev["rep_doc_id"], records)
     art["evidence_ids"] = list(r["evidence_ids"])
     return art, failed
 
 
 def key_figure_errors(figs, evidence_ids, records):
-    """수치 카드의 값은 인용한 근거 블록에 있는 수치여야 하고 label이 있어야 한다."""
-    from .checks import _NUM, _num_in
-    from .common import evidence_text
+    """수치 카드의 값은 인용한 근거 블록에 있는 수치나 말이어야 하고(figure_value_errors) label이 있어야 한다."""
     text = "\n".join(evidence_text(e, records) for e in evidence_ids)
     errs = []
     for k in figs:
-        nums = _NUM.findall(k["value"])
-        if not nums:
-            errs.append(f"수치 카드 '{k['value']}'에 숫자가 없음")
-        errs += [f"수치 카드 '{k['value']}'의 {n}이(가) 인용한 근거 블록에 없음" for n in nums if not _num_in(n, text)]
+        errs += [f"수치 카드 {e}" for e in figure_value_errors(k["value"], text)]
         if not k["label"].strip():
             errs.append(f"수치 카드 '{k['value']}'의 label이 비어 있음")
     return errs
@@ -161,28 +167,64 @@ def key_figure_errors(figs, evidence_ids, records):
 
 # 더 볼 거리 --------------------------------------------------------------------
 
+PAPER_CUE = re.compile(r"arxiv|\bdoi\b|doi\.org|published\s+(?:in|at|on|as)\b|published\s+['\"‘’“”]|\bjournal\b|conference paper|proceedings|"
+                       r"\bieee\b.{0,20}\btrans|논문|학술지|\bpreprint\b", re.I)
+
+
+def paper_cues(text):
+    """연구 논문 단서(arXiv, DOI, 'published …', 저널·학회 논문명)가 있으면 True(9.6)."""
+    return bool(PAPER_CUE.search(text or ""))
+
+
+def more_suffix(rec, text=""):
+    """(논문)/(보도) 표시: 논문 단서가 있으면 (논문), 그 밖의 언론 자료는 (보도)."""
+    if rec["source_type"] == "academic" or paper_cues(rec["title"] + " " + (text or "")):
+        return " (논문)"
+    return " (보도)" if rec["source_type"] == "press" else ""
+
+
+def more_item_for(m, events_by_id):
+    """draft.more 항목에서 다시 쓸 입력 항목(더 볼 거리 후보 형식)을 만든다. 사건이면 S4의 대표 주장·근거를 쓴다."""
+    ev = events_by_id.get(m["ref"])
+    if ev is None:      # 보류 자료: ref가 doc_id
+        return {"ref": m["ref"], "topic": m["topic"], "doc_id": m["ref"]}
+    sc = ev.get("score")
+    return {"ref": m["ref"], "topic": m["topic"], "doc_id": ev["rep_doc_id"], "doc_ids": list(ev["doc_ids"]),
+            "claim": sc["claim"] if sc else None, "evidence_ids": [x["id"] for x in sc["evidence"]] if sc else []}
+
+
+def _more_docs(item):
+    return set(item.get("doc_ids") or [item["doc_id"]])
+
+
 def _more_user(judge, item, records, cfg, feedback):
     rec = records[item["doc_id"]]
     info = {"ref": item["ref"], "분야": TOPIC_LABEL.get(item["topic"], item["topic"]), "한줄_글자수_한도": cfg["more_line_chars"]}
-    parts = ["[작성 지침]\n" + json.dumps(info, ensure_ascii=False), judge.source(rec, set(rec["body"]["lead_ids"]))]
+    parts = ["[작성 지침]\n" + json.dumps(info, ensure_ascii=False)]
+    if item.get("claim") and item.get("evidence_ids"):
+        # 사건 항목: 대표 자료 첫 문단이 아니라 S4의 대표 주장과 근거 블록을 입력으로 쓴다(대표 자료가 사건과 무관할 수 있다)
+        parts.append("[채점 결과]\n" + json.dumps({"claim": item["claim"]}, ensure_ascii=False))
+        by_doc = {}
+        for e in item["evidence_ids"]:
+            d, b = e.split("/")
+            by_doc.setdefault(d, []).append(b)
+        parts += [judge.source(records[d], set(bs)) for d, bs in by_doc.items() if d in records]
+    else:
+        parts.append(judge.source(rec, set(rec["body"]["lead_ids"])))
     if feedback:
         parts.append(judge.phrase("x_regen") + "\n" + feedback)
     return "\n".join(parts)
 
 
-def more_suffix(rec):
-    return {"academic": " (논문)", "press": " (보도)"}.get(rec["source_type"], "")
-
-
 def gen_more(judge, item, records, cfg, feedback=None):
     """더 볼 거리 한 줄. 반환: (항목 dict, 자동 작성 실패 여부)"""
-    rec = records[item["doc_id"]]
+    docs = _more_docs(item)
 
     def validate(obj):
         errs = []
         if obj["ref"] != item["ref"]:
             errs.append(f"ref가 입력과 다름: {obj['ref']}")
-        errs += evidence_errors(obj["evidence_ids"], records, {item["doc_id"]})
+        errs += evidence_errors(obj["evidence_ids"], records, docs)
         if not obj["evidence_ids"]:
             errs.append("근거 ID가 없음")
         return errs
@@ -190,52 +232,76 @@ def gen_more(judge, item, records, cfg, feedback=None):
         r = judge.ask("s6_more", _more_user(judge, item, records, cfg, feedback), MORE_SCHEMA, validate)
         failed = False
     except AutoJudgeFailed:
-        lead = rec["body"]["lead_ids"][:1]
-        r = {"line": trunc(rec["title"], cfg["more_line_chars"]), "evidence_ids": [f"{rec['doc_id']}/{lead[0]}"] if lead else []}
+        if item.get("evidence_ids"):
+            ids = item["evidence_ids"][:1]
+        else:
+            lead = records[item["doc_id"]]["body"]["lead_ids"][:1]
+            ids = [f"{item['doc_id']}/{lead[0]}"] if lead else []
+        r = {"line": trunc(item.get("claim") or records[item["doc_id"]]["title"], cfg["more_line_chars"]), "evidence_ids": ids}
         failed = True
-    return {"ref": item["ref"], "topic": item["topic"], "line": r["line"].strip() + more_suffix(rec), "credit": format_credit(rec),
-            "evidence_ids": list(r["evidence_ids"])}, failed
+    first = (r["evidence_ids"] or [item["doc_id"] + "/"])[0].split("/")[0]
+    rec = records.get(first) or records[item["doc_id"]]
+    cue_text = " ".join(evidence_text(e, records) for e in r["evidence_ids"]) + " " + " ".join(
+        b["text"] for b in rec["body"]["blocks"] if b["id"] in rec["body"]["lead_ids"])
+    return {"ref": item["ref"], "topic": item["topic"], "line": r["line"].strip() + more_suffix(rec, cue_text),
+            "credit": format_credit(rec), "evidence_ids": list(r["evidence_ids"])}, failed
 
 
-def _header_user(judge, draft_articles, events_by_id, issue_type, counts, cfg, feedback):
-    info = {"issue_type": issue_type, "호_타이틀_한도": cfg["issue_title_max"], "한_줄_요약_한도": cfg["one_line_max"],
-            "주간_요약_글자수_범위": cfg["abstract_chars"], "팹_판단_한_컷_한도": cfg["hook_chars"], "통계": counts}
+# 머리부: 헤드라인·총론·한 방(기사와 더 볼 거리 원고를 모두 쓴 뒤 그 원고만 입력으로 쓴다) ------------------------
+
+PUNCH_LABEL_NUM, PUNCH_LABEL_TEXT = "이번 주 가장 놀라운 숫자", "이번 주 한 방"
+
+
+def normalize_punch(p):
+    """label은 코드가 정한다: big에 숫자가 있으면 '이번 주 가장 놀라운 숫자', 아니면 '이번 주 한 방'."""
+    p = {k: p[k].strip() for k in ("big", "text", "twist", "evidence_id")}
+    p["label"] = PUNCH_LABEL_NUM if re.search(r"\d", p["big"]) else PUNCH_LABEL_TEXT
+    return {k: p[k] for k in ("big", "label", "text", "twist", "evidence_id")}
+
+
+def _header_user(judge, articles, more, issue_type, counts, cfg, feedback):
+    info = {"issue_type": issue_type, "헤드라인_글자수_한도": cfg["issue_title_max"], "총론_글자수_범위": cfg["summary_chars"],
+            "한방_글자수_한도(text+twist)": cfg["punch_chars"], "통계": counts}
     parts = ["[작성 지침]\n" + json.dumps(info, ensure_ascii=False)]
-    for a in draft_articles:
-        parts.append("[기사] " + json.dumps({"slot": a["slot"], "title": a["title"], "body": a["body"],
-                                           "evidence_ids": a["evidence_ids"]}, ensure_ascii=False))
+    for a in articles:
+        parts.append("[기사] " + json.dumps({"slot": a["slot"], "title": a["title"], "body": a["body"], "watch": a.get("watch"),
+                                           "key_figures": a.get("key_figures"), "evidence_ids": a["evidence_ids"]}, ensure_ascii=False))
+    for m in more:
+        parts.append("[더 볼 거리] " + json.dumps({"line": m["line"], "evidence_ids": m["evidence_ids"]}, ensure_ascii=False))
     if feedback:
         parts.append(judge.phrase("x_regen") + "\n" + feedback)
     return "\n".join(parts)
 
 
-def gen_header(judge, articles, events_by_id, records, issue_type, counts, cfg, feedback=None):
-    allowed = {e for a in articles for e in a["evidence_ids"]}
+def gen_header(judge, articles, more, records, issue_type, counts, cfg, feedback=None):
+    allowed = {e for a in articles for e in a["evidence_ids"]} | {e for m in more for e in m["evidence_ids"]}
 
     def validate(obj):
-        h = obj["hook"]
-        if h and (h["evidence_id"] not in allowed or evidence_errors([h["evidence_id"]], records)):
-            return [f"hook 근거 ID가 기사 근거에 없음: {h['evidence_id']}"]
-        return []
+        errs = []
+        for p in obj["punch_candidates"]:
+            if p["evidence_id"] not in allowed or evidence_errors([p["evidence_id"]], records):
+                errs.append(f"한 방 근거 ID가 원고의 근거에 없음: {p['evidence_id']}")
+            else:
+                errs += [f"한 방 big {e}" for e in figure_value_errors(p["big"], evidence_text(p["evidence_id"], records))]
+        return errs
     try:
-        return judge.ask("s6_header", _header_user(judge, articles, events_by_id, issue_type, counts, cfg, feedback),
-                         HEADER_SCHEMA, validate), False
+        h = judge.ask("s6_header", _header_user(judge, articles, more, issue_type, counts, cfg, feedback), HEADER_SCHEMA, validate)
+        return h, False
     except AutoJudgeFailed:
         first = articles[0]["title"] if articles else "이번 주 소식"
+        body = " ".join(a["body"] for a in articles)
         return {"issue_title_candidates": [trunc(first, cfg["issue_title_max"])] * 3,
-                "one_line_candidates": [trunc(first, cfg["one_line_max"])] * 2,
-                "abstract": " ".join(a["body"] for a in articles)[: cfg["abstract_chars"][1]],
-                "hook": None}, True
+                "summary_candidates": [trunc(body, cfg["summary_chars"][1])] * 2, "punch_candidates": []}, True
 
 
 def apply_header(draft, h):
     draft["issue_title_candidates"] = list(h["issue_title_candidates"])
     draft["issue_title"] = h["issue_title_candidates"][0]
-    draft["one_line_candidates"] = list(h["one_line_candidates"])
-    draft["one_line"] = h["one_line_candidates"][0]
-    draft["abstract"] = h["abstract"].strip()
-    draft["hook"] = ({"question": h["hook"]["question"], "answer": h["hook"]["answer"],
-                      "evidence_id": h["hook"]["evidence_id"]} if h["hook"] else None)
+    draft["summary_candidates"] = [x.strip() for x in h["summary_candidates"]]
+    draft["summary"] = draft["summary_candidates"][0]
+    cands = [normalize_punch(p) for p in h["punch_candidates"]]
+    draft["punch_candidates"] = cands
+    draft["punch"] = cands[0] if cands else None
 
 
 def published_events(events):
@@ -250,14 +316,17 @@ def status_draft(issue_week, counts, excluded_count=0):
         reason = "이번 주 사외 수집에서 완결된 자료가 없어"
     else:
         reason = f"수집 {counts['collected']}건 중 게재 기준을 충족한 사건이 없어"
+    summary = (f"{reason} 이번 호는 현황호로 발행한다. 아래에 네 분야별 조사 결과와 게재 사건이 없는 사유를 정리했다. "
+               "다음 주에는 새로 수집한 자료로 다시 판정한다.")
     return {"issue_week": issue_week, "issue_title": "이번 주 현황: 게재 사건 없음",
             "issue_title_candidates": ["이번 주 현황: 게재 사건 없음", "제조 AI 동향 점검: 게재 사건 없음", "이번 주는 현황호로 발행"],
-            "one_line": "게재 기준을 충족한 사건이 없어 네 분야 조사 결과만 알립니다.",
-            "one_line_candidates": ["게재 기준을 충족한 사건이 없어 네 분야 조사 결과만 알립니다.",
-                                    "이번 주는 게재할 사건이 없어 조사 현황만 전합니다."],
-            "abstract": f"{reason} 이번 호는 현황호로 발행한다. 아래에 네 분야별 조사 결과와 게재 사건이 없는 사유를 정리했다. "
-                        "다음 주에는 새로 수집한 자료로 다시 판정한다.",
-            "hook": None, "articles": [], "more": [], "excluded_count": excluded_count, "review_log": []}
+            "summary": summary, "summary_candidates": [summary, "이번 주는 게재할 사건이 없어 조사 현황만 전한다."],
+            "punch": None, "punch_candidates": [], "glossary": [], "articles": [], "more": [],
+            "excluded_count": excluded_count, "review_log": []}
+
+
+DRAFT_KEYS = ("issue_week", "issue_title", "issue_title_candidates", "summary", "summary_candidates", "punch", "punch_candidates",
+              "glossary", "articles", "more", "excluded_count", "review_log")
 
 
 def generate_draft(judge, events, records, issue_week, cfg, issue_type, counts, more_items=(), excluded_count=0):
@@ -279,45 +348,64 @@ def generate_draft(judge, events, records, issue_week, cfg, issue_type, counts, 
         if bad:
             failed.append(it["ref"])
     by_id = {e["event_id"]: e for e in events}
-    h, bad = gen_header(judge, articles, by_id, records, issue_type, counts, cfg)
+    h, bad = gen_header(judge, articles, more, records, issue_type, counts, cfg)
     if bad:
         failed.append("머리부")
     draft = {"issue_week": issue_week}
     apply_header(draft, h)
+    draft["glossary"] = []
     draft["articles"] = articles
     draft["more"] = more
     draft["excluded_count"] = excluded_count
     draft["review_log"] = []
-    ordered = {k: draft[k] for k in ("issue_week", "issue_title", "issue_title_candidates", "one_line",
-                                     "one_line_candidates", "abstract", "hook", "articles", "more", "excluded_count", "review_log")}
+    ordered = {k: draft[k] for k in DRAFT_KEYS}
     return ordered, failed
+
+
+# 용어 풀이 제안 -----------------------------------------------------------------------
+
+def _glossary_user(judge, term, contexts, feedback=None):
+    parts = ["[작성 지침]\n" + json.dumps({"term": term, "풀이_글자수_한도": GLOSS_MAX}, ensure_ascii=False)]
+    parts += [judge.source(rec, set(ids)) for rec, ids in contexts]
+    if feedback:
+        parts.append(judge.phrase("x_regen") + "\n" + feedback)
+    return "\n".join(parts)
+
+
+def gen_glossary(judge, term, contexts, records):
+    """모르는 약어의 풀이를 원문 근거로 제안한다. contexts: [(레코드, 블록 ID 목록)]. 반환: {term, meaning, source} 또는 None(실패)"""
+    allowed = {rec["doc_id"] for rec, _ in contexts}
+
+    def validate(obj):
+        errs = []
+        if obj["term"] != term:
+            errs.append(f"term이 입력과 다름: {obj['term']}")
+        if len(obj["meaning"].strip()) > GLOSS_MAX:
+            errs.append(f"풀이가 {len(obj['meaning'].strip())}자로 한도 {GLOSS_MAX}자를 넘음")
+        errs += evidence_errors(obj["evidence_ids"], records, allowed)
+        return errs
+    try:
+        r = judge.ask("s6_glossary", _glossary_user(judge, term, contexts), GLOSSARY_SCHEMA, validate)
+    except AutoJudgeFailed:
+        return None
+    return {"term": term, "meaning": r["meaning"].strip(), "source": "model"}
 
 
 # 파일 -----------------------------------------------------------------------
 
-class _Block(str):
-    pass
-
-
-def _block_repr(dumper, data):
-    return dumper.represent_scalar("tag:yaml.org,2002:str", str(data) + "\n", style="|")
-
-
-yaml.add_representer(_Block, _block_repr, Dumper=yaml.SafeDumper)
-
-
 def save_draft(path, draft):
     path.parent.mkdir(parents=True, exist_ok=True)
-    d = dict(draft)
-    d["abstract"] = _Block(draft["abstract"].strip())
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(yaml.safe_dump(d, allow_unicode=True, sort_keys=False, width=100), encoding="utf-8")
+    tmp.write_text(yaml.safe_dump(draft, allow_unicode=True, sort_keys=False, width=100), encoding="utf-8")
     tmp.replace(path)
 
 
 def load_draft(path):
     d = yaml.safe_load(path.read_text(encoding="utf-8"))
-    d["abstract"] = d["abstract"].strip()
+    d["summary"] = d["summary"].strip()
     d.setdefault("more", [])
     d.setdefault("excluded_count", 0)
+    d.setdefault("glossary", [])
+    d.setdefault("punch", None)
+    d.setdefault("punch_candidates", [])
     return d

@@ -1,5 +1,5 @@
 # MTC AX/PI 위클리 설정값 (설계서 v4.5 10장). 값을 바꾸면 config_version을 올린다.
-config_version: "2"
+config_version: "3"
 
 paths:
   work_dir: work      # 주차별 작업 폴더: candidates/, manual/, prompts/
@@ -40,11 +40,10 @@ internal:
   core3_min_score: 90
   brief_min_score: 60
   ledger_lookback_issues: 12
-  article_title_max: 30
-  issue_title_max: 30
-  one_line_max: 60
-  abstract_chars: [220, 350]
-  hook_chars: 120
+  article_title_max: 36
+  issue_title_max: 30         # 이번 주 헤드라인
+  summary_chars: [100, 170]   # 한 줄 요약(총론)
+  punch_chars: 120            # 이번 주 한 방(text+twist, big 제외)
   core_chars: [220, 300]
   brief_chars: [60, 95]
   issue_body_max: 2000
@@ -54,7 +53,10 @@ internal:
   watch_chars: 80             # 핵심 기사 'MTC가 볼 것' 한 문장
   more_max: 20                # 더 볼 거리 최대 건수
   more_line_chars: 70         # 더 볼 거리 한 줄 요약
-  newsletter_name: "MTC AX/PI · 제조 AI 위클리"   # 임시 이름
+  newsletter_name: "FAB4 위클리"                  # 후보, 확정 전
+  newsletter_tagline: "칩 · 장비 · 솔루션 · 로봇, 네 박자로 읽는 제조 AI"
+  newsletter_team: "삼성전자 DS · 메모리 MTC AX/PI"   # 꼬리말 소개
+  newsletter_theme: A                                # A 삼성 블루 팝 / B 클린룸 민트 / C 웨이퍼 나이트
   # 사내 모델 접속(OpenAI 호환 /v1/chat/completions, 예: vLLM·Ollama). 모든 LLM 단계가 같은 모델을 쓴다.
   llm:
     backend: http                         # http(OpenAI 호환 서버) | file(요청·응답 파일을 주고받음, 사람·에이전트가 모델 역할)

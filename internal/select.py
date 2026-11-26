@@ -171,6 +171,12 @@ def more_candidates(events, fit, records, cfg):
         return (grp, 0 if score is not None else 1, -(score or 0), "".join(chr(255 - ord(c)) for c in date), e["event_id"])
     out.sort(key=key)
     overflow = max(0, len(out) - cfg["more_max"])
-    items = [{"ref": rec["doc_id"] if e["kind"] == "hold_doc" else e["event_id"], "topic": "B" if transfer else (topic or ""), "doc_id": rec["doc_id"], "title": rec["title"],
-              "event_id": e["event_id"], "score": score} for e, rec, topic, transfer, score in out[:cfg["more_max"]]]
+    items = []
+    for e, rec, topic, transfer, score in out[:cfg["more_max"]]:
+        sc = e.get("score")
+        items.append({"ref": rec["doc_id"] if e["kind"] == "hold_doc" else e["event_id"], "topic": "B" if transfer else (topic or ""),
+                      "doc_id": rec["doc_id"], "doc_ids": list(e["doc_ids"]), "title": rec["title"], "event_id": e["event_id"],
+                      "score": score,
+                      # 사건 항목의 입력은 S4의 대표 주장과 근거 블록이다(대표 자료 첫 문단이 사건과 무관할 수 있다)
+                      "claim": sc["claim"] if sc else None, "evidence_ids": [x["id"] for x in sc["evidence"]] if sc else []})
     return items, overflow

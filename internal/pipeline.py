@@ -8,10 +8,10 @@ import json
 import sys
 from datetime import datetime
 
-from . import checks, draft as draftmod, fingerprint, events as ev_mod, fit as fit_mod, metrics, render, review as rv, score as sc_mod
+from . import checks, draft as draftmod, fingerprint, glossary as glossmod, events as ev_mod, fit as fit_mod, metrics, render, review as rv, score as sc_mod
 from . import select as sel
 from .common import add_flag
-from .draft import ABSTRACT_SCHEMA, load_draft, save_draft
+from .draft import SUMMARY_SCHEMA, load_draft, save_draft
 from .intake import IntakeError, load_package
 from .llm import AutoJudgeFailed, Pending, ResponseCache, is_truncated
 from .review import ReviewError
@@ -411,10 +411,14 @@ class Pipeline:
         else:
             self.step_header("S7")
             d, warns = run_s7(self.judge, d, self.state["events"], self.records, self.cfg, self.state["issue_type"],
-                              self.header_counts(), self.state["failed_gen"])
+                              self.header_counts(), self.state["failed_gen"], self.glossary_data())
             self.state["warnings"] = warns
             save_draft(self.s.draft_path(self.week), d)
         self.goto("R2")
+
+    def glossary_data(self):
+        """(glossary.yaml의 용어, 공통어). 저장소 루트의 glossary.yaml을 쓰고, data_root가 다르면 복사본을 쓴다."""
+        return glossmod.load(self.s.ensure_glossary())
 
     # 검토 요청 ② -----------------------------------------------------------------------
 
@@ -424,21 +428,24 @@ class Pipeline:
             return []
         by_id = {e["event_id"]: e for e in self.state["events"]}
         warns = checks.autofix(d, self.records)
+        terms, common = self.glossary_data()       # F로 항목을 빼면 쓰지 않게 된 용어가 있을 수 있어 목록을 다시 만든다(모델 호출 없음)
+        d["glossary"] = glossmod.build_glossary(d, terms, [g for g in d.get("glossary") or [] if g["source"] != "glossary"])
         for tgt, kind, msg in checks.hard_violations(d, by_id, self.records, self.cfg, self.state["issue_type"]):
             warns.append({"scope": "머리부" if tgt[0] == "header" else "기사", "quote": "", "kind": kind, "message": msg, "fix": None})
         warns += checks.soft_warnings(d, by_id, self.records, self.cfg, self.state["issue_type"])
         return checks.number_ids(warns)
 
-    def rewrite_abstract(self, d, instruction):
-        user = ("[현재 주간 요약]\n" + d["abstract"] + "\n[편집자 입력]\n" + instruction + "\n[글자 수 범위]\n"
-                + json.dumps(self.cfg["abstract_chars"]) + "\n"
-                + "\n".join(f"[기사] {a['title']}: {a['body']}" for a in d["articles"]))
+    def rewrite_summary(self, d, instruction):
+        user = ("[현재 총론]\n" + d["summary"] + "\n[편집자 입력]\n" + instruction + "\n[글자 수 범위]\n"
+                + json.dumps(self.cfg["summary_chars"]) + "\n"
+                + "\n".join(f"[기사] {a['title']}: {a['body']}" for a in d["articles"])
+                + "\n" + "\n".join(f"[더 볼 거리] {m['line']}" for m in d.get("more") or []))
         try:
-            r = self.judge.ask("s6_abstract", user, ABSTRACT_SCHEMA)
+            r = self.judge.ask("s6_summary", user, SUMMARY_SCHEMA)
         except AutoJudgeFailed:
-            self.io.write("오류: 주간 요약 자동 수정에 실패해 기존 초안을 유지합니다.")
-            return d["abstract"]
-        return checks.strip_urls(r["abstract"])[0].strip()
+            self.io.write("오류: 총론 자동 수정에 실패해 기존 초안을 유지합니다.")
+            return d["summary"]
+        return checks.strip_urls(r["summary"])[0].strip()
 
     def step_R2(self):
         d = load_draft(self.s.draft_path(self.week))
@@ -453,52 +460,54 @@ class Pipeline:
             return res, text
 
         pend = self.state.get("pending_review")
-        if pend and pend["review"] == "R2":      # C 재수정 확인에서 끊김: ② 응답은 이미 적용돼 있으므로 그 질문에 이어서 답한다
-            text, stats, instruction, c_rev = pend["text"], pend["stats"], pend["instruction"], pend["c_rev"]
+        if pend and pend["review"] == "R2":      # B 재수정 확인에서 끊김: ② 응답은 이미 적용돼 있으므로 그 질문에 이어서 답한다
+            text, stats, instruction, b_rev = pend["text"], pend["stats"], pend["instruction"], pend["c_rev"]
         else:
             res, text = self.loop_review("R2", render_fn, handle)
             stats = rv.apply_review2(d, res, warns)
-            instruction, c_rev = (res["C"][1] if res["C"][0] == "text" else None), 0
+            instruction, b_rev = stats["b_revise"], 0
             save_draft(self.s.draft_path(self.week), d)
         while instruction is not None:
-            self.state["pending_review"] = {"review": "R2", "text": text, "stats": stats, "instruction": instruction, "c_rev": c_rev}
-            new = self.rewrite_abstract(d, instruction)
-            self.request("R2-C", rv.render_c_confirm(new))
+            self.state["pending_review"] = {"review": "R2", "text": text, "stats": stats, "instruction": instruction, "c_rev": b_rev}
+            new = self.rewrite_summary(d, instruction)
+            self.request("R2-B", rv.render_b_confirm(new))
             while True:
                 ans = self.ask()
                 try:
-                    kind, val = rv.parse_c_confirm(ans)
-                    self.respond("R2-C", ans, True)
+                    kind, val = rv.parse_b_confirm(ans)
+                    self.respond("R2-B", ans, True)
                     break
                 except ReviewError as e:
-                    self.respond("R2-C", ans, False, str(e))
+                    self.respond("R2-B", ans, False, str(e))
                     self.io.write(f"오류: {e}")
-                    self.request("R2-C", rv.render_c_confirm(new))
-            c_rev += 1
-            d["abstract"] = new
+                    self.request("R2-B", rv.render_b_confirm(new))
+            b_rev += 1
+            d["summary"] = new
+            d["summary_candidates"] = [new] + [c for c in d["summary_candidates"] if c != new]
             instruction = None if kind == "approve" else val
             self.state["pending_review"] = None if instruction is None else {
-                "review": "R2", "text": text, "stats": stats, "instruction": instruction, "c_rev": c_rev}
+                "review": "R2", "text": text, "stats": stats, "instruction": instruction, "c_rev": b_rev}
             save_draft(self.s.draft_path(self.week), d)
         self.state["pending_review"] = None
         self.state["warnings"] = self.final_warnings(d)
         prev = self.state["metrics"].get("r2")
-        merged = {**stats, "c_revisions": c_rev}
+        merged = {**stats, "b_revisions": b_rev}
         if prev:    # 발송 확인에서 ②로 돌아온 경우: 지표를 누적한다(제목 변경은 기사 단위로 한 번만 센다)
             ids = sorted(set(prev["d_ids"]) | set(stats["d_ids"]))
             merged.update(A_custom=prev["A_custom"] or stats["A_custom"], B_custom=prev["B_custom"] or stats["B_custom"],
-                          c_revisions=prev["c_revisions"] + c_rev, d_ids=ids, d_changed=len(ids), e_total=prev["e_total"],
+                          b_revisions=prev["b_revisions"] + b_rev, d_ids=ids, d_changed=len(ids), e_total=prev["e_total"],
                           e_fix=prev["e_fix"] + stats["e_fix"], e_keep=prev["e_keep"] + stats["e_keep"],
-                          f_removed=prev.get("f_removed", 0) + stats["f_removed"])
+                          f_removed=prev.get("f_removed", 0) + stats["f_removed"],
+                          g_edited=prev.get("g_edited", 0) + stats["g_edited"])
         self.state["metrics"]["r2"] = merged
         d["review_log"].append({"review": "②", "at": self.clock(), "response": text.strip(),
-                                "applied": f"A·B 확정, C {'수정 ' + str(c_rev) + '회' if c_rev else '승인'}, "
+                                "applied": f"A·B 확정, B {'수정 ' + str(b_rev) + '회' if b_rev else '승인'}, "
                                            f"제목 변경 {stats['d_changed']}건, 경고 수정 {stats['e_fix']}건·유지 {stats['e_keep']}건"})
         save_draft(self.s.draft_path(self.week), d)
         self.log.write(kind="applied", review="R2", stats=self.state["metrics"]["r2"])
         self.io.write(f"[적용 결과] 호 타이틀: {d['issue_title']}")
-        self.io.write(f" 한 줄 요약: {d['one_line']}")
-        self.io.write(f" 주간 요약 {len(d['abstract'])}자 확정 / 제목 변경 {stats['d_changed']}건 / "
+        self.io.write(f" 한 줄 요약(총론): {d['summary']}")
+        self.io.write(f" 이번 주 한 방: {d['punch']['big'] if d.get('punch') else '없음'} / 새 용어 풀이 {len(rv.new_terms(d))}건 / 제목 변경 {stats['d_changed']}건 / "
                       f"경고 수정 {stats['e_fix']}건 · 유지 {stats['e_keep']}건")
         self.goto("R3")
 
@@ -510,7 +519,7 @@ class Pipeline:
 
         def render_fn():
             return rv.render_review3(self.week, {
-                "title": d["issue_title"], "one_line": d["one_line"], "abstract_len": len(d["abstract"]),
+                "title": d["issue_title"], "summary": d["summary"], "summary_len": len(d["summary"]),
                 "core": sum(a["slot"] == "core" for a in d["articles"]), "brief": sum(a["slot"] == "brief" for a in d["articles"]),
                 "body_len": checks.body_total(d), "body_max": self.cfg["issue_body_max"], "sources": sources,
                 "warnings": len(self.state["warnings"])})
@@ -564,12 +573,19 @@ class Pipeline:
                "issue_type": it, "counts": {"pass_docs": self.state["counts"]["pass_docs"], "published": pub},
                "events": self.state["events"], "status_rows": self.status_rows() if it == "현황호" else [],
                "corrections": corrections, "note": note, "newsletter_name": self.cfg["newsletter_name"],
+               "newsletter_tagline": self.cfg["newsletter_tagline"], "newsletter_team": self.cfg["newsletter_team"],
+               "theme": self.cfg.get("newsletter_theme", "A"),
+               "period_short": render.period_short(self.pkg.doc["window_start"], self.pkg.doc["window_end_exclusive"]),
                "issue_no": metrics.issue_number(self.s.pilot_csv, self.week), "n_docs": len(self.records)}
         html_doc, text_doc = render.build(d, ctx)
         out = self.s.out_dir(self.week)
         out.mkdir(parents=True, exist_ok=True)
         (out / "newsletter.html").write_text(html_doc, encoding="utf-8")
         (out / "newsletter.txt").write_text(text_doc, encoding="utf-8")
+        # 발송 확정: 이번 호에서 확정한 새 용어(모델 제안·편집자 입력)를 glossary.yaml에 덧붙인다(주석·순서 보존)
+        new_terms = [(g["term"], g["meaning"]) for g in d.get("glossary") or [] if g["source"] != "glossary" and g.get("meaning")]
+        if new_terms:
+            glossmod.append_terms(self.s.ensure_glossary(), new_terms, self.week)
         entries = ev_mod.load_ledger(self.s.ledger_path)
         ev_mod.save_ledger(self.s.ledger_path, ev_mod.update_ledger(entries, self.state["events"], self.week, corrections))
         row = metrics.build_row(self.state, self.pkg.doc, self.log, str(self.s.config.get("config_version", "")))

@@ -72,3 +72,43 @@ def add_flag(obj, flag):
 def trunc(s, n):
     s = " ".join((s or "").split())
     return s if len(s) <= n else s[: n - 1] + "…"
+
+
+# 숫자·수치 값 검사 도구(S7과 S6 검증이 함께 쓴다) -------------------------------------
+
+_NUM = re.compile(r"\d[\d,]*(?:\.\d+)?")
+_EN_NUM = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}
+
+
+def _numval(tok):
+    return tok.replace(",", "")
+
+
+def _num_re(tok):
+    return re.compile(rf"(?<![\d.]){re.escape(_numval(tok))}(?![\d]|\.\d)")
+
+
+def _num_in(tok, text):
+    v = _numval(tok)
+    if _num_re(tok).search(text.replace(",", "")):
+        return True
+    return v.isdigit() and 1 <= int(v) <= 10 and re.search(rf"\b{_EN_NUM[int(v)]}\b", text, re.I) is not None
+
+
+def figure_value_errors(value, text):
+    """수치 카드·한 방의 값 검사: 숫자는 근거 텍스트에 있어야 하고, 짧은 말('수 시간')은 근거에 그대로 있어야 한다.
+    '수 시간 → 수 분', '99%', '90,000+'처럼 →·/·≠·+로 이어 붙인 값은 조각마다 본다(한 글자 조각은 단위로 보고 건너뜀)."""
+    errs = []
+    compact = re.sub(r"\s+", "", text)
+    for part in re.split(r"[→/≠·+~]|->", value):
+        part = part.strip()
+        if len(part) <= 1:
+            continue
+        nums = _NUM.findall(part)
+        if nums:
+            errs += [f"'{value}'의 {n}이(가) 근거에 없음" for n in nums if not _num_in(n, text)]
+        elif re.sub(r"\s+", "", part) not in compact:
+            errs.append(f"'{value}'의 '{part}'이(가) 근거에 그대로 나오지 않음")
+    if not any(len(p.strip()) > 1 for p in re.split(r"[→/≠·+~]|->", value)) and not _NUM.search(value):
+        errs.append(f"'{value}'에 수치나 근거에 있는 말이 없음")
+    return errs

@@ -1,0 +1,83 @@
+# 소식지 테마(설계서 9.8): 구조는 같고 색만 다르다. internal.newsletter_theme(A|B|C)로 고른다.
+# topic: 꼭지별 [글자색, 배경색]. hero_dark가 참이면 그라데이션 머리띠(고정색 + 그라데이션), 거짓이면 흰 머리띠.
+A:
+  name: A · 삼성 블루 팝
+  hero_dark: true
+  bg: "#e9effb"
+  hero: "#1428a0"
+  hero2: "#2f4fd8"
+  hero_text: "#ffffff"
+  hero_sub: "#cfdcff"
+  accent: "#00a3e0"
+  ink: "#13203b"
+  soft: "#f2f6ff"
+  card_border: "#d7e2fb"
+  radius: 14px
+  topic:
+    T1: ["#1428a0", "#e3eaff"]
+    T2: ["#0a8f86", "#dff6f3"]
+    T3: ["#6b3fd1", "#eee6ff"]
+    T4: ["#e0570f", "#ffeadc"]
+    B: ["#5a6475", "#eceff3"]
+  punch_bg: "#fff4cc"
+  punch_border: "#ffcf3f"
+  punch_big: "#1428a0"
+  punch_label: "#9a6700"
+  punch_text: "#13203b"
+  punch_twist: "#4b5563"
+  watch_bg: "#e8f6fd"
+  watch_ink: "#05608a"
+B:
+  name: B · 클린룸 민트
+  hero_dark: false
+  bg: "#eef7f6"
+  hero: "#ffffff"
+  hero2: "#ffffff"
+  hero_text: "#0b2b3c"
+  hero_sub: "#4b6470"
+  accent: "#00b3a4"
+  ink: "#0b2b3c"
+  soft: "#f3fbfa"
+  card_border: "#cfe9e6"
+  radius: 18px
+  topic:
+    T1: ["#1d5fd6", "#e5eeff"]
+    T2: ["#008c80", "#d9f4f1"]
+    T3: ["#8a49d6", "#f1e7ff"]
+    T4: ["#f07a1a", "#fff0e0"]
+    B: ["#5a6475", "#eceff3"]
+  punch_bg: "#0b2b3c"
+  punch_border: "#0b2b3c"
+  punch_big: "#00b3a4"
+  punch_label: "#00b3a4"
+  punch_text: "#ffffff"
+  punch_twist: "#bfe9e4"
+  watch_bg: "#e3f7f4"
+  watch_ink: "#00685f"
+C:
+  name: C · 웨이퍼 나이트
+  hero_dark: true
+  bg: "#f1effa"
+  hero: "#141a3c"
+  hero2: "#3b2c8f"
+  hero_text: "#ffffff"
+  hero_sub: "#c9c3ff"
+  accent: "#8b7bff"
+  ink: "#1b1d33"
+  soft: "#f6f5ff"
+  card_border: "#e0dcf7"
+  radius: 10px
+  topic:
+    T1: ["#3a55e6", "#e6eaff"]
+    T2: ["#0f9b8e", "#dcf5f2"]
+    T3: ["#8b4ce0", "#f0e6ff"]
+    T4: ["#e8620f", "#ffe9dc"]
+    B: ["#5a6475", "#eceff3"]
+  punch_bg: "#ede9ff"
+  punch_border: "#8b7bff"
+  punch_big: "#3b2c8f"
+  punch_label: "#3b2c8f"
+  punch_text: "#1b1d33"
+  punch_twist: "#4b5563"
+  watch_bg: "#f1efff"
+  watch_ink: "#3b2c8f"

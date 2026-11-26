@@ -97,7 +97,7 @@ def test_key_figure_validation():
     ok = [{"value": "30%", "label": "정렬 시간 단축(최대)"}, {"value": "12개", "label": "고객 팹"}]
     assert draftmod.key_figure_errors(ok, ev_ids, recs) == []
     errs = draftmod.key_figure_errors([{"value": "45%", "label": "만든 수치"}], ev_ids, recs)
-    assert errs and "근거 블록에 없음" in errs[0]
+    assert errs and "근거에 없음" in errs[0]
     assert draftmod.key_figure_errors([{"value": "많음", "label": "숫자 없음"}], ev_ids, recs)
     assert draftmod.key_figure_errors([{"value": "30%", "label": " "}], ev_ids, recs)
 
@@ -204,7 +204,7 @@ def draft_with_more():
 
 def test_review2_f_grammar_render_and_apply():
     assert rv.parse_review2("승인 F3=빼기")["F"] == [3]
-    assert rv.parse_review2("A2 B1 C승인 F1=빼기, F4=빼기 E1=수정")["F"] == [1, 4]
+    assert rv.parse_review2("A2 B1 C1 F1=빼기, F4=빼기 E1=수정")["F"] == [1, 4]
     assert rv.parse_review2("승인 F2=빼기 F2=빼기")["F"] == [2]
     assert rv.parse_review2("승인 D 핵심1=a F3=빼기")["D"] == {"핵심1": ("pick", "a")}      # 기존 문법과 함께
     for bad in ("승인 F3=넣기", "승인 F=빼기", "승인 F3"):
@@ -214,7 +214,7 @@ def test_review2_f_grammar_render_and_apply():
     text = rv.render_review2(WEEK, d, [], CFG)
     lines = text.splitlines()
     assert any(l.startswith("[F 더 볼 거리]") for l in lines) and "  F1 칩메이커 · 요약 1" in lines and "  F3 제조 솔루션 · 요약 3" in lines
-    assert lines.index("[F 더 볼 거리]   (분야별 한 줄 요약 · 빼려면 F3=빼기)") < lines.index("[E 자동 검사 경고]")
+    assert lines.index("[F 더 볼 거리]   (분야별 한 줄 요약 · 빼려면 F3=빼기)") < lines.index("[G 새 용어 풀이]") < lines.index("[E 자동 검사 경고]")
     assert " - F: 뺄 항목만. 예: F3=빼기, F7=빼기. 생략하면 모두 싣는다" in lines
     with pytest.raises(rv.ReviewError, match="F9"):
         rv.validate_review2(rv.parse_review2("승인 F9=빼기"), d, [], CFG)
@@ -237,45 +237,100 @@ def full_draft():
     d["more"] = [{"ref": "r1", "topic": "T1_CHIPMAKER", "line": "칩메이커 항목 요약 (보도)", "credit": "출처 1", "evidence_ids": []},
                  {"ref": "r2", "topic": "T3_SOLUTION", "line": "솔루션 항목 요약 (논문)", "credit": "출처 2", "evidence_ids": []}]
     d["excluded_count"] = 10
-    d["hook"] = {"question": "임무 성공률 99%는 검출률인가?", "answer": "아니다.", "evidence_id": "x"}
+    d["punch"] = {"big": "99%", "label": "이번 주 가장 놀라운 숫자", "text": "로봇개 두 대가 서브팹 점검 9만 건을 해낸 숫자.",
+                  "twist": "단, 결함을 찾은 비율이 아니라 임무를 마친 비율이다.", "evidence_id": "x"}
+    d["glossary"] = [{"term": "AMHS", "meaning": "웨이퍼를 자동으로 실어 나르는 팹 물류 시스템", "source": "glossary"},
+                     {"term": "ADC", "meaning": "자동 결함 분류", "source": "model"}]
+    d["articles"][0]["body"] = "AMHS를 넓혔다. AMHS는 다시 나온다. ADC도 쓴다."
+    d["articles"][0]["title"] = "AMHS 제목에는 풀이가 붙지 않는다"
     return d
 
 
-def render_ctx(issue_type="정규호"):
+def render_ctx(issue_type="정규호", theme="A"):
     ev = {"event_id": "e1", "ledger": {"verdict": "SAME_WITH_CHANGE", "issue": "2026-W47"}}
-    return {"issue_week": WEEK, "period": "2026-11-15 ~ 2026-11-21", "issue_type": issue_type, "counts": {"pass_docs": 12, "published": 3},
+    return {"issue_week": WEEK, "period": "2026-11-15 ~ 2026-11-21", "period_short": "11.15 ~ 11.21", "issue_type": issue_type,
+            "counts": {"pass_docs": 12, "published": 3},
             "events": [dict(ev, event_id="e1"), dict(ev, event_id="e2", ledger={"verdict": "NEW"})], "status_rows": [], "corrections": [], "note": "",
-            "newsletter_name": "MTC AX/PI · 제조 AI 위클리", "issue_no": 3, "n_docs": 39}
+            "newsletter_name": "FAB4 위클리", "newsletter_tagline": "칩 · 장비 · 솔루션 · 로봇, 네 박자로 읽는 제조 AI",
+            "newsletter_team": "삼성전자 DS · 메모리 MTC AX/PI", "theme": theme, "issue_no": 3, "n_docs": 39}
 
 
-def test_template_has_all_sections_and_is_static():
+SECTIONS = ("FAB", "제3호 · 2026-W49", "11.15 ~ 11.21", "칩 · 장비 · 솔루션 · 로봇, 네 박자로 읽는 제조 AI", "🏭 칩메이커", "이번 주 헤드라인", "한 줄 요약",
+            "이번 주 가장 놀라운 숫자", "99%", "이번 주 핵심", "⚡ 단신", "📚 더 볼 거리", "MTC가 볼 것", "임무 성공률 ≠ 검출률", "875건", "현장 실증·적용",
+            "2026-W47 보도 후속", "출처 · 발행처, 「원제」", "칩메이커 항목 요약 (보도)", "솔루션 항목 요약 (논문)", "📖 이번 호 용어 사전",
+            "이 밖에 검토했으나 싣지 않은 자료는 10건", "사내 AI가 초안을 쓰고 편집자가 검토", "회신", "검토해 3건을 골랐고", "공개 자료 39건")
+
+
+@pytest.mark.parametrize("theme", ["A", "B", "C"])
+def test_template_has_all_sections_and_is_static_for_each_theme(theme):
+    d = full_draft()
+    d["articles"][0]["event_id"], d["articles"][1]["event_id"] = "e1", "e2"
+    html_doc, text = render.build(d, render_ctx(theme=theme))
+    low = html_doc.lower()
+    assert "http" not in low and "<a " not in low and "<script" not in low and "<img" not in low and "<link" not in low and "<style" not in low
+    for must in SECTIONS:
+        assert must in html_doc, must
+    assert html_doc.index("이번 주 헤드라인") < html_doc.index("이번 주 핵심") < html_doc.index("⚡ 단신") < html_doc.index("📚 더 볼 거리") < html_doc.index("📖 이번 호 용어 사전") < html_doc.index("이 밖에 검토했으나")
+    assert 'width="680"' in html_doc and html_doc.count("<span") >= 7
+    th = render.load_themes()[theme]
+    assert th["accent"] in html_doc and th["bg"] in html_doc
+    assert ("linear-gradient" in html_doc) == th["hero_dark"]             # 그라데이션은 고정색 위에 얹는 어두운 테마(A·C)에만
+    if th["hero_dark"]:
+        assert f"background:{th['hero']};background-image:linear-gradient" in html_doc
+    assert "http" not in text
+
+
+def test_theme_switch_changes_colors_only():
+    d = full_draft()
+    d["articles"][0]["event_id"], d["articles"][1]["event_id"] = "e1", "e2"
+    out = {t: render.build(copy.deepcopy(d), render_ctx(theme=t))[0] for t in "ABC"}
+    assert len({out[t] for t in "ABC"}) == 3
+    for t in "ABC":
+        stripped = out[t]
+        for v in render.load_themes()[t].values():
+            pass
+    th = render.load_themes()
+    assert th["A"]["bg"] in out["A"] and th["B"]["bg"] in out["B"] and th["C"]["bg"] in out["C"] and th["A"]["bg"] not in out["B"]
+    with pytest.raises(ValueError, match="테마"):
+        render.build(copy.deepcopy(d), render_ctx(theme="Z"))
+
+
+def test_plain_text_mirrors_sections_and_glossary():
     d = full_draft()
     d["articles"][0]["event_id"], d["articles"][1]["event_id"] = "e1", "e2"
     html_doc, text = render.build(d, render_ctx())
-    low = html_doc.lower()
-    assert "http" not in low and "<a " not in low and "<script" not in low and "<img" not in low and "<link" not in low
-    for must in ("MTC AX/PI · 제조 AI 위클리", "제3호 · 2026-W49", "대상 기간 2026-11-15 ~ 2026-11-21 · 검토 문서 39건 · 게재 3건", "이번 주 요약",
-                 "팹 판단 한 컷", "핵심 기사", "단신", "더 볼 거리", "MTC가 볼 것", "99%", "임무 성공률 ≠ 검출률", "875건", "현장 실증·적용",
-                 "2026-W47 보도 후속", "출처 · 발행처, 「원제」", "칩메이커 항목 요약 (보도)", "솔루션 항목 요약 (논문)", "이 밖에 검토했으나 싣지 않은 자료는 10건",
-                 "사내 AI가 초안을 쓰고 편집자가 검토", "회신"):
-        assert must in html_doc, must
-    assert html_doc.index("핵심 기사") < html_doc.index("단신") < html_doc.index("더 볼 거리") < html_doc.index("이 밖에 검토했으나")
-    assert html_doc.count("<span") >= 7 and "<style" not in low and 'width="680"' in html_doc
-    for must in ("[핵심 기사]", "[단신]", "[더 볼 거리]", "<칩메이커>", "<제조 솔루션>", "수치: 99% 임무 성공률 ≠ 검출률", "MTC가 볼 것 · 유효 경보로 이어진 비율",
-                 "출처 · 발행처, 「원제」", "이 밖에 검토했으나 싣지 않은 자료는 10건", "[이번 주 요약]", "[팹 판단 한 컷]", "제3호"):
+    for must in ("이번 주 헤드라인", "[한 줄 요약]", "[이번 주 가장 놀라운 숫자]", "99% —", "[이번 주 핵심]", "[단신]", "[더 볼 거리]", "<칩메이커>", "<제조 솔루션>",
+                 "수치: 99% 임무 성공률 ≠ 검출률", "MTC가 볼 것 · 유효 경보로 이어진 비율", "출처 · 발행처, 「원제」", "[이번 호 용어 사전]", "- AMHS: 웨이퍼를 자동으로",
+                 "이 밖에 검토했으나 싣지 않은 자료는 10건", "제3호", "FAB4 위클리"):
         assert must in text, must
     assert "http" not in text
 
 
+def test_glossary_first_occurrence_only_and_never_in_titles():
+    d = full_draft()
+    d["articles"][0]["event_id"], d["articles"][1]["event_id"] = "e1", "e2"
+    d["articles"][0]["title"] = "AMHS 제목에는 풀이가 붙지 않는다"
+    html_doc, text = render.build(d, render_ctx())
+    gloss = '<span style="color:#7a8597;font-size:12.5px;">(웨이퍼를 자동으로 실어 나르는 팹 물류 시스템)</span>'
+    assert html_doc.count(gloss) == 1                                      # 이번 호 첫 등장 한 곳에만
+    assert html_doc.index("AMHS" + gloss) < html_doc.index("AMHS는 다시 나온다")      # 첫 등장 바로 뒤에 붙는다
+    assert text.count("(웨이퍼를 자동으로 실어 나르는 팹 물류 시스템)") == 1 and "ADC(자동 결함 분류)도" in text
+    assert "AMHS 제목에는 풀이가 붙지 않는다" in html_doc and "AMHS(웨이퍼" not in html_doc.split("이번 주 핵심")[0]      # 헤드라인·총론·제목에는 없다
+
+
 def test_template_omits_empty_sections_and_scrubs_urls():
     d = full_draft()
-    d["more"], d["hook"] = [], None
+    d["more"], d["punch"], d["glossary"] = [], None, []
     d["articles"][1]["key_figures"] = []
     d["issue_title"] = "제목 https://x.example.org/a 끝"
     html_doc, text = render.build(d, render_ctx())
-    assert "더 볼 거리" not in html_doc and "팹 판단 한 컷" not in html_doc and "x.example.org" not in html_doc and "[더 볼 거리]" not in text
+    assert "📚 더 볼 거리" not in html_doc and "가장 놀라운 숫자" not in html_doc and "📖 이번 호 용어 사전" not in html_doc
+    assert "x.example.org" not in html_doc and "[더 볼 거리]" not in text and "[이번 호 용어 사전]" not in text
     d["more"] = [{"ref": "r", "topic": "B", "line": "전이 사례 요약", "credit": "c", "evidence_ids": []}]
     assert "기반기술 전이 사례" in render.build(d, render_ctx())[0]
+    d["punch"] = {"big": "수 분", "label": "이번 주 한 방", "text": "t", "twist": "w", "evidence_id": "x"}
+    h2 = render.build(d, render_ctx())[0]
+    assert "💥 이번 주 한 방" in h2
 
 
 def test_fill_helper_semantics():
@@ -321,7 +376,7 @@ def test_pipeline_more_section_end_to_end(tmp_path):
     html_doc = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
     assert "더 볼 거리" in html_doc and "제1호" in html_doc and "자료는 1건" in html_doc and "http" not in html_doc
     txt = (tmp_path / "out_internal" / WEEK / "newsletter.txt").read_text(encoding="utf-8")
-    assert "[더 볼 거리]" in txt and "[핵심 기사]" in txt
+    assert "[더 볼 거리]" in txt and "[이번 주 핵심]" in txt
     assert client.steps().count("s6_more") == 1
     pilot = list(csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8")))[0]
     assert pilot["issue_week"] == WEEK
