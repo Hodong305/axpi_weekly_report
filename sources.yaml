@@ -11,11 +11,12 @@
 #   false : 아직 확인 전. 순회는 시도하지만 프롬프트에서는 "우선 확인 발행처"로도 안내해
 #           순회가 실패해도 LLM 탐색으로 보완되게 한다.
 # url_prefixes : 같은 도메인을 여러 발행처가 나눠 쓸 때 URL 앞부분으로 구분한다.
+# source_type: 정부·공공기관의 공식 발표(EU 집행위원회, 국가기술표준원 등)는 standards_body로 둔다(설계서 9.10의 '공식 원문'에 해당).
 # include_url_patterns / exclude_url_patterns : 정규식. 발행처 단위로 명백히 무관한 경로만 제외한다
 #   (분야 적합성 판정은 사내에서 한다. 설계서 3장).
 # 아래 URL은 공개 정보 기준의 초기값이며 모두 verified: false다. 첫 실행 전에 check-sources로 확인한다.
 
-registry_version: "2026-11-26.1"
+registry_version: "2026-11-26.2"
 
 sources:
   # ── ① 칩메이커 ───────────────────────────────────────────────
@@ -111,7 +112,7 @@ sources:
 
   - id: intel-newsroom
     publisher: Intel Newsroom
-    domains: [newsroom.intel.com]
+    domains: [newsroom.intel.com, intel.com]
     topics: [T1_CHIPMAKER]
     track: A
     language: en
@@ -132,6 +133,19 @@ sources:
     source_tier: primary
     method: llm_only
     home_url: https://gf.com/news/
+    verified: false
+
+
+  - id: screen
+    publisher: SCREEN Semiconductor Solutions
+    domains: [screen.co.jp]
+    topics: [T2_EQUIPMENT]
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://www.screen.co.jp/spe/en/
     verified: false
 
   # ── ② 반도체 장비사 ───────────────────────────────────────────
@@ -242,6 +256,103 @@ sources:
     source_tier: primary
     method: llm_only
     home_url: https://www.gausslabs.ai/
+    verified: false
+
+
+  - id: boston-dynamics
+    publisher: Boston Dynamics
+    domains: [bostondynamics.com]
+    topics: [T4_PHYSICAL_AI]
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://bostondynamics.com/news/
+    verified: false
+
+  - id: rockwell-automation
+    publisher: Rockwell Automation
+    domains: [rockwellautomation.com]
+    topics: []
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://www.rockwellautomation.com/en-us/company/news.html
+    verified: false
+
+  - id: adeka
+    publisher: ADEKA
+    domains: [adeka.co.jp]
+    topics: []
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://www.adeka.co.jp/en/
+    verified: false
+
+  - id: nvidia-newsroom
+    publisher: NVIDIA Newsroom
+    domains: [nvidianews.nvidia.com]
+    topics: []
+    track: A
+    language: en
+    source_type: company_official
+    source_tier: primary
+    method: llm_only
+    home_url: https://nvidianews.nvidia.com/
+    verified: false
+
+  - id: imec
+    publisher: imec
+    domains: [imec-int.com]
+    topics: []
+    track: A
+    language: en
+    source_type: research_lab
+    source_tier: primary
+    method: llm_only
+    home_url: https://www.imec-int.com/en/press
+    verified: false
+
+  - id: european-commission
+    publisher: European Commission
+    domains: [ec.europa.eu]
+    topics: []
+    track: A
+    language: en
+    source_type: standards_body
+    source_tier: primary
+    method: llm_only
+    home_url: https://digital-strategy.ec.europa.eu/en/news
+    verified: false
+
+  - id: kats
+    publisher: 국가기술표준원 · 산업통상부
+    domains: [motir.go.kr, kats.go.kr]
+    topics: []
+    track: A
+    language: ko
+    source_type: standards_body
+    source_tier: primary
+    method: llm_only
+    home_url: https://www.kats.go.kr/
+    verified: false
+
+  - id: reuters
+    publisher: Reuters
+    domains: [reuters.com]
+    topics: []
+    track: A
+    language: en
+    source_type: press
+    source_tier: named_secondary
+    method: llm_only
+    home_url: https://www.reuters.com/technology/
     verified: false
 
   # ── 산업 단체·전문지 (분야 공통) ───────────────────────────────
