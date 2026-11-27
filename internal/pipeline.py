@@ -536,15 +536,16 @@ class Pipeline:
     def step_R3(self):
         d = load_draft(self.s.draft_path(self.week))
         sources = len({c for a in d["articles"] for c in a["credits"]})
+        placeholders = checks.placeholder_hits(d)
 
         def render_fn():
             return rv.render_review3(self.week, {
                 "title": d["issue_title"], "summary": d["summary"], "summary_len": len(d["summary"]),
                 "core": sum(a["slot"] == "core" for a in d["articles"]), "brief": sum(a["slot"] == "brief" for a in d["articles"]),
                 "body_len": checks.body_total(d), "body_max": self.cfg["issue_body_max"], "sources": sources,
-                "warnings": len(self.state["warnings"])})
+                "warnings": len(self.state["warnings"]), "placeholders": placeholders})
 
-        choice = self.loop_review("R3", render_fn, lambda text: rv.parse_choice(text))
+        choice = self.loop_review("R3", render_fn, lambda text: rv.parse_review3(text, placeholders))
         d["review_log"].append({"review": "발송 확인", "at": self.clock(), "response": str(choice),
                                 "applied": "발송본 생성·확정" if choice == 1 else "검토 ②로 돌아감"})
         save_draft(self.s.draft_path(self.week), d)
@@ -608,6 +609,10 @@ class Pipeline:
         ctx.update(image_loader=self.load_image, image_max_kb=self.cfg["image_max_kb"], newsletter_from=self.cfg.get("newsletter_from", ""),
                    read_chars_per_min=self.cfg.get("read_chars_per_min", 500))
         built = render.build_all(d, ctx)
+        left = checks.placeholder_hits(d, built["text"])     # 마지막 차단: 완성된 발송본에도 가상·견본 흔적이 없어야 한다
+        if left:
+            raise RuntimeError("발송본에 가상·견본 데이터 흔적이 있어 만들지 않았습니다: "
+                               + ", ".join(f"{h['scope']} '{h['quote']}'" for h in left[:10]))
         out = self.s.out_dir(self.week)
         out.mkdir(parents=True, exist_ok=True)
         (out / "newsletter.html").write_text(built["html_preview"], encoding="utf-8")       # 미리 보기: 이미지를 data URI로 내장

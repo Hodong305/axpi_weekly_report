@@ -588,11 +588,24 @@ def parse_b_confirm(text):
 # ③ 발송 확인 -----------------------------------------------------------------
 
 def render_review3(issue_week, s):
-    """s: title, summary, summary_len, core, brief, body_len, body_max, sources, warnings"""
-    return "\n".join([
+    """s: title, summary, summary_len, core, brief, body_len, body_max, sources, warnings, placeholders(선택: 가상·견본 흔적 목록)"""
+    lines = [
         f"{BAR} 발송 확인 · {issue_week} {BAR}",
         f"{s['title']} / {s['summary']} / 총론 {s['summary_len']}자 / 핵심 {s['core']} · 단신 {s['brief']} / "
-        f"본문 {s['body_len']:,}자(한도 {s['body_max']:,}) / 출처 {s['sources']}건 / 경고 {s['warnings']}",
-        " 1) 발송본 생성·확정 (권장)",
-        " 2) 검토 ②로 돌아가기",
-        "응답:"])
+        f"본문 {s['body_len']:,}자(한도 {s['body_max']:,}) / 출처 {s['sources']}건 / 경고 {s['warnings']}"]
+    ph = s.get("placeholders") or []
+    if ph:      # v4.7: 가상·견본 데이터가 남아 있으면 발송할 수 없다
+        lines.append(f"[발송 불가] 가상·견본 데이터 흔적 {len(ph)}건 — 실제 소식지에는 들어가면 안 됩니다. 검토 ②에서 고친 뒤 다시 확인하세요.")
+        lines += [f"  · {h['scope']} \"{h['quote']}\" ({h['kind']})" for h in ph[:20]]
+        lines += [" 2) 검토 ②로 돌아가기", "응답:"]
+        return "\n".join(lines)
+    lines += [" 1) 발송본 생성·확정 (권장)", " 2) 검토 ②로 돌아가기", "응답:"]
+    return "\n".join(lines)
+
+
+def parse_review3(text, placeholders=()):
+    """발송 확인 응답. 가상·견본 흔적이 남아 있으면 1(발송)을 받지 않는다."""
+    choice = parse_choice(text)
+    if choice == 1 and placeholders:
+        raise ReviewError(f"가상·견본 데이터 흔적 {len(placeholders)}건이 남아 있어 발송할 수 없습니다 — 2로 검토 ②에 돌아가 고치세요.")
+    return choice

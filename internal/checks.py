@@ -371,6 +371,27 @@ def hard_violations(draft, events_by_id, records, cfg, issue_type):
         hit = verbatim_hit(text, all_src, run)
         if hit:
             v.append((("header",), "원문 연속 일치", f"머리부에 원문과 {run}자 이상 같은 구간: \"{hit[:40]}…\""))
+    # 가상·견본 데이터(모델이 쓴 칸): 재생성 대상. 출처 줄은 코드가 원문 정보로 만들므로 여기서는 보지 않고 발송 확인·S8에서 막는다.
+    for i, a in enumerate(draft["articles"]):
+        for path, text in article_fields(a):
+            for pat, kind in PLACEHOLDER_PATTERNS:
+                m = pat.search(text)
+                if m:
+                    v.append((("article", i), "가상 데이터", f"{'.'.join(path)}에 {kind} '{m.group(0).strip()}' — 실제 이름·실제 내용으로 써라"))
+                    break
+    for j, m_ in enumerate(draft.get("more") or []):
+        for pat, kind in PLACEHOLDER_PATTERNS:
+            m = pat.search(m_["line"])
+            if m:
+                v.append((("more", j), "가상 데이터", f"{kind} '{m.group(0).strip()}' — 실제 이름·실제 내용으로 써라"))
+                break
+    head = " ".join([draft.get("issue_title") or "", draft.get("summary") or ""]
+                    + ([str(draft["punch"].get(k) or "") for k in ("text", "twist")] if draft.get("punch") else []))
+    for pat, kind in PLACEHOLDER_PATTERNS:
+        m = pat.search(head)
+        if m:
+            v.append((("header",), "가상 데이터", f"머리부에 {kind} '{m.group(0).strip()}' — 실제 이름·실제 내용으로 써라"))
+            break
     p = draft.get("punch")
     if p:
         errs = evidence_errors([p["evidence_id"]], records)
@@ -434,3 +455,54 @@ def number_ids(warns):
     for i, w in enumerate(warns, 1):
         w["id"] = f"E{i}"
     return warns
+
+
+# 가상·견본 데이터 차단(v4.7, 설계서 9.7·9.2 ③) --------------------------------------------
+# 실제 발간물에는 견본 표시, 가상 인물, 가려 쓴 회사 이름, 자리 표시 글자가 절대 들어가면 안 된다.
+# '가상 계측'·'샘플링 검사'처럼 제조 용어로 쓰이는 말은 걸리지 않게 낱말을 좁혀 둔다.
+PLACEHOLDER_PATTERNS = [
+    (re.compile(r"견본"), "견본 표시"),
+    (re.compile(r"레이아웃\s*확인용|가상\s*(?:데이터|내용|회사|기업|인물|사례)|더미\s*데이터|예시\s*데이터|테스트\s*데이터"), "가상 데이터 표시"),
+    (re.compile(r"홍길동|김철수|이영희|아무개"), "가상 인물"),
+    (re.compile(r"(?i)\blorem\b|\bipsum\b|\bplaceholder\b|\bdummy\b|\bTODO\b|\bTBD\b|\bFIXME\b"), "자리 표시 글자"),
+    (re.compile(r"XXX|○○|OOO|△△|＊＊＊"), "자리 표시 글자"),
+    (re.compile(r"(?:장비사|칩메이커|파운드리|메모리|솔루션|로봇|반도체|경쟁|소재|부품)?\s*(?:기업|회사|업체|경쟁사|장비사|칩메이커|솔루션사)\s?[A-Z](?![A-Za-z0-9])"),
+     "가려 쓴 회사 이름"),
+]
+
+
+def placeholder_fields(draft):
+    """검사할 모든 글 칸: [(위치 이름, 텍스트)]. 머리부·기사(제목·한 줄 핵심·요점·본문·MTC가 볼 것·수치·출처·검색어)·더 볼 거리·용어."""
+    out = [("헤드라인", draft.get("issue_title") or ""), ("한 줄 요약", draft.get("summary") or "")]
+    p = draft.get("punch")
+    if p:
+        out += [("이번 주 한 방", " ".join(str(p.get(k) or "") for k in ("big", "text", "twist")))]
+    labels = {i: lab for lab, i in article_labels(draft).items()}
+    for i, a in enumerate(draft.get("articles") or []):
+        lab = labels.get(i, f"기사{i + 1}")
+        out += [(lab, t) for _, t in article_fields(a)]
+        for k in list(a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else []):
+            out.append((lab, " ".join(str(k.get(x) or "") for x in ("value", "label"))))
+        out += [(f"{lab} 출처", c) for c in a.get("credits") or []]
+        out += [(f"{lab} 검색어", t) for t in a.get("search_terms") or []]
+        if a.get("image"):
+            out.append((lab, a["image"].get("caption") or ""))
+    for j, m in enumerate(draft.get("more") or [], 1):
+        out += [(f"F{j}", m.get("line") or ""), (f"F{j} 출처", m.get("credit") or "")]
+    out += [("용어", f"{g.get('term', '')} {g.get('meaning', '')}") for g in draft.get("glossary") or []]
+    return out
+
+
+def placeholder_hits(draft, extra_text=None):
+    """가상·견본 데이터 흔적. 반환: [{"scope", "quote", "kind"}]. extra_text(완성된 텍스트본 등)도 함께 본다."""
+    fields = placeholder_fields(draft) + ([("발송본", extra_text)] if extra_text else [])
+    hits, seen = [], set()
+    for scope, text in fields:
+        for pat, kind in PLACEHOLDER_PATTERNS:
+            for m in pat.finditer(text or ""):
+                q = m.group(0).strip()
+                if (scope, q) in seen:
+                    continue
+                seen.add((scope, q))
+                hits.append({"scope": scope, "quote": q, "kind": kind})
+    return hits
