@@ -64,8 +64,7 @@ MORE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["re
 
 TOPIC_LABEL = {"T1_CHIPMAKER": "칩메이커", "T2_EQUIPMENT": "장비사", "T3_SOLUTION": "제조 솔루션", "T4_PHYSICAL_AI": "Physical AI",
                "B": "기반기술 전이 사례"}
-MATURITY_LABEL = {20: "양산·상시 운영", 15: "현장 실증·적용", 10: "도입 계획", 5: "구상·연구"}
-EVIDENCE_LABEL = {25: "독립 검증·기관 확정", 20: "운영사 발표", 15: "당사자 발표", 5: "언론 보도"}
+EVIDENCE_LABEL = {30: "독립 검증·기관 확정", 22: "운영사 발표", 15: "당사자 발표", 8: "언론 보도"}
 
 
 def image_candidates(ev, records, cfg):
@@ -88,14 +87,14 @@ def find_candidate(cands, media_ref):
 
 
 def make_tags(ev, slot):
-    """꼬리표(9.8, 코드가 만든다): 분야 · 성숙도 · 근거 유형. 단신은 분야만. 채점 결과가 없으면 있는 것만."""
+    """꼬리표(9.8, 코드가 만든다): 분야 · 근거 유형. 단신은 분야만. 채점 결과가 없으면 있는 것만(성숙도는 v4.7 개편에서 폐지)."""
     tags = []
     if ev.get("primary_topic") in TOPIC_LABEL:
         tags.append(TOPIC_LABEL[ev["primary_topic"]])
     sc = ev.get("score")
     if slot == "core" and sc:
         t = sc["tiers"]
-        for key, table in (("field_maturity", MATURITY_LABEL), ("evidence_level", EVIDENCE_LABEL)):
+        for key, table in (("evidence_level", EVIDENCE_LABEL),):
             if t.get(key) in table:
                 tags.append(table[t[key]])
     return tags

@@ -1,38 +1,22 @@
 """S5 자동 편성(설계서 9.5) → review/{issue_week}-selection.csv."""
 import csv
 
-from collector.competitors import find_company
-
 from .common import add_flag, evidence_text, trunc
 from .events import _norm, ledger_label
-from .score import METRICS
+from .score import METRICS, detect_competitor  # noqa: F401  (detect_competitor는 이전 위치 호환)
 
 CSV_COLUMNS = ["rank", "slot", "event_id", "total", "placement_cap", "title_draft", "claim", "stage", "evidence",
                "ledger", "flags", "note", "competitor"]
 
 
-def detect_competitor(ev, records, cfg):
-    """경쟁사 사건이면 회사 이름, 아니면 ""(9.5). 주체를 먼저 보고, 없으면 대표 자료 발행처, 그것도 없으면 제목을 본다."""
-    companies = cfg.get("competitors") or []
-    if not companies:
-        return ""
-    rec = (records or {}).get(ev.get("rep_doc_id")) or {}
-    texts = [ev.get("subject")]
-    if not (ev.get("subject") or "").strip():
-        texts += [rec.get("publisher"), rec.get("title")]
-    else:
-        texts.append(rec.get("publisher"))
-    return find_company(companies, *texts) or ""
-
-
 def _tie_key(ev):
-    """총점 → 경쟁사 사건 → FAB 관련성 → 근거 수준 → 이번 주 변화(v4.7)."""
+    """총점 → 경쟁사 사건 → MTC 연관성(적용 영역 + 대상) → 근거 수준 → 이번 주 변화(v4.7 개편)."""
     t = ev["score"]["tiers"]
-    return (ev["score"]["total"], 1 if ev.get("competitor") else 0, t["fab_relevance"], t["evidence_level"], t["weekly_change"])
+    return (ev["score"]["total"], 1 if ev.get("competitor") else 0, t["mtc_area"] + t["mtc_target"], t["evidence_level"], t["weekly_change"])
 
 
 def sort_candidates(events):
-    """총점 → 경쟁사 사건 → FAB 관련성 → 근거 수준 → 이번 주 변화 순(내림차순). 같으면 event_id 순으로 고정한다."""
+    """총점 → 경쟁사 사건 → MTC 연관성 → 근거 수준 → 이번 주 변화 순(내림차순). 같으면 event_id 순으로 고정한다."""
     return sorted(events, key=lambda e: tuple(-v for v in _tie_key(e)) + (e["event_id"],))
 
 
@@ -41,6 +25,7 @@ def select(events, cfg, records=None):
     core_min, brief_min = cfg["core_min_score"], cfg["brief_min_score"]
     comp_min = cfg.get("competitor_core_min", 2)
     core_gap, core_min_count = cfg.get("core_gap", 10), cfg.get("core_min_count", 2)
+    core_max = cfg.get("core_max") or 99
     for ev in events:
         ev["competitor"] = detect_competitor(ev, records, cfg)
     for ev in events:
@@ -72,9 +57,11 @@ def select(events, cfg, records=None):
         k = _norm(e["subject"]) or e["event_id"]
         count[k] = count.get(k, 0) + 1
 
-    pool = [e for e in cands if e["cap"] != "brief" and e["score"]["total"] >= core_min]
-    # 낙차 컷: 바로 앞 사건보다 core_gap점 이상 낮아지는 첫 지점에서 자른다. 자격 사건이 있으면 최소 core_min_count건은 핵심.
-    # 앞의 core_min_count건(4)은 낙차와 관계없이 핵심이고(자격 사건이 그보다 적으면 전부), 낙차는 그 뒤에서부터 찾는다.
+    # 핵심 자격(v4.7 개편): 게재 상한이 단신이 아닌 사건(MTC 연관성 미달·산업 배경 등은 상한이 단신). 점수 순.
+    eligible = [e for e in cands if e["cap"] != "brief"]
+    pool = [e for e in eligible if e["score"]["total"] >= core_min]
+    # 낙차 컷: 바로 앞 사건보다 core_gap점 이상 낮아지는 첫 지점에서 자른다. 앞의 core_min_count건(4)은 낙차와 관계없이 핵심이고,
+    # 낙차는 그 뒤에서부터 찾는다. 핵심은 최대 core_max건(6).
     cut = len(pool)
     for i in range(max(1, core_min_count), len(pool)):
         if pool[i - 1]["score"]["total"] - pool[i]["score"]["total"] >= core_gap:
@@ -82,17 +69,33 @@ def select(events, cfg, records=None):
             break
     core = []
     for e in pool[:cut]:
-        if room(e):
+        if len(core) < core_max and room(e):
             core.append(e)
             take(e)
-    # 경쟁사 최소: 컷 아래의 자격 경쟁사 사건을 점수 순으로 더해 competitor_core_min건을 채운다.
-    for e in pool[cut:]:
+    # 최소 채우기: core_min_score 이상이 core_min_count건보다 적으면, 핵심 자격이 있는 나머지(brief_min 이상)를 점수 순으로 더한다.
+    for e in eligible:
+        if len(core) >= min(core_min_count, core_max):
+            break
+        if e not in core and e["score"]["total"] < core_min and room(e):
+            core.append(e)
+            take(e)
+    # 경쟁사 최소: 핵심 밖의 자격 경쟁사 사건(core_min 이상)을 점수 순으로 더해 competitor_core_min건을 채운다.
+    # 핵심이 core_max건으로 차 있으면 가장 낮은 비경쟁사 사건과 바꾼다.
+    for e in pool:
         if sum(1 for c in core if c["competitor"]) >= comp_min:
             break
-        if e["competitor"] and room(e):
-            core.append(e)
-            take(e)
-    core = [e for e in pool if e in core]          # 핵심 안의 순서는 점수 순(같으면 경쟁사 먼저)
+        if e in core or not e["competitor"] or not room(e):
+            continue
+        if len(core) >= core_max:
+            out_e = next((c for c in sorted(core, key=lambda c: c["score"]["total"]) if not c["competitor"]), None)
+            if out_e is None:
+                break
+            core.remove(out_e)
+            k = _norm(out_e["subject"]) or out_e["event_id"]
+            count[k] -= 1
+        core.append(e)
+        take(e)
+    core = [e for e in eligible if e in core]      # 핵심 안의 순서는 점수 순(같으면 경쟁사 먼저)
     # 단신: 남은 brief_min 이상 중 최대 brief_max건. 점수가 같으면 경쟁사 사건이 먼저(정렬 기준). 산업 배경은 최대 1건.
     max_brief = cfg["brief_max"]
     brief, background, bg_skipped = [], 0, set()
@@ -103,7 +106,7 @@ def select(events, cfg, records=None):
             break
         if not room(e):
             continue
-        if e["score"]["tiers"]["fab_relevance"] == 10:
+        if e["score"]["tiers"]["mtc_area"] == 10:
             if background >= 1:
                 bg_skipped.add(e["event_id"])      # 산업 배경 1건 한도에 걸려 건너뜀
                 continue
@@ -129,7 +132,7 @@ def select(events, cfg, records=None):
 
 
 def core_eligible(events, cfg):
-    """핵심 자격: core_min_score 이상이면서 게재 상한이 단신이 아닌 사건(8장 분모 정의)."""
+    """핵심 자격: core_min_score 이상이면서 게재 상한이 단신이 아닌 사건(8장 분모 정의, MTC 연관성 미달은 상한이 단신)."""
     return [e for e in events if e["status"] == "PASS" and e["score"] and e["score"]["total"] is not None
             and e["score"]["total"] >= cfg["core_min_score"] and e["cap"] != "brief" and e["slot"] in ("core", "brief")]
 

@@ -12,7 +12,7 @@
     "rank": 1,
     "slot": "core",
     "status": "PASS",
-    "total": 85
+    "total": 82
    }
   ],
   "exit": 0,
@@ -71,7 +71,7 @@
     "rank": 1,
     "slot": "core",
     "status": "PASS",
-    "total": 80
+    "total": 77
    }
   ],
   "exit": 0,
@@ -129,7 +129,7 @@
     "rank": 1,
     "slot": "core",
     "status": "PASS",
-    "total": 100
+    "total": 95
    }
   ],
   "exit": 0,

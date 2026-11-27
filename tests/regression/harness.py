@@ -76,10 +76,10 @@ class CannedClient(ti.FakeClient):
         eid = re.search(r'"event_id": "(EVT-[^"]+)"', user).group(1)
         d, key = self._key(user)
         s = self.spec["llm"][key]["score"]
-        from internal.score import METRICS
+        from internal.score import MODEL_METRICS  # 모델 지표 4개(적용 영역, 근거, 구체성, 변화). 대상은 코드가 더한다
         return {"event_id": eid, "status": "PASS", "primary_topic": "T2_EQUIPMENT", "claim": "대표 주장 한 문장",
                 "evidence_ids": [{"id": f"{d}/{b}", "type": t} for b, t in zip(s["evidence"], s["types"])],
-                "maturity": s["maturity"], "score_tiers": {m: {"tier": t, "reason": "사유"} for m, t in zip(METRICS, s["tiers"])},
+                "maturity": s["maturity"], "score_tiers": {m: {"tier": t, "reason": "사유"} for m, t in zip(MODEL_METRICS, s["tiers"])},
                 "placement_cap": "core", "fact": ["사실"], "mtc_impact": "영향", "action_watch": "지표", "unresolved": []}
 
 

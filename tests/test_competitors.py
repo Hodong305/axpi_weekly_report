@@ -156,10 +156,10 @@ def comp(ev, subject="SK하이닉스"):
 
 
 def test_config_v9_keys():
-    assert settings_mod.load().config["config_version"] == "10"
+    assert settings_mod.load().config["config_version"] == "11"
     assert (CFG["core_gap"], CFG["core_min_count"], CFG["core_alert_count"], CFG["competitor_core_min"], CFG["brief_max"],
-            CFG["search_terms_max"], CFG["issue_body_max"]) == (10, 4, 8, 2, 4, 3, 9000)
-    assert "core_max" not in CFG
+            CFG["search_terms_max"], CFG["issue_body_max"]) == (10, 4, 8, 2, 6, 3, 11000)
+    assert (CFG["core_max"], CFG["core_mtc_min"], CFG["core_min_score"], CFG["brief_min_score"], CFG["more_max"]) == (6, 30, 80, 55, 8)
     assert "core3_min_score" not in CFG and {c["name"] for c in CFG["competitors"]} == {c["name"] for c in COMPANIES}
 
 
@@ -197,7 +197,12 @@ def test_core_and_brief_maximums_and_brief_cap_events_never_core():
     for i, e in enumerate(evs[:6]):                                # 같은 주체 한도(2)를 피하려고 서로 다른 경쟁사로 나눈다
         e["subject"] = ["Kioxia", "SanDisk", "CXMT", "YMTC", "Nanya", "Winbond"][i]
     sel.select(evs, CFG)
-    assert sum(e["slot"] == "core" for e in evs) == 6 and sum(e["slot"] == "brief" for e in evs) == 4      # 핵심은 낙차가 없으면 상한 없이 전부, 단신은 최대 4
+    assert sum(e["slot"] == "core" for e in evs) == 6 and sum(e["slot"] == "brief" for e in evs) == 6      # 핵심 최대 6, 단신 최대 6(개편)
+    evs = [mk(f"k{i}", 95 - i) for i in range(8)]
+    for i, e in enumerate(evs):
+        e["subject"] = f"주체{i}"
+    sel.select(evs, CFG)
+    assert _core(evs) == [f"k{i}" for i in range(6)] and sum(e["slot"] == "brief" for e in evs) == 2       # 낙차가 없어도 핵심은 6건까지
     capped = [comp(mk("c1", 95, cap="brief"), "TSMC"), comp(mk("c2", 90, cap="brief"), "UMC")]
     sel.select(capped, CFG)
     assert all(e["slot"] == "brief" for e in capped)
@@ -205,7 +210,7 @@ def test_core_and_brief_maximums_and_brief_cap_events_never_core():
 
 def test_tie_break_prefers_competitor_and_flags_tie():
     evs = [mk("a", 70), comp(mk("b", 70), "UMC"), mk("c", 70), mk("d", 70), mk("e", 70)]
-    sel.select(evs, CFG)
+    sel.select(evs, dict(CFG, core_min_count=0, brief_max=4))         # 단신 정렬만 본다(최소 핵심 채우기 끔)
     s = {e["event_id"]: e["slot"] for e in evs}
     assert s["b"] == "brief" and s["e"] == "out" and next(e for e in evs if e["event_id"] == "b")["rank"] == 1    # 단신 4건 중 경쟁사가 맨 앞
     assert "동점" not in next(e for e in evs if e["event_id"] == "b")["flags"]       # 경쟁사 여부까지 같아야 동점

@@ -425,7 +425,7 @@ def soft_warnings(draft, events_by_id, records, cfg, issue_type):
             warns.append({"scope": labels[i], "quote": a["title"], "kind": "게재 상한",
                           "message": f"게재 상한 위반: 상한 '단신'({' · '.join(ev['cap_reasons'])})인데 핵심으로 편성됨", "fix": None})
     bg = [e for e in events_by_id.values() if e["slot"] in ("core", "brief") and e.get("score")
-          and e["score"]["tiers"]["fab_relevance"] == 10]
+          and e["score"]["tiers"]["mtc_area"] == 10]
     if len(bg) > 1:
         warns.append({"scope": "머리부", "quote": "", "kind": "게재 상한", "message": f"게재 상한 위반: 산업 배경 사건이 {len(bg)}건(최대 1건)",
                       "fix": None})

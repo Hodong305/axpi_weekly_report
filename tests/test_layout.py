@@ -29,12 +29,12 @@ def test_same_subject_limit_w48_like():
            with_subject(mk("f", 66), "Intel")]
     sel.select(evs, CFG)
     s = {e["event_id"]: (e["slot"], e["note"]) for e in evs}
-    assert [s[k][0] for k in "abcdf"] == ["core", "core", "brief", "brief", "brief"]
-    assert s["e"] == ("out", "같은 주체 한도")                # 점수가 가장 낮은 SK하이닉스 단신이 더 볼 거리로
+    assert [s[k][0] for k in "abcdf"] == ["core", "core", "core", "core", "brief"]   # 80점 이상이 2건이라 c·d로 최소 4건을 채운다
+    assert s["e"] == ("out", "같은 주체 한도")                # 점수가 가장 낮은 SK하이닉스 사건이 더 볼 거리로
     # 점수가 높은 쪽이 남는다
     evs = [with_subject(mk("a", 88), "A사"), with_subject(mk("b", 85), "B사"), with_subject(mk("x", 70), "S"), with_subject(mk("y", 90, cap="brief"), "S"),
            with_subject(mk("z", 65), "S")]
-    sel.select(evs, CFG)
+    sel.select(evs, dict(CFG, core_min_count=2))      # 최소 채우기 없이 같은 주체 한도만 본다
     kept = {e["event_id"] for e in evs if e["slot"] in ("core", "brief")}
     assert {"y", "x"} <= kept and "z" not in kept
 
@@ -43,16 +43,16 @@ def test_same_subject_counts_core_and_brief_together():
     evs = [with_subject(mk("a", 95), "S사"), with_subject(mk("b", 92), "S사"), with_subject(mk("c", 90), "S사"), with_subject(mk("d", 70), "T사")]
     sel.select(evs, CFG)
     s = {e["event_id"]: e["slot"] for e in evs}
-    assert s["a"] == s["b"] == "core" and s["c"] == "out" and s["d"] == "brief"
+    assert s["a"] == s["b"] == "core" and s["c"] == "out" and s["d"] == "core"     # d는 최소 채우기로 핵심
 
 
-def test_brief_max_and_core_no_cap_config():
+def test_brief_max_and_core_fill_config():
     evs = [mk(f"e{i}", 70 - i) for i in range(9)]
     sel.select(evs, CFG)
-    assert sum(e["slot"] == "brief" for e in evs) == 4
+    assert sum(e["slot"] == "core" for e in evs) == 4 and sum(e["slot"] == "brief" for e in evs) == 5     # 80점 이상이 없어도 핵심 4건을 채운다
     evs = [mk(x, 95 - n) for n, x in enumerate("abcde")] + [mk(f"e{i}", 70 - i) for i in range(9)]
     sel.select(evs, CFG)
-    assert sum(e["slot"] == "core" for e in evs) == 5 and sum(e["slot"] == "brief" for e in evs) == 4     # 핵심 5건(상한 없음)이어도 단신은 줄지 않는다
+    assert sum(e["slot"] == "core" for e in evs) == 5 and sum(e["slot"] == "brief" for e in evs) == 6     # 핵심 5건이어도 단신은 최대 6건
 
 
 # 더 볼 거리 후보 ---------------------------------------------------------------------
@@ -106,7 +106,7 @@ def test_core_article_schema_requires_watch_and_figures_and_retries():
     recs = {r["doc_id"]: r for r in sample_records()}
     d = [r for r in sample_records() if r["publisher"] == "Lam Research"][0]["doc_id"]
     ev = ev_mod.new_event("EVT-2026W49-01", "event", [d], d, "Lam Research", "t", "가제목", "T2_EQUIPMENT")
-    ev.update(slot="core", score={"tiers": {"field_maturity": 20, "evidence_level": 20}, "claim": "c", "maturity": "m", "fact": [],
+    ev.update(slot="core", score={"tiers": {"specificity": 15, "evidence_level": 22}, "claim": "c", "maturity": "m", "fact": [],
                                   "mtc_impact": "", "action_watch": "", "unresolved": [], "evidence": []})
     good = {"event_id": ev["event_id"], "title": "제목", "title_alternatives": ["가", "나"], "body": fill("본문", 450),
             "watch": "확인할 지표", "key_figures": [{"value": "30%", "label": "최대 단축"}], "evidence_ids": [f"{d}/P1"]}
@@ -115,7 +115,7 @@ def test_core_article_schema_requires_watch_and_figures_and_retries():
     c = FakeClient({"s6_article": lambda u: next(seq)})
     art, failed = draftmod.gen_article(Judge(c), ev, "core", recs, CFG)
     assert not failed and art["key_figures"] == [{"value": "30%", "label": "최대 단축"}] and c.steps() == ["s6_article", "s6_article"]
-    assert art["watch"] == "확인할 지표" and art["tags"] == ["장비사", "양산·상시 운영", "운영사 발표"]
+    assert art["watch"] == "확인할 지표" and art["tags"] == ["장비사", "운영사 발표"]
     nowatch = {k: v for k, v in good.items() if k != "watch"}
     c = FakeClient({"s6_article": lambda u: nowatch})
     art, failed = draftmod.gen_article(Judge(c), ev, "core", recs, CFG)
@@ -348,10 +348,10 @@ def test_issue_number_counts_earlier_issues(tmp_path):
 
 
 def test_tags_by_tier():
-    ev = {"primary_topic": "T1_CHIPMAKER", "score": {"tiers": {"field_maturity": 15, "evidence_level": 25}}}
-    assert draftmod.make_tags(ev, "core") == ["칩메이커", "현장 실증·적용", "독립 검증·기관 확정"]
-    ev["score"]["tiers"] = {"field_maturity": 5, "evidence_level": 5}
-    assert draftmod.make_tags(ev, "core") == ["칩메이커", "구상·연구", "언론 보도"] and draftmod.make_tags(ev, "brief") == ["칩메이커"]
+    ev = {"primary_topic": "T1_CHIPMAKER", "score": {"tiers": {"specificity": 15, "evidence_level": 30}}}
+    assert draftmod.make_tags(ev, "core") == ["칩메이커", "독립 검증·기관 확정"]          # 성숙도 꼬리표는 개편에서 폐지
+    ev["score"]["tiers"] = {"specificity": 5, "evidence_level": 8}
+    assert draftmod.make_tags(ev, "core") == ["칩메이커", "언론 보도"] and draftmod.make_tags(ev, "brief") == ["칩메이커"]
     assert draftmod.make_tags({"primary_topic": None, "score": None}, "core") == []
 
 

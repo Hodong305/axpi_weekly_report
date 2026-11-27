@@ -36,7 +36,7 @@ def test_config_v47_keys():
     assert CFG["newsletter_theme"] == "B6"
     assert (CFG["deck_chars"], CFG["point_chars"], CFG["figure_why_chars"], CFG["watch_chars"]) == (120, 180, 80, 160)
     assert CFG["core_chars"] == [400, 640] and CFG["brief_chars"] == [90, 150] and CFG["summary_chars"] == [140, 240]
-    assert CFG["more_line_chars"] == 120 and CFG["punch_chars"] == 320 and CFG["issue_body_max"] == 9000 and CFG["article_title_max"] == 50
+    assert CFG["more_line_chars"] == 120 and CFG["punch_chars"] == 320 and CFG["issue_body_max"] == 11000 and CFG["article_title_max"] == 50
     th = render.load_themes()
     for t in ("B6", "S4"):
         assert th[t]["gloss_top"] is True and th[t]["numbers_panel"] is True and th[t]["show_body"] is True

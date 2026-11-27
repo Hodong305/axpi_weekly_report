@@ -246,7 +246,7 @@ class Pipeline:
             self.goto("S5")
             return
         self.step_header("S4")
-        sc_mod.score_events(self.judge, self.state["events"], self.records, self.state["fit"])
+        sc_mod.score_events(self.judge, self.state["events"], self.records, self.state["fit"], self.cfg)
         for e in self.state["events"]:
             if e["status"] == "PENDING":      # 방어: 채점되지 않은 사건은 보류로 둔다
                 e.update(status="HOLD", note="채점 누락")

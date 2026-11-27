@@ -1,5 +1,5 @@
 # MTC AX/PI 위클리 설정값 (설계서 v4.7 10장). 값을 바꾸면 config_version을 올린다.
-config_version: "10"
+config_version: "11"
 
 paths:
   work_dir: work      # 주차별 작업 폴더: candidates/, manual/, prompts/
@@ -42,11 +42,13 @@ thresholds:
 # 사내 파이프라인 값 (설계서 7.2, 9장)
 internal:
   core_min_score: 80
+  core_max: 6                 # 핵심 최대 건수(v4.7 개편)
+  core_mtc_min: 30            # 핵심 자격: MTC 연관성(적용 영역 + 대상) 최소 점수. 미달이면 게재 상한이 단신
   core_gap: 10                # 핵심 낙차 컷(9.5): 바로 앞 사건보다 이 점수 이상 떨어지는 첫 지점에서 핵심을 자른다(상한 없음)
-  core_min_count: 4           # 낙차와 관계없이 최소 핵심 건수(80점 이상 사건 안에서). 낙차 컷은 이 건수 뒤부터 적용
+  core_min_count: 4           # 최소 핵심 건수. 80점 이상이 모자라면 핵심 자격(MTC 연관성 충족) 사건을 점수 순으로 채운다. 낙차 컷은 이 건수 뒤부터
   core_alert_count: 8         # 핵심이 이 건수를 넘으면 검토 요청 ①에 '줄이려면 순위를 조정하세요'를 표시한다
   competitor_core_min: 2      # 핵심 자격이 있는 경쟁사 사건을 핵심에 먼저 배정하는 최소 건수
-  brief_min_score: 60
+  brief_min_score: 55
   ledger_lookback_issues: 12
   article_title_max: 50        # 전문 용어에 쉬운 수식어를 붙일 여유(36 → 50)
   issue_title_max: 30         # 이번 주 헤드라인
@@ -54,7 +56,7 @@ internal:
   punch_chars: 320            # 이번 주 한 방(text+twist, big 제외): 무엇을 잰 숫자인지 + 무엇과 비교해 왜 중요한지
   core_chars: [400, 640]      # 핵심 본문(자세히: 배경·방식·조건·업계 맥락 4~6문장). 요점(points)과 겹치지 않게
   brief_chars: [90, 150]      # 단신 2문장: 무슨 일 + 왜 볼 만한지
-  issue_body_max: 9000        # 한 방 + 핵심(한 줄 핵심·요점·본문·MTC AX Insight·수치 의미) + 단신 합계(핵심 4건 기준)
+  issue_body_max: 11000       # 한 방 + 핵심(한 줄 핵심·요점·본문·MTC AX Insight·수치 의미) + 단신 합계(핵심 6·단신 6 기준, 약 17분)
   deck_chars: 120             # 핵심 기사 한 줄 핵심(30초 브리핑에도 쓴다): 주체·사건·결과 + 왜 중요한지
   point_chars: 180            # 핵심 기사 요점(무슨 일 · 얼마나 · 왜 중요 · 어디까지) 각 1~2문장
   figure_why_chars: 80        # 수치의 "왜 중요"(비교 기준·업무상 의미)
@@ -78,11 +80,11 @@ internal:
     - {name: "PSMC", aliases: ["力積電", "力积电", "Powerchip", "Powerchip Semiconductor"]}
     - {name: "Rapidus", aliases: ["ラピダス", "라피더스"]}
   verbatim_max_run: 30
-  brief_max: 4                # 단신 최대 건수
+  brief_max: 6                # 단신 최대 건수(v4.7 개편)
   search_terms_max: 3         # 기사(핵심·단신)당 검색어 최대 개수. 근거 블록에 그대로 있는 원문 표기만 남긴다(9.7)
   same_subject_max: 2         # 핵심+단신에서 같은 주체 최대 건수
   watch_chars: 160            # 핵심 기사 'MTC AX Insight' 1~2문장
-  more_max: 20                # 더 볼 거리 최대 건수
+  more_max: 8                 # 더 볼 거리 최대 건수
   more_line_chars: 120        # 더 볼 거리: 무슨 자료인지 + 왜 볼 만한지
   newsletter_name: "MTC AX Tech Brief"            # 후보, 확정 전. B3 테마는 끝 두 단어(Tech Brief)를 강조색으로 쓴다
   newsletter_tagline: "메모리 제조기술센터 AX/PI팀이 매주 정리하는 팹 AI 브리프"

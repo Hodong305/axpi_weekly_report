@@ -22,7 +22,7 @@ def only_event(name):
 
 def test_regression_key_outcomes():
     e = only_event("1_late_evidence")                  # 후반 문단 근거 → 재분류로 통과, 핵심
-    assert (e["status"], e["slot"], e["total"]) == ("PASS", "core", 85)
+    assert (e["status"], e["slot"], e["total"]) == ("PASS", "core", 82)       # 30 + 대상 10 + 22 + 15 + 5
     e = only_event("2_design_manufacturing_mixed")     # 설계·제조 혼재 → 판단 보류
     assert (e["kind"], e["status"], e["slot"], e["total"]) == ("hold_doc", "HOLD", "hold", None)
     e = only_event("3_operating_and_future")           # 운영 중 + 향후 시험: 유형을 따로 기록

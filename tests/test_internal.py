@@ -184,8 +184,10 @@ class FakeClient:
         eid = re.search(r'"event_id": "(EVT-[^"]+)"', user).group(1)
         doc = pick_doc(user)
         subject = re.search(r'"subject": "([^"]+)"', user).group(1)
-        tiers = {"Lam Research": (30, 20, 20, 15, 10), "예시반도체": (30, 20, 15, 10, 10), "Foundry Co": (20, 15, 10, 10, 5)}[subject]
-        names = sc_mod.METRICS
+        # 모델 지표(적용 영역, 근거, 구체성, 변화). 대상(T2 → 10)은 코드가 더한다: Lam 87, 예시반도체 82,
+        # Foundry Co 57(적용 영역 10 = 산업 배경 → 게재 상한 단신. 단일 언론 근거는 개편에서 상한이 아니다)
+        tiers = {"Lam Research": (30, 22, 15, 10), "예시반도체": (30, 22, 15, 5), "Foundry Co": (10, 22, 10, 5)}[subject]
+        names = sc_mod.MODEL_METRICS
         return {"event_id": eid, "status": "PASS", "primary_topic": "T2_EQUIPMENT", "claim": f"{subject} 대표 주장",
                 "evidence_ids": [{"id": f"{doc}/P1", "type": "실측"}], "maturity": "양산·상시 운영",
                 "score_tiers": {m: {"tier": t, "reason": "사유"} for m, t in zip(names, tiers)},
@@ -386,16 +388,30 @@ def test_source_block_wraps_and_escapes():
 
 # 점수·상한 ------------------------------------------------------------------------
 
-def tiers(f=30, e=20, m=20, c=15, a=10):
-    return {k: {"tier": v, "reason": "r"} for k, v in zip(sc_mod.METRICS, (f, e, m, c, a))}
+def tiers(f=30, e=22, m=15, c=10, t=None):
+    """f 적용 영역, e 근거, m 구체성, c 이번 주 변화, t 대상(코드 몫, None이면 모델 응답 모양)."""
+    d = {"mtc_area": f, "evidence_level": e, "specificity": m, "weekly_change": c}
+    if t is not None:
+        d["mtc_target"] = t
+    return {k: {"tier": v, "reason": "r"} for k, v in d.items()}
 
 
 def test_total_and_tier_validation():
-    assert sc_mod.compute_total(tiers()) == 95
-    assert sc_mod.compute_total(tiers(f="미확인")) is None
+    assert sc_mod.compute_total(tiers(t=15)) == 92
+    assert sc_mod.compute_total(tiers(30, 30, 15, 10, 15)) == 100
+    assert sc_mod.compute_total(tiers(f="미확인", t=15)) is None
     assert sc_mod.tier_errors(tiers()) == []
-    assert len(sc_mod.tier_errors(tiers(f=25))) == 1          # 25는 FAB 관련성 허용값이 아님
-    assert len(sc_mod.tier_errors(tiers(a=7))) == 1
+    assert len(sc_mod.tier_errors(tiers(f=25))) == 1          # 25는 적용 영역 허용값이 아님
+    assert len(sc_mod.tier_errors(tiers(e=25))) == 1          # 근거 수준은 30/22/15/8
+    assert len(sc_mod.tier_errors(tiers(c=15))) == 1          # 이번 주 변화는 10/5/0
+    assert set(sc_mod.SCORE_SCHEMA["properties"]["score_tiers"]["required"]) == set(sc_mod.MODEL_METRICS)   # 대상은 모델이 반환하지 않는다
+
+
+def test_target_tier_by_code():
+    assert sc_mod.target_tier("T1_CHIPMAKER", "") == 15
+    assert sc_mod.target_tier("T4_PHYSICAL_AI", "GlobalFoundries") == 15      # 경쟁사 팹의 Physical AI
+    assert sc_mod.target_tier("T2_EQUIPMENT", "") == sc_mod.target_tier("T3_SOLUTION", "") == 10
+    assert sc_mod.target_tier("T4_PHYSICAL_AI", "") == 5
 
 
 def recs_for(*specs):
@@ -404,13 +420,18 @@ def recs_for(*specs):
 
 def test_placement_caps():
     off = recs_for(("company_official", "A"))
-    assert sc_mod.compute_cap({}, off, tiers(), "core", "T2_EQUIPMENT") == ("core", [])
-    assert sc_mod.compute_cap({}, off, tiers(f=10), "core", "T1_CHIPMAKER")[0] == "brief"                      # 산업 배경
-    assert "공급사 구상" in sc_mod.compute_cap({}, off, tiers(m=5), "core", "T3_SOLUTION")[1]                   # 공급사 구상
-    assert sc_mod.compute_cap({}, off, tiers(m=5), "core", "T2_EQUIPMENT")[0] == "core"
-    assert "단일 언론 근거" in sc_mod.compute_cap({}, recs_for(("press", "A")), tiers(), "core", "T2_EQUIPMENT")[1]
-    assert sc_mod.compute_cap({}, recs_for(("company_official", "B")), tiers(), "core", "T2_EQUIPMENT")[1] == ["B 경로 전이 사례"]
-    assert sc_mod.compute_cap({}, off, tiers(), "brief", "T2_EQUIPMENT")[0] == "brief"                         # 모델이 낮춘 상한은 존중
+    assert sc_mod.compute_cap({}, off, tiers(t=10), "core", "T2_EQUIPMENT") == ("core", [])
+    assert sc_mod.compute_cap({}, off, tiers(f=10, t=15), "core", "T1_CHIPMAKER")[0] == "brief"                # 산업 배경
+    assert "공급사 구상" in sc_mod.compute_cap({}, off, tiers(m=5, t=10), "core", "T3_SOLUTION")[1]             # 공급사 구상
+    assert sc_mod.compute_cap({}, off, tiers(m=5, t=10), "core", "T2_EQUIPMENT")[0] == "core"
+    # v4.7 개편: 단일 언론 근거는 상한이 아니다(근거 수준 점수로만 반영)
+    assert sc_mod.compute_cap({}, recs_for(("press", "A")), tiers(e=8, t=10), "core", "T2_EQUIPMENT") == ("core", [])
+    # MTC 연관성(적용 영역 + 대상) 30 미만이면 핵심이 될 수 없다: 인접 영역 20 + 비경쟁사 Physical AI 5 = 25
+    cap, why = sc_mod.compute_cap({}, off, tiers(f=20, t=5), "core", "T4_PHYSICAL_AI")
+    assert cap == "brief" and why == ["MTC 연관성 미달(25<30)"]
+    assert sc_mod.compute_cap({}, off, tiers(f=20, t=10), "core", "T2_EQUIPMENT")[0] == "core"                 # 20 + 10 = 30
+    assert sc_mod.compute_cap({}, recs_for(("company_official", "B")), tiers(t=10), "core", "T2_EQUIPMENT")[1] == ["B 경로 전이 사례"]
+    assert sc_mod.compute_cap({}, off, tiers(t=10), "brief", "T2_EQUIPMENT")[0] == "brief"                     # 모델이 낮춘 상한은 존중
 
 
 def test_apply_result_hold_has_no_total():
@@ -419,7 +440,7 @@ def test_apply_result_hold_has_no_total():
     ev = ev_mod.new_event("EVT-2026W49-01", "event", [d], d, "S", "T", "가제목", "T2_EQUIPMENT")
     ev["status"] = "PENDING"
     res = {"event_id": ev["event_id"], "status": "PASS", "primary_topic": "T2_EQUIPMENT", "claim": "c", "evidence_ids": [{"id": f"{d}/P1", "type": "실측"}],
-           "maturity": "실증", "score_tiers": tiers(a="미확인"), "placement_cap": "core", "fact": [], "mtc_impact": "", "action_watch": "", "unresolved": []}
+           "maturity": "실증", "score_tiers": tiers(c="미확인"), "placement_cap": "core", "fact": [], "mtc_impact": "", "action_watch": "", "unresolved": []}
     fitr = {d: {"route": "REVIEW"}}
     sc_mod.apply_result(ev, res, recs, fitr)
     assert ev["status"] == "HOLD" and ev["score"]["total"] is None and "근거 미확인" in ev["flags"]
@@ -450,8 +471,8 @@ CFG = settings_mod.load().internal
 
 def mk(eid, total, fab=30, evi=20, chg=10, cap="core"):
     e = ev_mod.new_event(eid, "event", [eid], eid, "S" + eid, "T", "가제목 " + eid, "T2_EQUIPMENT")
-    e.update(status="PASS", cap=cap, score={"total": total, "tiers": {"fab_relevance": fab, "evidence_level": evi, "field_maturity": 15,
-                                                                      "weekly_change": chg, "actionability": 5},
+    e.update(status="PASS", cap=cap, score={"total": total, "tiers": {"mtc_area": fab, "mtc_target": 10, "evidence_level": evi,
+                                                                      "specificity": 15, "weekly_change": chg},
                                             "claim": "c", "maturity": "실증", "evidence": [], "fact": [], "unresolved": []})
     return e
 
@@ -467,30 +488,33 @@ def test_selection_core_up_to_four_and_brief_three():
     evs = [mk("a", 88), mk("b", 85), mk("c", 84), mk("d", 70), mk("e", 65), mk("f", 61), mk("g", 59)]
     sel.select(evs, CFG3)
     s = slots(evs)
-    assert [s[k][0] for k in "abc"] == ["core"] * 3 and s["a"] == ("core", 1)          # 80점 이상을 낙차(10점)에서 자른다: 84→70에서 컷
-    assert [s[k][0] for k in "def"] == ["brief"] * 3 and s["g"][0] == "out"            # 단신 최대 3(CFG3), 59점은 brief_min 미만
+    assert [s[k][0] for k in "abcd"] == ["core"] * 4 and s["a"] == ("core", 1)         # 80점 이상이 3건뿐이라 핵심 자격 70점(d)으로 4건을 채운다
+    assert [s[k][0] for k in "efg"] == ["brief"] * 3                                    # 단신 최대 3(CFG3), 59점도 brief_min(55) 이상
+    evs = [mk("a", 88), mk("b", 54)]
+    sel.select(evs, CFG3)
+    assert slots(evs)["b"][0] == "out"                                                  # brief_min(55) 미만은 채우기에도 쓰지 않는다
 
 
 def _core_ids(evs):
     return [e["event_id"] for e in sorted(evs, key=lambda e: e["rank"] or 99) if e["slot"] == "core"]
 
 
-def test_selection_core_gap_cut_keys_and_no_upper_limit():
-    assert "core3_min_score" not in CFG and "core_max" not in CFG and CFG["brief_max"] == 4
+def test_selection_core_gap_cut_keys_and_upper_limit():
+    assert "core3_min_score" not in CFG and CFG["core_max"] == 6 and CFG["brief_max"] == 6
     assert (CFG["core_gap"], CFG["core_min_count"], CFG["core_alert_count"]) == (10, 4, 8)
     evs = [mk("a", 95), mk("b", 92), mk("c", 90), mk("d", 89), mk("e", 88), mk("f", 87), mk("g", 70)]
     sel.select(evs, CFG)
     s = slots(evs)
-    assert [s[k][0] for k in "abcdef"] == ["core"] * 6 and s["g"][0] == "brief"                              # 상한 없이 낙차(88→70 아님, 87→70)까지 전부 핵심
-    evs = [mk("a", 95), mk("b", 92), mk("c", 79)]
+    assert [s[k][0] for k in "abcdef"] == ["core"] * 6 and s["g"][0] == "brief"                              # 낙차(87→70)까지 핵심, 최대 6
+    evs = [mk("a", 95), mk("b", 92), mk("c", 91), mk("d", 90), mk("e", 79)]
     sel.select(evs, CFG)
-    assert slots(evs)["c"][0] == "brief"                                                                    # core_min_score(80) 미만은 단신
+    assert slots(evs)["e"][0] == "brief"                                                                    # 4건이 찼으면 core_min_score(80) 미만은 단신
 
 
 def test_selection_core_gap_doc_examples():
     # 설계서 9.5 예시(최소 4건, 낙차는 4번째 뒤부터)
     for scores, n in (([95, 90, 90, 85, 85, 70, 65], 5), ([95, 85, 80, 80], 4), ([95, 80, 80, 80, 80, 80, 65], 6),
-                      ([95, 85, 80], 3), ([95, 90, 85, 80, 70], 4)):
+                      ([95, 85, 80], 3), ([95, 85, 80, 72], 4), ([95, 90, 85, 80, 70], 4), ([95, 90, 90, 88, 86, 85, 84], 6)):
         evs = [mk(f"e{i}", t) for i, t in enumerate(scores)]
         sel.select(evs, CFG)
         assert len(_core_ids(evs)) == n, scores
@@ -517,7 +541,10 @@ def test_selection_core_min_count_even_when_drop_after_first():
 def test_selection_core_no_eligible_events():
     evs = [mk("a", 79), mk("b", 70), mk("c", 95, cap="brief")]
     sel.select(evs, CFG)
-    assert _core_ids(evs) == [] and all(e["slot"] == "brief" for e in evs)
+    assert _core_ids(evs) == ["a", "b"] and slots(evs)["c"][0] == "brief"       # 80점 이상이 없으면 핵심 자격 사건으로 채운다. 상한이 단신이면 95점도 단신
+    evs = [mk("c", 95, cap="brief")]
+    sel.select(evs, CFG)
+    assert _core_ids(evs) == []
 
 
 def test_selection_core_same_subject_limit_inside_cut():
@@ -532,8 +559,11 @@ def test_review1_alert_when_core_over_alert_count():
     from internal import review as rv
     counts = {"pass_docs": 9, "events": 9, "candidates": 9, "core_eligible": 9}
     evs = [mk(f"e{i}", 95 - i) for i in range(9)]
-    sel.select(evs, CFG)
+    sel.select(evs, dict(CFG, core_max=None))          # 상한을 끈 설정에서만 알림이 의미가 있다
     assert "핵심이 9건입니다. 줄이려면 순위를 조정하세요" in rv.render_review1(WEEK, counts, evs, None, CFG)
+    evs = [mk(f"e{i}", 95 - i) for i in range(9)]
+    sel.select(evs, CFG)
+    assert sum(e["slot"] == "core" for e in evs) == 6 and "줄이려면" not in rv.render_review1(WEEK, counts, evs, None, CFG)
     evs = [mk(f"e{i}", 95 - i) for i in range(8)]
     sel.select(evs, CFG)
     assert "줄이려면 순위를 조정하세요" not in rv.render_review1(WEEK, counts, evs, None, CFG)
@@ -699,13 +729,13 @@ def test_parse_review1_invalid(bad):
 
 
 def two_core_events():
-    evs = [mk("a", 88), mk("b", 82, cap="brief"), mk("c", 70)]
+    evs = [mk("a", 88), mk("b", 82, cap="brief"), mk("c", 70)]       # 검토 요청 ① 조작 시험용: 최소 채우기 없이 핵심 1건
     h = mk("h", 0)
     h.update(status="HOLD", score=None, cap=None, note="근거 미확인")
     x = mk("x", 0)
     x.update(status="EXCLUDE", note="DESIGN_ONLY")
     evs += [h, x]
-    sel.select(evs, CFG)
+    sel.select(evs, dict(CFG, core_min_count=1))
     return evs
 
 
@@ -1002,7 +1032,7 @@ def test_full_run_outputs(tmp_path):
         by_slot.setdefault(r["slot"], []).append(r)
     assert len(by_slot["core"]) == 2 and len(by_slot["brief"]) == 1 and len(by_slot["hold"]) == 1 and len(by_slot["out"]) == 1
     assert by_slot["brief"][0]["placement_cap"] == "brief" and by_slot["brief"][0]["ledger"] == "NEW"
-    assert [r["total"] for r in by_slot["core"]] == ["95", "85"]
+    assert [r["total"] for r in by_slot["core"]] == ["87", "82"]
     # draft.yaml 키
     d = yaml.safe_load((tmp_path / "review" / f"{WEEK}-draft.yaml").read_text(encoding="utf-8"))
     assert list(d) == ["issue_week", "issue_title", "issue_title_candidates", "summary", "summary_candidates", "punch", "punch_candidates", "glossary", "articles", "more", "excluded_count", "review_log"]
@@ -1057,7 +1087,7 @@ def test_review1_edit_flow_with_cap_check_and_log(tmp_path):
     assert pipe.start(pkg) == 0
     assert any(l.startswith("오류: ") for l in io.out)
     assert sum(l.startswith("━━ 검토 요청 ① 선정") for l in io.out) == 2
-    assert any(l.startswith("━━ 상한 확인 ━━ 3번은(는) 게재 상한이 '단신'입니다(단일 언론 근거).") for l in io.out)
+    assert any(l.startswith("━━ 상한 확인 ━━ 3번은(는) 게재 상한이 '단신'입니다(산업 배경).") for l in io.out)
     assert "[적용 결과]" in io.text
     rows = list(csv.DictReader(open(tmp_path / "review" / f"{WEEK}-selection.csv", encoding="utf-8")))
     assert [r["slot"] for r in rows if r["placement_cap"] == "brief" and r["slot"] in ("core", "brief")] == ["brief"]   # '단신으로 유지'
@@ -1232,7 +1262,7 @@ def test_fingerprint_change_warning(tmp_path):
     rows = {r["issue_week"]: r for r in csv.DictReader(open(tmp_path / "log" / "pilot.csv", encoding="utf-8"))}
     fp = rows[WEEK]
     assert re.fullmatch(r"[0-9a-f]{64}", fp["fp_operator_sha256"]) and fp["fp_design_version"] == "v4.7" and fp["fp_internal_version"]
-    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "10"
+    assert fp["fp_collector_version"] == "0.2.0" and fp["config_version"] == "11"
 
 
 def test_no_fingerprint_warning_when_same_or_first_issue(tmp_path):
