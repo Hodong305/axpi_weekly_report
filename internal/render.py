@@ -443,6 +443,8 @@ def _build(draft, ctx, imgs, mode):
     competitors = list(ctx.get("competitors") or [])
     radar = radar_html(ov_items, th, competitors)
     fabmap = fabmap_html(ov_items, th) if th.get("overview") in (True, "all") else ""     # overview: radar면 레이더만
+    if th.get("punch_in_numbers") and punch:        # S6: 가장 놀라운 숫자가 숫자 섹션 맨 앞에 오므로 같은 값의 타일은 한 번만
+        numbers = [x for x in numbers if x["value"].replace(" ", "") != punch["big"].replace(" ", "")]
     summary_html = to_html(segs[("summary",)], gmode) if ("summary",) in segs else html.escape(_s(draft["summary"]))
     first = re.split(r"(?<=다\.)\s", _s(draft["summary"]), maxsplit=1)[0]
     index = [{"name": n, "count": c} for n, c in (("브리핑", len(tldr)), ("숫자로 보는 이번 주", len(numbers)), ("이번 주 핵심", len(core)),
@@ -462,7 +464,7 @@ def _build(draft, ctx, imgs, mode):
     big = punch["big"] if punch else ""
     t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark", "template", "name_em_words", "name_em_color", "show_body",
                                                      "gloss_top", "numbers_panel", "footer", "gloss_mode", "overview", "core_layout",
-                                                     "stage_colors", "stage_radius", "ov_grid", "ov_line", "ov_num", "ov_pin_border")},
+                                                     "stage_colors", "stage_radius", "ov_grid", "ov_line", "ov_num", "ov_pin_border", "punch_in_numbers")},
          "has_overview": bool(radar or fabmap), "has_radar": bool(radar), "radar_html": radar, "has_fabmap": bool(fabmap), "fabmap_html": fabmap,
          "stage_legend_html": stage_legend_html(th), "overview_text": overview_text(ov_items, competitors, bool(fabmap)),
          "overview_both": bool(radar and fabmap), "overview_title": "이번 주 판도" if (radar and fabmap) else "경쟁사 레이더",
@@ -480,7 +482,7 @@ def _build(draft, ctx, imgs, mode):
          "masthead_chips": [{"chip": chip(th, c, "11.5px")} for c in ("T1", "T2", "T3", "T4")],
          "n_docs": ctx["n_docs"], "n_pub": ctx["counts"]["published"], "note": note,
          "issue_title": draft["issue_title"], "summary": draft["summary"],
-         "punch": bool(punch), "punch_big_text": big, "punch_big_size": 40 if len(big) <= 6 else 26 if len(big) <= 12 else 20,
+         "punch": bool(punch), "punch_alone": bool(punch) and not (numbers and th.get("numbers_panel", False)), "punch_big_text": big, "punch_big_size": 40 if len(big) <= 6 else 26 if len(big) <= 12 else 20,
          "punch_label_text": punch["label"] if punch else "", "punch_text_body": punch["text"] if punch else "",
          "punch_twist_body": punch["twist"] if punch else "",
          "has_status": bool(status), "status_rows": status, "status_note": ctx["note"] if status else "",
@@ -490,6 +492,10 @@ def _build(draft, ctx, imgs, mode):
     out_html = fill((TEMPLATE_DIR / th.get("template", "newsletter.html")).read_text(encoding="utf-8"), t)
     verify_static(out_html)
     return out_html, build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs, b3, show_body)
+
+
+def ctx_theme_flag(ctx, key):
+    return bool(load_themes().get(ctx.get("theme", "A"), {}).get(key))
 
 
 def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3=False, show_body=True):
@@ -507,9 +513,13 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
     if note:
         L += [note, ""]
     p = draft.get("punch")
-    if p:
+    inside = bool(p) and ctx_theme_flag(ctx, "punch_in_numbers") and t.get("show_numbers")
+    if p and not inside:
         L += [f"[{p['label']}]", f"{p['big']} — {p['text']}", p["twist"], ""]
-    if t.get("show_numbers") and t["numbers"]:
+    if inside:        # S6: 숫자로 보는 이번 주 맨 앞에 가장 놀라운 숫자
+        L += ["[숫자로 보는 이번 주]", f"{p['label']} · {p['big']} — {p['text']}", p["twist"]]
+        L += [f"- {x['value']} {x['label']} (기사 {x['num']})" + (f" — {x['why']}" if x["why"] else "") for x in t["numbers"]] + [""]
+    elif t.get("show_numbers") and t["numbers"]:
         L.append("[숫자로 보는 이번 주]")
         L += [f"- {x['value']} {x['label']} (기사 {x['num']})" + (f" — {x['why']}" if x["why"] else "") for x in t["numbers"]] + [""]
     if t["has_status"]:
