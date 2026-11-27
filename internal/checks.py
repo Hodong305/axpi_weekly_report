@@ -110,6 +110,10 @@ def _fix_text(group, old, figure):
         return f"{_QUAL[group][4]} {old}"
     if group == "over":
         first, _, rest = old.partition(" ")
+        # '9만 건'처럼 수 단위(만·억·천·조) 뒤에 띄어 쓴 단위 명사가 오면 그 명사 뒤에 붙인다('9만 넘게 건' 방지)
+        if re.search(r"\d\s*[천만억조]$", first) and rest:
+            noun, _, tail = rest.partition(" ")
+            return f"{first} {noun} 넘게" + (f" {tail}" if tail else "")
         return f"{first} 넘게" + (f" {rest}" if rest else "")
     return None
 

@@ -229,3 +229,11 @@ def test_company_alias_matches_english_source():
     assert checks.company_warnings("삼성전자와 SK하이닉스가 결함 분석에 AI를 쓴다", src, "01", al) == []
     assert [w["quote"] for w in checks.company_warnings("삼성전자가 발표했다", src, "01")] == ["삼성전자"]   # 별칭이 없으면 예전처럼 경고
     assert [w["quote"] for w in checks.company_warnings("LG전자가 발표했다", src, "01", al)] == ["LG전자"]   # 근거에 없는 회사는 경고
+
+
+def test_over_fix_places_neomge_after_counter_noun_for_korean_units():
+    from internal import checks
+    pairs = [("d/P5", "more than 90,000 inspections")]
+    w = checks.number_warnings("서브팹 9만 건 점검", pairs, ["x"], "01")
+    assert len(w) == 1 and w[0]["fix"]["old"] == "9만 건" and w[0]["fix"]["new"] == "9만 건 넘게"
+    assert checks._fix_text("over", "90,000건 점검", False) == "90,000건 넘게 점검"      # 기존 동작 유지
