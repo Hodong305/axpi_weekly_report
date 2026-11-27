@@ -4,7 +4,8 @@
 
 --overlay: 기사별로 덮어쓸 값. 예) {EVT-2026W48-32: {area: maintenance, stage: scaled}, EVT-2026W48-40: {company: Lam Research}}
   area: process·metrology·defect·logistics·maintenance·test·fabwide / stage: plan·pilot·deployed·scaled (internal/render.py AREAS·STAGES)
-결과: {out}/{week}-{theme}.html(미리 보기, 이미지 내장)과 .txt
+결과: {out}/{week}-{theme}.html(미리 보기, 이미지 내장)과 .txt, --eml이면 .eml(메일 프로그램으로 열 수 있는 초안, 이미지 cid 내장)
+발송본과 같은 마지막 검사(가상·견본 데이터 흔적)를 거친다.
 """
 import argparse
 import json
@@ -15,7 +16,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from internal import metrics, render, settings as settings_mod  # noqa: E402
+from internal import checks, metrics, render, settings as settings_mod  # noqa: E402
 from internal.draft import load_draft  # noqa: E402
 from internal.intake import load_package  # noqa: E402
 
@@ -26,6 +27,7 @@ def main():
     ap.add_argument("--theme", default="B7")
     ap.add_argument("--overlay")
     ap.add_argument("--out")
+    ap.add_argument("--eml", action="store_true")
     a = ap.parse_args()
     s = settings_mod.load()
     cfg = s.internal
@@ -56,11 +58,17 @@ def main():
            "competitors": [c["name"] for c in cfg.get("competitors") or []],
            "image_loader": load_image, "image_max_kb": cfg["image_max_kb"], "read_chars_per_min": cfg.get("read_chars_per_min", 500)}
     built = render.build_all(d, ctx)
+    left = checks.placeholder_hits(d, built["text"])
+    if left:
+        raise SystemExit("가상·견본 데이터 흔적이 있어 만들지 않았습니다: " + ", ".join(f"{h['scope']} '{h['quote']}'" for h in left[:10]))
     out = Path(a.out) if a.out else s.out_dir(week).parent / f"{week}-preview"
     out.mkdir(parents=True, exist_ok=True)
     html_path = out / f"{week}-{a.theme}.html"
     html_path.write_text(built["html_preview"], encoding="utf-8")
     html_path.with_suffix(".txt").write_text(built["text"], encoding="utf-8")
+    if a.eml:
+        ctx["newsletter_from"] = cfg.get("newsletter_from", "")
+        html_path.with_suffix(".eml").write_bytes(render.build_eml(d, ctx, built).as_bytes())
     print(html_path)
 
 
