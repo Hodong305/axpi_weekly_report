@@ -2,7 +2,7 @@
 import io
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from importlib.metadata import version as pkg_version
 from urllib.parse import urljoin, urlsplit
@@ -24,6 +24,23 @@ def _ver(pkg):
 
 
 # 날짜 --------------------------------------------------------------------
+
+DATE_FLOOR = date(1995, 1, 1)      # 이보다 이른 발행일은 사이트의 기본값·자리 표시로 본다(1970-01-01 등)
+DATE_FUTURE_DAYS = 2                # 수집일보다 이 날수를 넘어 미래인 발행일도 믿지 않는다
+
+
+def plausible_date(d, today=None):
+    """발행일(YYYY-MM-DD)이 말이 되는지. 1995-01-01 이전(1970-01-01 같은 기본값)이나 수집일 +2일 이후면 False.
+    False인 값은 버리고 다음 날짜 출처로 넘어간다(설계서 4.4). 남는 출처가 없으면 DATE_UNCERTAIN → 수동 보완 큐."""
+    if not d:
+        return False
+    try:
+        dd = date.fromisoformat(str(d)[:10])
+    except ValueError:
+        return False
+    today = today or date.today()
+    return DATE_FLOOR <= dd <= today + timedelta(days=DATE_FUTURE_DAYS)
+
 
 def parse_when(value):
     """문자열 → (published_at 또는 None, published_date 또는 None).
@@ -142,8 +159,12 @@ def html_metadata(text, final_url):
                ("article:published_time", _meta(doc, "article:published_time", "datePublished")),
                ("time[datetime]", (doc.xpath("//time/@datetime") or [None])[0])]
     m["published_at"] = m["published_date"] = m["date_source"] = None
+    m["date_rejected"] = []
     for src, val in pub_src:
         at, d = parse_when(val)
+        if d and not plausible_date(d):
+            m["date_rejected"].append(f"{src}={d}")       # 사이트 기본값(1970-01-01 등)은 버리고 다음 출처로
+            continue
         if d:
             m["published_at"], m["published_date"], m["date_source"] = at, d, src
             break

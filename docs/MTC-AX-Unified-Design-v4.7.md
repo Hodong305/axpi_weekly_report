@@ -25,6 +25,8 @@
 
 견본: `docs/samples/sample-draft-v4.7.yaml`을 `python tools/render_sample.py --png`로 B3·B4·B5 각각 만들어 비교한다(`out_internal/samples/`).
 
+**수집 단계 보완(v4.7, 2026-W48 사례).** TSMC 뉴스룸(`pr.tsmc.com`) 기사가 JSON-LD `datePublished`에 사이트 기본값 `1970-01-01`을 담고 있었고, 수집기가 이를 그대로 믿어 11월 17일 기사를 `OUT_OF_WINDOW`로 제외했다. 이제 발행일 후보마다 타당성(1995-01-01 이후, 수집일 +2일 이내)을 확인해 아닌 값은 버리고 다음 출처로 넘어가며, 남는 출처가 없으면 제외하지 않고 수동 보완 큐로 보낸다(4.4, 6.2).
+
 ### v4.6 개정 요약 (v4.5 대비)
 
 | 구분 | v4.5 | v4.6 |
@@ -112,7 +114,7 @@
 |---|---|
 | `published_at`(오프셋 포함) | KST로 변환해 기간과 비교 |
 | `published_date`만 | 날짜끼리 비교: `window_start` 날짜 ≤ 발행일 < `window_end_exclusive` 날짜. 자정 시각을 만들지 않는다 |
-| 둘 다 없음 | `DATE_UNCERTAIN`(partial) |
+| 둘 다 없음 | `DATE_UNCERTAIN`(partial). 말이 안 되는 날짜(4.4)만 있던 경우도 여기에 해당한다 — 잘못된 날짜로 `OUT_OF_WINDOW` 제외하지 않는다 |
 
 | 귀속 결과 | 처리 |
 |---|---|
@@ -222,7 +224,7 @@ HBM·EUV·EDA·패키징 등은 검색 단서다. 공급사 공식 자료는 제
 
 | 항목 | 우선순위 |
 |---|---|
-| 발행 시각·날짜 | JSON-LD `datePublished`(또는 `uploadDate`) → `article:published_time` → `<time datetime>` → 피드 `pubDate` → URL 경로의 날짜 → PDF `CreationDate` → 수동 확인(`overrides.yaml`). 사용한 출처는 observation에 기록 |
+| 발행 시각·날짜 | JSON-LD `datePublished`(또는 `uploadDate`) → `article:published_time` → `<time datetime>` → 피드 `pubDate` → URL 경로의 날짜 → PDF `CreationDate` → 수동 확인(`overrides.yaml`). 사용한 출처는 observation에 기록. **말이 안 되는 날짜는 버리고 다음 출처로 넘어간다(v4.7)**: 1995-01-01 이전(사이트가 빈 칸에 넣는 기본값 `1970-01-01`, `1900-01-01`, `0001-01-01` 등)이거나 수집일 +2일보다 미래인 값. 버린 값은 observation에 `버린 발행일(기본값·불가능한 날짜): 출처=값`으로 남긴다. 남는 출처가 없으면 `DATE_UNCERTAIN`(partial, 수동 보완 큐)이며 `OUT_OF_WINDOW`로 제외하지 않는다 |
 | 수정 시각 | JSON-LD `dateModified` → `article:modified_time` (`change_at`) |
 | 제목 | JSON-LD `headline` → `og:title` → `<title>`에서 사이트명 제거 → 첫 heading. PDF는 메타데이터 Title → 첫 블록 |
 | 발행처 | 레지스트리 `publisher` → `og:site_name` → 호스트 이름 |

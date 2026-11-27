@@ -249,3 +249,20 @@ def test_design_doc_code_matches_reference():
     for block in blocks:
         for func in re.split(r"\n(?=def )", block.strip()):
             assert func.strip() in src, func.splitlines()[0]
+
+
+def test_placeholder_dates_are_rejected_and_fall_through():
+    """설계서 4.4: 1970-01-01 같은 사이트 기본값은 버리고 다음 출처로. 남는 출처가 없으면 DATE_UNCERTAIN(수동 보완), OUT_OF_WINDOW가 아니다."""
+    from datetime import date
+    from collector.extract import html_metadata, plausible_date
+    assert not plausible_date("1970-01-01") and not plausible_date("1900-01-01") and not plausible_date("0001-01-01")
+    assert plausible_date("2026-11-17", today=date(2026, 11, 27)) and not plausible_date("2026-12-31", today=date(2026, 11, 27))
+    html = ('<html lang="en"><head><title>T</title><script type="application/ld+json">'
+            '{"@type":"NewsArticle","headline":"T","datePublished":"1970-01-01T08:00:00+08:00"}</script>'
+            '<meta property="article:published_time" content="2026-11-17T09:00:00+08:00"></head><body><p>x</p></body></html>')
+    m = html_metadata(html, "https://pr.example.com/english/news/3355")
+    assert m["published_date"] == "2026-11-17" and m["date_source"] == "article:published_time"
+    assert m["date_rejected"] == ["json-ld datePublished=1970-01-01"]
+    only_bad = html.replace('<meta property="article:published_time" content="2026-11-17T09:00:00+08:00">', "")
+    m2 = html_metadata(only_bad, "https://pr.example.com/english/news/3355")
+    assert m2["published_date"] is None and m2["date_rejected"]

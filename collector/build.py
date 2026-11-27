@@ -1,7 +1,7 @@
 """레코드 생성과 상태 판정 (설계서 4.4, 5장)."""
 from urllib.parse import urlsplit
 
-from .extract import date_from_url, extract_html, extract_pdf, parse_when
+from .extract import date_from_url, extract_html, extract_pdf, parse_when, plausible_date
 from .ref import attribute, body_digest, document_key, lead_ids, to_ascii_uri
 from .settings import TOPIC_CODES
 
@@ -84,14 +84,23 @@ def build_record(group, fetched, pass_no, settings, window, override=None, manua
 
     # 메타데이터 (4.4 우선순위)
     published_at, published_date, date_src = meta.get("published_at"), meta.get("published_date"), meta.get("date_source")
+    rejected = list(meta.get("date_rejected") or [])      # 말이 안 되는 날짜(1970-01-01 등)는 버리고 다음 출처로(4.4)
     if not published_date and (group.get("date_hint") or group.get("at_hint")):
-        published_at, published_date, date_src = group.get("at_hint"), group.get("date_hint"), "feed pubDate"
+        if plausible_date(group.get("date_hint") or (group.get("at_hint") or "")[:10]):
+            published_at, published_date, date_src = group.get("at_hint"), group.get("date_hint"), "feed pubDate"
+        else:
+            rejected.append(f"feed pubDate={group.get('date_hint') or group.get('at_hint')}")
     if not published_date:
         d = date_from_url(source_url)
-        if d:
+        if d and plausible_date(d):
             published_date, date_src = d, "URL 경로"
+        elif d:
+            rejected.append(f"URL 경로={d}")
     if not published_date and meta.get("pdf_creation_date"):
-        published_date, date_src = meta["pdf_creation_date"], "PDF CreationDate"
+        if plausible_date(meta["pdf_creation_date"]):
+            published_date, date_src = meta["pdf_creation_date"], "PDF CreationDate"
+        else:
+            rejected.append(f"PDF CreationDate={meta['pdf_creation_date']}")
     if override.get("published_date"):
         published_at, published_date = None, str(override["published_date"])
         date_src = f"수동 확인({override.get('note', '근거 미기재')})"
@@ -172,6 +181,8 @@ def build_record(group, fetched, pass_no, settings, window, override=None, manua
         obs.append(f"본문 {body_chars}자, 블록 {len(blocks)}개")
     if date_src:
         obs.append(f"발행일 출처: {date_src}")
+    if rejected:
+        obs.append("버린 발행일(기본값·불가능한 날짜): " + ", ".join(rejected))
     obs.append(f"귀속 {where}")
     if source_url != to_ascii_uri(group["url"]):
         obs.append(f"대표 URL {source_url} (후보 URL {group['url']})")
