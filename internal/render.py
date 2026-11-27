@@ -24,6 +24,7 @@ TOPIC_CODE = {"T1_CHIPMAKER": "T1", "T2_EQUIPMENT": "T2", "T3_SOLUTION": "T3", "
 TOPIC_ICON = {"T1": "🏭", "T2": "⚙️", "T3": "📊", "T4": "🤖", "B": "🧪"}
 TOPIC_NAME = {"T1": "칩메이커", "T2": "장비사", "T3": "제조 솔루션", "T4": "Physical AI", "B": "기반기술 전이 사례"}
 GLOSS_STYLE = "color:#7a8597;font-size:12.5px;"
+SEMAFORM_LABELS = {"what": "사실 · 무슨 일", "how_much": "사실 · 얼마나", "why": "해석 · 왜 중요", "scope": "해석 · 근거와 한계"}
 
 
 def load_themes():
@@ -216,6 +217,111 @@ def to_plain(segs):
     return "".join(t + (f"({m})" if m else "") for t, m in segs)
 
 
+# v4.7 B7: 이번 주 판도(칩메이커 레이더 · 팹 지도) ----------------------------------------------------------
+# 기사에 area·stage(영역·단계 코드, 지금은 편집자가 원고에 적는다)가 있을 때만 그린다. 회사·칩메이커 여부는 사건 정보에서 가져온다.
+AREAS = (("process", "공정 최적화"), ("metrology", "검사·계측"), ("defect", "결함·수율 분석"), ("logistics", "팹 물류"),
+         ("maintenance", "설비 보전·순찰"), ("test", "테스트·후공정"))
+AREA_FABWIDE = ("fabwide", "팹 전체")
+AREA_NAME = dict(AREAS + (AREA_FABWIDE,))
+STAGES = {"plan": ("계획", "#eceef2", "#3f4652", "발표·계획·연구 소개"), "pilot": ("실증", "#fdecc4", "#7a4b00", "개발·시범·실증 중"),
+          "deployed": ("적용", "#d5f3df", "#14532d", "일부 현장 적용"), "scaled": ("확대", "#15803d", "#ffffff", "여러 팹 확대·상시 운영")}
+
+
+def stage_chip(stage, num=""):
+    lab, bg, fg, _ = STAGES[stage]
+    n = f' <span style="font-weight:normal;opacity:.8;">{html.escape(num)}</span>' if num else ""
+    return (f'<span style="display:inline-block;background:{bg};color:{fg};font-size:11.5px;font-weight:bold;padding:2px 7px;'
+            f'border-radius:5px;white-space:nowrap;margin:1px 0;">{lab}{n}</span>')
+
+
+def overview_items(draft, nums, by_id=None):
+    """판도에 쓸 기사: [{num, company, chipmaker, area, stage}] (area·stage가 알려진 코드인 것만, 브리핑 번호 순).
+    회사는 원고의 company(편집자가 고친 값)가 우선이고, 없으면 사건의 경쟁사 이름 → 주체(subject). 칩메이커 여부도 같은 순서
+    (원고의 chipmaker → 경쟁사이거나 분야가 칩메이커인 사건)."""
+    out = []
+    for i, a in enumerate(draft.get("articles") or []):
+        ev = (by_id or {}).get(a.get("event_id")) or {}
+        company = a.get("company") or ev.get("competitor") or ev.get("subject") or ""
+        chip = a["chipmaker"] if "chipmaker" in a else (bool(ev.get("competitor")) or ev.get("primary_topic") == "T1_CHIPMAKER")
+        if i in nums and a.get("area") in AREA_NAME and a.get("stage") in STAGES and company:
+            out.append({"num": nums[i], "company": _s(company), "chipmaker": bool(chip), "area": a["area"], "stage": a["stage"]})
+    return sorted(out, key=lambda x: x["num"])
+
+
+def radar_html(items, th, competitors=()):
+    """칩메이커 레이더: 회사(행) × 영역(열), 칸에는 단계 꼬리표와 브리핑 번호. 이번 주 소식이 없는 경쟁사는 표 아래 한 줄로."""
+    by_co = {}
+    for it in items:
+        if it["chipmaker"]:
+            by_co.setdefault(it["company"], {}).setdefault(it["area"], []).append(it)
+    rows = list(by_co.items())
+    if not rows:
+        return ""
+    cols = AREAS + (AREA_FABWIDE,)
+    b = th["card_border"]
+    head = "".join(f'<td align="center" valign="bottom" style="padding:6px 2px;font-size:11.5px;font-weight:bold;line-height:1.3;color:{th["ink"]};'
+                   f'background:{th["soft"]};border:1px solid {b};">{html.escape(n)}</td>' for _, n in cols)
+    body = ""
+    for name, cells in rows:
+        tds = "".join(f'<td align="center" valign="middle" style="padding:6px 2px;border:1px solid {b};">'
+                      + "<br>".join(stage_chip(x["stage"], x["num"]) for x in cells.get(k, [])) + "</td>" for k, _ in cols)
+        body += (f'<tr><td valign="middle" style="padding:6px 8px;border:1px solid {b};font-size:13px;font-weight:800;line-height:1.3;">'
+                 f'{html.escape(name)}</td>{tds}</tr>')
+    seen = {r[0] for r in rows}
+    quiet = [c for c in competitors if c not in seen]
+    quiet_html = (f'<div style="font-size:12.5px;color:{th["muted"]};margin-top:8px;">이번 주 제조 AI 소식 없음 · {html.escape(" · ".join(quiet))}</div>'
+                  if quiet else "")
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:fixed;">'
+            f'<tr><td width="88" style="background:{th["soft"]};border:1px solid {b};"></td>{head}</tr>{body}</table>{quiet_html}')
+
+
+def fabmap_html(items, th):
+    """팹 지도: 공정 영역을 왼쪽에서 오른쪽으로 놓고, 영역마다 이번 주 기사(번호·회사)를 꽂는다. 소식 없는 영역은 흐리게."""
+    if not items:
+        return ""
+    on, off = th["accent"], "#c3cad3"
+    cells, pins = "", ""
+    for k, n in AREAS:
+        here = [x for x in items if x["area"] == k]
+        c = on if here else off
+        cells += (f'<td align="center" valign="top" style="padding:0 3px;">'
+                  f'<div style="height:4px;background:{c};margin:7px 0 0 0;"></div>'
+                  f'<div style="width:14px;height:14px;border-radius:50%;background:{"#ffffff" if not here else c};border:3px solid {c};margin:-9px auto 0 auto;"></div>'
+                  f'<div style="font-size:12px;font-weight:800;line-height:1.3;margin-top:6px;color:{th["ink"] if here else "#9aa5b1"};">{html.escape(n)}</div></td>')
+        pins += ('<td valign="top" style="padding:6px 3px 0 3px;">' + ("".join(
+            f'<div style="background:{th["soft"]};border:1px solid {th["card_border"]};border-radius:7px;padding:5px 6px;margin-bottom:5px;'
+            f'font-size:12px;line-height:1.4;"><b style="color:{on};">{html.escape(x["num"])}</b> {html.escape(x["company"])}<br>{stage_chip(x["stage"])}</div>'
+            for x in here) or f'<div style="font-size:11.5px;color:#a4adb8;text-align:center;">소식 없음</div>') + "</td>")
+    wide = [x for x in items if x["area"] == AREA_FABWIDE[0]]
+    wide_html = ("" if not wide else
+                 f'<div style="font-size:12.5px;margin-top:8px;border-top:1px dashed {th["card_border"]};padding-top:7px;"><b>팹 전체</b> · '
+                 + " · ".join(f'<b style="color:{on};">{html.escape(x["num"])}</b> {html.escape(x["company"])} {stage_chip(x["stage"])}' for x in wide) + "</div>")
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;"><tr>{cells}</tr><tr>{pins}</tr></table>'
+            + wide_html)
+
+
+def stage_legend_html():
+    return " ".join(f'{stage_chip(k)} <span style="font-size:11.5px;color:#6b7480;">{STAGES[k][3]}</span>&nbsp;&nbsp;' for k in STAGES)
+
+
+def overview_text(items, competitors=()):
+    """텍스트본의 [이번 주 판도]."""
+    if not items:
+        return []
+    L = ["[이번 주 판도]", "칩메이커 레이더 (회사 · 영역 · 단계 · 브리핑 번호)"]
+    chips = [x for x in items if x["chipmaker"]]
+    L += [f"- {x['company']}: {AREA_NAME[x['area']]} · {STAGES[x['stage']][0]} ({x['num']})" for x in chips]
+    quiet = [c for c in competitors if c not in {x["company"] for x in chips}]
+    if quiet:
+        L.append("이번 주 제조 AI 소식 없음: " + " · ".join(quiet))
+    L.append("팹 지도 (영역별 이번 주 소식)")
+    for k, n in AREAS + (AREA_FABWIDE,):
+        here = [f"{x['num']} {x['company']}" for x in items if x["area"] == k]
+        if here or k != AREA_FABWIDE[0]:
+            L.append(f"- {n}: " + (", ".join(here) if here else "소식 없음"))
+    return L + [""]
+
+
 def build(draft, ctx):
     """미리 보기용 HTML(이미지는 data URI)과 텍스트본. 반환: (html, text)"""
     r = build_all(draft, ctx)
@@ -277,7 +383,10 @@ def _build(draft, ctx, imgs, mode):
         pts = a.get("points") or {}
         points = [{"label": lab, "text_html": to_html(segs[("articles", i, "point_" + k)], gmode)}
                   for k, lab in POINT_LABELS if pts.get(k) and ("articles", i, "point_" + k) in segs]
-        return {"pill_html": topic_pill(th, code), "topic_name": B3_NAME[code], "deck": a.get("deck") or "",
+        pt = {f"pt_{k}_html": to_html(segs[("articles", i, "point_" + k)], gmode) if pts.get(k) and ("articles", i, "point_" + k) in segs else ""
+              for k, _ in POINT_LABELS}
+        return {**pt, "has_fact": bool(pt["pt_what_html"] or pt["pt_how_much_html"]), "has_view": bool(pt["pt_why_html"] or pt["pt_scope_html"]),
+                "pill_html": topic_pill(th, code), "topic_name": B3_NAME[code], "deck": a.get("deck") or "",
                 "points": points, "has_points": bool(points), "show_body": show_body or a["slot"] != "core",
                 "fig1_value": figs[0]["value"] if figs else "", "fig1_label": figs[0]["label"] if figs else "",
                 "fig_rest": [{"value": k["value"], "label": k["label"]} for k in figs[1:]],
@@ -311,6 +420,11 @@ def _build(draft, ctx, imgs, mode):
         for k in figs:
             numbers.append({"num": c["num"], "value": k["value"], "label": k["label"], "why": k.get("why") or "", "vsize": value_size(k["value"]),
                             "topic_name": c["topic_name"], "topic_fg": c["topic_fg"], "topic_bg": c["topic_bg"], "article_title": a["title"]})
+    nums = {i: c["num"] for c, (i, a) in zip(core_ctx + brief_ctx, core + brief)}
+    ov_items = overview_items(draft, nums, by_id) if th.get("overview") else []
+    competitors = list(ctx.get("competitors") or [])
+    radar = radar_html(ov_items, th, competitors)
+    fabmap = fabmap_html(ov_items, th)
     summary_html = to_html(segs[("summary",)], gmode) if ("summary",) in segs else html.escape(_s(draft["summary"]))
     first = re.split(r"(?<=다\.)\s", _s(draft["summary"]), maxsplit=1)[0]
     index = [{"name": n, "count": c} for n, c in (("브리핑", len(tldr)), ("숫자로 보는 이번 주", len(numbers)), ("이번 주 핵심", len(core)),
@@ -329,7 +443,10 @@ def _build(draft, ctx, imgs, mode):
     gl = [g for g in draft.get("glossary") or [] if g.get("meaning")]
     big = punch["big"] if punch else ""
     t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark", "template", "name_em_words", "name_em_color", "show_body",
-                                                     "gloss_top", "numbers_panel", "footer", "gloss_mode")},
+                                                     "gloss_top", "numbers_panel", "footer", "gloss_mode", "overview", "core_layout")},
+         "has_overview": bool(radar or fabmap), "has_radar": bool(radar), "radar_html": radar, "has_fabmap": bool(fabmap), "fabmap_html": fabmap,
+         "stage_legend_html": stage_legend_html(), "overview_text": overview_text(ov_items, competitors),
+         "semaform": th.get("core_layout") == "semaform",
          "show_footer": th.get("footer", True),
          "tldr": tldr, "has_tldr": bool(tldr), "read_min": mins, "skim_sec": secs, "skim_min": max(1, round(secs / 60)),
          "numbers": numbers, "has_numbers": bool(numbers), "summary_html": summary_html, "preheader": first,
@@ -366,6 +483,7 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
         brief_name = "30초 브리핑" if t.get("show_footer", True) else "이번 주 브리핑"   # B6·S4는 HTML과 같은 이름
         L.append(f"[{brief_name}] 전체 약 {t['read_min']}분 · 이것만 읽으면 약 {t['skim_sec']}초")
         L += [f"{x['num']} {x.get('line_plain', x['line'])}" for x in t["tldr"]] + [""]
+    L += t.get("overview_text") or []
     if note:
         L += [note, ""]
     p = draft.get("punch")
@@ -390,6 +508,8 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
             L.append(f"  ▶ {a['deck']}")
         for k, lab in POINT_LABELS:
             if ("articles", i, "point_" + k) in segs:
+                if t.get("semaform"):        # B7: 확인된 사실(무슨 일·얼마나) | 해석과 한계(왜 중요·근거와 한계)
+                    lab = SEMAFORM_LABELS[k]
                 L.append(f"  · {lab}: {to_plain(segs[('articles', i, 'point_' + k)])}")
         if show_body or a["slot"] != "core":
             L.append(to_plain(segs[("articles", i, "body")]))

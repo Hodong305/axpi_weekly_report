@@ -606,6 +606,7 @@ class Pipeline:
                "theme": self.cfg.get("newsletter_theme", "A"),
                "period_short": render.period_short(self.pkg.doc["window_start"], self.pkg.doc["window_end_exclusive"]),
                "issue_no": metrics.issue_number(self.s.pilot_csv, self.week), "n_docs": len(self.records)}
+        ctx["competitors"] = [c["name"] for c in self.cfg.get("competitors") or []]     # B7 레이더: 이번 주 소식 없는 경쟁사
         ctx.update(image_loader=self.load_image, image_max_kb=self.cfg["image_max_kb"], newsletter_from=self.cfg.get("newsletter_from", ""),
                    read_chars_per_min=self.cfg.get("read_chars_per_min", 500))
         built = render.build_all(d, ctx)

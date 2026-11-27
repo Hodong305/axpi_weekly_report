@@ -338,6 +338,45 @@ B6:
   punch_twist: "#b9e6e0"
   watch_bg: "#fff7e6"
   watch_ink: "#7a4a00"
+B7:
+  name: B7 · 판도 브리핑(v4.7 후보, B6 + 칩메이커 레이더·팹 지도·2단 핵심)
+  template: newsletter-b7.html       # B6 + 브리핑 아래 이번 주 판도(칩메이커 레이더 · 팹 지도), 핵심은 2단(확인된 사실 | 해석과 한계) + 자세히 + Insight
+  overview: true                     # 기사의 company·area·stage가 있으면 판도를 그린다
+  core_layout: semaform
+  show_body: true
+  gloss_top: true                    # 한 줄 요약·브리핑의 첫 등장부터 용어 풀이
+  numbers_panel: true
+  footer: false                      # 꼬리말 없음(9.8)
+  gloss_mode: tooltip                # 용어에 점선 밑줄 + 마우스를 올리면 풀이(title). 풀이는 용어 사전에도 싣는다
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#0b2b3c"
+  bg: "#eef4f3"
+  hero: "#00a898"
+  hero2: "#00a898"
+  hero_text: "#ffffff"
+  hero_sub: "#dcfbf6"
+  hero_chip_bg: "#0b8f82"
+  accent: "#00897b"
+  ink: "#0f2733"
+  muted: "#7a8a94"
+  soft: "#f3faf9"
+  card_border: "#dbeceb"
+  radius: 16px
+  topic:
+    T1: ["#2563eb", "#e8f0ff"]
+    T2: ["#00897b", "#dff5f2"]
+    T3: ["#7c4dcc", "#f1eaff"]
+    T4: ["#e0640f", "#fff0e2"]
+    B: ["#5a6475", "#eef0f3"]
+  punch_bg: "#0f2733"
+  punch_border: "#0f2733"
+  punch_big: "#2fe0cc"
+  punch_label: "#2fe0cc"
+  punch_text: "#ffffff"
+  punch_twist: "#b9e6e0"
+  watch_bg: "#fff7e6"
+  watch_ink: "#7a4a00"
 S4:
   name: S4 · 매거진(v4.7 후보, S 발전형)
   template: newsletter-s4.html       # 검정·노랑, 큰 번호 · 이번 호 구성 · 브리핑 · 숫자 타일 2열 · 핵심(요점 4, 숫자는 타일로) · 단신 · 더 볼 거리 · 용어 · 받는 이유
