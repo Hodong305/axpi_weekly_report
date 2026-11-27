@@ -235,3 +235,19 @@ def test_s6_punch_heads_numbers_section_and_is_not_repeated():
     sec = t.split("[숫자로 보는 이번 주]")[1].split("[이번 주 핵심]")[0]
     assert sec.lstrip().startswith(d["punch"]["label"]) and sec.count(f"- {big} ") == 0
     assert "[이번 주 가장 놀라운 숫자]" not in t and "경쟁사 레이더" not in h          # area·stage가 없으면 레이더도 없다
+
+
+def test_radar_columns_base_set_plus_this_weeks_new_area():
+    d, core = _radar_draft()
+    core[1].update(area="환경·안전")                      # 기본 열에 없는 새 영역(글 그대로)
+    c = ctx("S6")
+    c["events"] = [{"event_id": core[0]["event_id"], "competitor": "SK hynix", "subject": "x", "primary_topic": "T1_CHIPMAKER", "ledger": None},
+                   {"event_id": core[1]["event_id"], "competitor": "TSMC", "subject": "y", "primary_topic": "T1_CHIPMAKER", "ledger": None}]
+    h = render.build_all(d, c)["html_preview"]
+    radar = h[h.index("경쟁사 레이더"):h.index("숫자로 보는 이번 주")]
+    heads = ["공정 최적화", "검사·계측", "결함·수율", "팹 물류", "설비 보전·", "테스트·", "환경·안전", "팹 전체"]
+    pos = [radar.index(x) for x in heads]
+    assert pos == sorted(pos)                                  # 기본 열 순서 그대로, 새 영역은 팹 전체 바로 앞
+    core[1].update(area="maintenance")
+    h2 = render.build_all(d, c)["html_preview"]
+    assert "환경·안전" not in h2 and "설비 보전·" in h2       # 새 영역이 없는 주에는 기본 열만

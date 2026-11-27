@@ -223,6 +223,21 @@ AREAS = (("process", "공정 최적화"), ("metrology", "검사·계측"), ("def
          ("maintenance", "설비 보전·순찰"), ("test", "테스트·후공정"))
 AREA_FABWIDE = ("fabwide", "팹 전체")
 AREA_NAME = dict(AREAS + (AREA_FABWIDE,))
+
+
+def area_label(area):
+    """영역 이름: 기본 코드면 정해 둔 이름, 아니면 원고에 적은 글 그대로(기본 열에 없는 새 영역)."""
+    return AREA_NAME.get(area, _s(area).strip())
+
+
+def area_columns(items):
+    """레이더·지도의 열: 기본 열(AREAS, 고정 순서) + 이번 주 기사에만 있는 새 영역(처음 나온 순서) + 팹 전체(맨 끝).
+    새 영역은 그 주에만 열로 덧붙인다(빈 열이 쌓이지 않게 다음 주에는 그 주 기사가 있을 때만 다시 나온다)."""
+    extra = []
+    for x in items:
+        if x["area"] not in AREA_NAME and x["area"] not in [k for k, _ in extra]:
+            extra.append((x["area"], area_label(x["area"])))
+    return AREAS + tuple(extra) + (AREA_FABWIDE,)
 STAGES = {"plan": ("계획", "#eceef2", "#3f4652", "발표·계획·연구 소개"), "pilot": ("실증", "#fdecc4", "#7a4b00", "개발·시범·실증 중"),
           "deployed": ("적용", "#d5f3df", "#14532d", "일부 현장 적용"), "scaled": ("확대", "#15803d", "#ffffff", "여러 팹 확대·상시 운영")}
 
@@ -249,8 +264,9 @@ def overview_items(draft, nums, by_id=None):
         ev = (by_id or {}).get(a.get("event_id")) or {}
         company = a.get("company") or ev.get("competitor") or ev.get("subject") or ""
         chip = a["chipmaker"] if "chipmaker" in a else (bool(ev.get("competitor")) or ev.get("primary_topic") == "T1_CHIPMAKER")
-        if i in nums and a.get("area") in AREA_NAME and a.get("stage") in STAGES and company:
-            out.append({"num": nums[i], "company": _s(company), "chipmaker": bool(chip), "area": a["area"], "stage": a["stage"],
+        area = _s(a.get("area") or "").strip()
+        if i in nums and area and a.get("stage") in STAGES and company:
+            out.append({"num": nums[i], "company": _s(company), "chipmaker": bool(chip), "area": area, "stage": a["stage"],
                         "key": ev.get("competitor") or _s(company)})     # 소식 유무 판정은 경쟁사 목록 이름으로(표시 이름은 바꿀 수 있다)
     return sorted(out, key=lambda x: x["num"])
 
@@ -265,7 +281,7 @@ def radar_html(items, th, competitors=()):
     rows = list(by_co.items())
     if not rows:
         return ""
-    cols = AREAS + (AREA_FABWIDE,)
+    cols = area_columns([x for x in items if x["chipmaker"]])
     b = th.get("ov_grid", th["card_border"])
     cell = f"border:1px solid {b};vertical-align:middle;word-break:keep-all;"
     head = "".join(f'<td align="center" height="40" style="{cell}text-align:center;padding:4px 3px;font-size:11.5px;font-weight:bold;line-height:1.3;'
@@ -295,7 +311,7 @@ def fabmap_html(items, th):
     num_c = th.get("ov_num", on)
     pin_b = th.get("ov_pin_border", th["card_border"])
     cells, pins = "", ""
-    for k, n in AREAS:
+    for k, n in area_columns(items)[:-1]:
         here = [x for x in items if x["area"] == k]
         c = on if here else off
         cells += (f'<td align="center" valign="top" style="padding:0 3px;">'
@@ -327,14 +343,14 @@ def overview_text(items, competitors=(), with_map=True):
         return []
     L = ["[이번 주 판도]", "칩메이커 레이더 (회사 · 영역 · 단계 · 브리핑 번호)"] if with_map else ["[경쟁사 레이더] (회사 · 영역 · 단계 · 브리핑 번호)"]
     chips = [x for x in items if x["chipmaker"]]
-    L += [f"- {x['company']}: {AREA_NAME[x['area']]} · {STAGES[x['stage']][0]} ({x['num']})" for x in chips]
+    L += [f"- {x['company']}: {area_label(x['area'])} · {STAGES[x['stage']][0]} ({x['num']})" for x in chips]
     quiet = [c for c in competitors if c not in {x["key"] for x in chips}]
     if quiet:
         L.append("이번 주 제조 AI 소식 없음: " + " · ".join(quiet))
     if not with_map:
         return L + [""]
     L.append("팹 지도 (영역별 이번 주 소식)")
-    for k, n in AREAS + (AREA_FABWIDE,):
+    for k, n in area_columns(items):
         here = [f"{x['num']} {x['company']}" for x in items if x["area"] == k]
         if here or k != AREA_FABWIDE[0]:
             L.append(f"- {n}: " + (", ".join(here) if here else "소식 없음"))
