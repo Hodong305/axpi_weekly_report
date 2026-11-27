@@ -459,3 +459,87 @@ S5:
   punch_twist: "#111111"
   watch_bg: "#f4f4f4"
   watch_ink: "#111111"
+S6:
+  name: S6 · 레이더 매거진(v4.7 후보, S4 + 경쟁사 레이더)
+  template: newsletter-s4.html       # S4 그대로 + 브리핑 아래 경쟁사 레이더(팹 지도·2단 핵심 없음)
+  overview: radar
+  stage_colors:                      # 단계 꼬리표 [바탕, 글자, 테두리]: 흑백·노랑
+    plan: ["#ffffff", "#111111", "#111111"]
+    pilot: ["#dcdcdc", "#111111"]
+    deployed: ["#ffd60a", "#111111"]
+    scaled: ["#111111", "#ffd60a"]
+  stage_radius: 0px
+  ov_grid: "#cfcfcf"
+  ov_line: "#111111"
+  ov_num: "#111111"
+  ov_pin_border: "#cfcfcf"
+  show_body: true
+  gloss_top: true
+  numbers_panel: true
+  footer: false                      # 꼬리말 없음(9.8)
+  gloss_mode: tooltip                # 용어에 점선 밑줄 + 마우스를 올리면 풀이(title). 풀이는 용어 사전에도 싣는다
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#ffd60a"
+  bg: "#e6e6e6"
+  hero: "#111111"
+  hero2: "#111111"
+  hero_text: "#ffffff"
+  hero_sub: "#bdbdbd"
+  accent: "#ffd60a"
+  ink: "#111111"
+  soft: "#f4f4f4"
+  card_border: "#111111"
+  radius: 0px
+  topic:
+    T1: ["#111111", "#ffd60a"]
+    T2: ["#111111", "#ffd60a"]
+    T3: ["#111111", "#ffd60a"]
+    T4: ["#111111", "#ffd60a"]
+    B: ["#111111", "#ffd60a"]
+  punch_bg: "#ffd60a"
+  punch_border: "#111111"
+  punch_big: "#111111"
+  punch_label: "#111111"
+  punch_text: "#111111"
+  punch_twist: "#111111"
+  watch_bg: "#f4f4f4"
+  watch_ink: "#111111"
+B8:
+  name: B8 · 레이더 브리핑(v4.7 후보, B6 + 경쟁사 레이더)
+  template: newsletter-b6.html       # B6 그대로 + 브리핑 아래 경쟁사 레이더(팹 지도·2단 핵심 없음)
+  overview: radar
+  show_body: true
+  gloss_top: true                    # 한 줄 요약·브리핑의 첫 등장부터 용어 풀이
+  numbers_panel: true
+  footer: false                      # 꼬리말 없음(9.8)
+  gloss_mode: tooltip                # 용어에 점선 밑줄 + 마우스를 올리면 풀이(title). 풀이는 용어 사전에도 싣는다
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#0b2b3c"
+  bg: "#eef4f3"
+  hero: "#00a898"
+  hero2: "#00a898"
+  hero_text: "#ffffff"
+  hero_sub: "#dcfbf6"
+  hero_chip_bg: "#0b8f82"
+  accent: "#00897b"
+  ink: "#0f2733"
+  muted: "#7a8a94"
+  soft: "#f3faf9"
+  card_border: "#dbeceb"
+  radius: 16px
+  topic:
+    T1: ["#2563eb", "#e8f0ff"]
+    T2: ["#00897b", "#dff5f2"]
+    T3: ["#7c4dcc", "#f1eaff"]
+    T4: ["#e0640f", "#fff0e2"]
+    B: ["#5a6475", "#eef0f3"]
+  punch_bg: "#0f2733"
+  punch_border: "#0f2733"
+  punch_big: "#2fe0cc"
+  punch_label: "#2fe0cc"
+  punch_text: "#ffffff"
+  punch_twist: "#b9e6e0"
+  watch_bg: "#fff7e6"
+  watch_ink: "#7a4a00"

@@ -312,16 +312,18 @@ def stage_legend_html(th=None):
     return " ".join(f'{stage_chip(k, th=th)} <span style="font-size:11.5px;color:#6b7480;">{STAGES[k][3]}</span>&nbsp;&nbsp;' for k in STAGES)
 
 
-def overview_text(items, competitors=()):
-    """텍스트본의 [이번 주 판도]."""
+def overview_text(items, competitors=(), with_map=True):
+    """텍스트본의 [이번 주 판도](레이더 + 팹 지도) 또는 [경쟁사 레이더](레이더만)."""
     if not items:
         return []
-    L = ["[이번 주 판도]", "칩메이커 레이더 (회사 · 영역 · 단계 · 브리핑 번호)"]
+    L = ["[이번 주 판도]", "칩메이커 레이더 (회사 · 영역 · 단계 · 브리핑 번호)"] if with_map else ["[경쟁사 레이더] (회사 · 영역 · 단계 · 브리핑 번호)"]
     chips = [x for x in items if x["chipmaker"]]
     L += [f"- {x['company']}: {AREA_NAME[x['area']]} · {STAGES[x['stage']][0]} ({x['num']})" for x in chips]
     quiet = [c for c in competitors if c not in {x["company"] for x in chips}]
     if quiet:
         L.append("이번 주 제조 AI 소식 없음: " + " · ".join(quiet))
+    if not with_map:
+        return L + [""]
     L.append("팹 지도 (영역별 이번 주 소식)")
     for k, n in AREAS + (AREA_FABWIDE,):
         here = [f"{x['num']} {x['company']}" for x in items if x["area"] == k]
@@ -432,7 +434,7 @@ def _build(draft, ctx, imgs, mode):
     ov_items = overview_items(draft, nums, by_id) if th.get("overview") else []
     competitors = list(ctx.get("competitors") or [])
     radar = radar_html(ov_items, th, competitors)
-    fabmap = fabmap_html(ov_items, th)
+    fabmap = fabmap_html(ov_items, th) if th.get("overview") in (True, "all") else ""     # overview: radar면 레이더만
     summary_html = to_html(segs[("summary",)], gmode) if ("summary",) in segs else html.escape(_s(draft["summary"]))
     first = re.split(r"(?<=다\.)\s", _s(draft["summary"]), maxsplit=1)[0]
     index = [{"name": n, "count": c} for n, c in (("브리핑", len(tldr)), ("숫자로 보는 이번 주", len(numbers)), ("이번 주 핵심", len(core)),
@@ -454,7 +456,8 @@ def _build(draft, ctx, imgs, mode):
                                                      "gloss_top", "numbers_panel", "footer", "gloss_mode", "overview", "core_layout",
                                                      "stage_colors", "stage_radius", "ov_grid", "ov_line", "ov_num", "ov_pin_border")},
          "has_overview": bool(radar or fabmap), "has_radar": bool(radar), "radar_html": radar, "has_fabmap": bool(fabmap), "fabmap_html": fabmap,
-         "stage_legend_html": stage_legend_html(th), "overview_text": overview_text(ov_items, competitors),
+         "stage_legend_html": stage_legend_html(th), "overview_text": overview_text(ov_items, competitors, bool(fabmap)),
+         "overview_both": bool(radar and fabmap), "overview_title": "이번 주 판도" if (radar and fabmap) else "경쟁사 레이더",
          "semaform": th.get("core_layout") == "semaform",
          "show_footer": th.get("footer", True),
          "tldr": tldr, "has_tldr": bool(tldr), "read_min": mins, "skim_sec": secs, "skim_min": max(1, round(secs / 60)),
