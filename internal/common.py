@@ -95,6 +95,45 @@ def _num_in(tok, text):
     return v.isdigit() and 1 <= int(v) <= 10 and re.search(rf"\b{_EN_NUM[int(v)]}\b", text, re.I) is not None
 
 
+# 단위 배수(v4.7 개편): 영문 근거의 "90,000"·"1.2 billion"과 한국어 원고의 "9만"·"12억"을 같은 값으로 본다.
+_SCALE = {"천": 1e3, "만": 1e4, "억": 1e8, "조": 1e12,
+          "thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12, "bn": 1e9}
+_SCALED = re.compile(r"(?<![\d.])(\d[\d,]*(?:\.\d+)?)\s*(천|만|억|조|thousand|million|billion|trillion|bn)?(?![A-Za-z])", re.I)
+
+
+def scaled_values(text):
+    """텍스트의 숫자를 {값: 원래 표기}로. 단위가 붙은 숫자는 배수를 곱한 값도 넣는다('9만' → 90000)."""
+    out = {}
+    for m in _SCALED.finditer(text):
+        raw = m.group(1)
+        try:
+            v = float(raw.replace(",", ""))
+        except ValueError:
+            continue
+        out.setdefault(v, raw)
+        if m.group(2):
+            out.setdefault(round(v * _SCALE[m.group(2).lower()], 6), raw)
+    return out
+
+
+def scaled_match(field_text, start, tok, source):
+    """원고 숫자 tok(field_text[start:]에서 시작)이 단위 배수를 맞추면 근거에 있는지. 있으면 근거 쪽 원래 표기, 없으면 None.
+    예: 원고 '9만 건' ↔ 근거 '90,000 inspections', 원고 '12억 달러' ↔ 근거 '$1.2 billion'."""
+    m = _SCALED.match(field_text, start)
+    if not m or m.group(1) != tok:
+        return None
+    try:
+        v = float(tok.replace(",", ""))
+    except ValueError:
+        return None
+    vals = {v}
+    if m.group(2):
+        vals.add(round(v * _SCALE[m.group(2).lower()], 6))
+    src = scaled_values(source)
+    hit = next((src[x] for x in vals if x in src and (x != v or m.group(2) or x >= 1000)), None)
+    return hit
+
+
 def figure_value_errors(value, text):
     """수치 카드·한 방의 값 검사: 숫자는 근거 텍스트에 있어야 하고, 짧은 말('수 시간')은 근거에 그대로 있어야 한다.
     '수 시간 → 수 분', '99%', '90,000+'처럼 →·/·≠·+로 이어 붙인 값은 조각마다 본다(한 글자 조각은 단위로 보고 건너뜀)."""

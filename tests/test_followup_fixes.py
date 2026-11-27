@@ -204,3 +204,28 @@ def test_b_confirm_answers_in_one_run(tmp_path, capsys):
     capsys.readouterr()
     assert noninteractive(tmp_path, client, ['승인 B:수정 "짧게"', "1"]).resume() == 4         # ② 응답 + B 확인을 한 번에 → 발송 확인에서 멈춤
     assert "━━ 발송 확인" in capsys.readouterr().out
+
+
+# 영문 근거 ↔ 한국어 원고: 단위만 다른 같은 숫자, 표기만 다른 같은 회사(v4.7 개편, W48 오탐) -----------------
+
+def test_number_with_korean_unit_matches_english_source():
+    from internal import checks
+    pairs = [("d/P1", "Spot robots completed more than 90,000 inspections across the sub-fab.")]
+    w = checks.number_warnings("서브팹 점검 9만 건을 넘게 했다", pairs, ["x"], "01")
+    assert w == []                                                     # 9만 = 90,000, 한정어(넘게)도 있음
+    w = checks.number_warnings("서브팹 점검 9만 건을 했다", pairs, ["x"], "01")
+    assert len(w) == 1 and "한정어 누락" in w[0]["message"]              # 값은 같지만 'more than'이 빠짐
+    pairs = [("d/P2", "The company will invest $1.2 billion in the fab.")]
+    assert checks.number_warnings("12억 달러를 투자한다", pairs, ["x"], "01") == []
+    assert len(checks.number_warnings("13억 달러를 투자한다", pairs, ["x"], "01")) == 1     # 값이 다르면 여전히 경고
+    pairs = [("d/P3", "about 90 thousand wafers")]
+    assert checks.number_warnings("약 90,000장", pairs, ["x"], "01") == []
+
+
+def test_company_alias_matches_english_source():
+    from internal import checks
+    src = checks.norm("Samsung Electronics said its Defect Agent cut analysis time. SK hynix also ...")
+    al = checks.alias_groups({"competitors": [{"name": "SK hynix", "aliases": ["SK하이닉스"]}]})
+    assert checks.company_warnings("삼성전자와 SK하이닉스가 결함 분석에 AI를 쓴다", src, "01", al) == []
+    assert [w["quote"] for w in checks.company_warnings("삼성전자가 발표했다", src, "01")] == ["삼성전자"]   # 별칭이 없으면 예전처럼 경고
+    assert [w["quote"] for w in checks.company_warnings("LG전자가 발표했다", src, "01", al)] == ["LG전자"]   # 근거에 없는 회사는 경고

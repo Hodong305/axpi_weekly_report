@@ -53,7 +53,7 @@ def verbatim_hit(text, source_norm, run):
 
 # 숫자 ------------------------------------------------------------------------
 
-from .common import _EN_NUM, _NUM, _num_in, _num_re, _numval  # noqa: E402,F401  (숫자 검사 도구는 common에 있다)
+from .common import _EN_NUM, _NUM, _num_in, _num_re, _numval, scaled_match  # noqa: E402,F401  (숫자 검사 도구는 common에 있다)
 
 # 한정어 그룹: 근거(영문·한글)에서 찾는 말(앞·뒤)과, 원고에서 같은 뜻으로 인정하는 말(앞·뒤), 수정안에 넣을 한글 한정어.
 # 원고의 한정어는 숫자 앞뒤 어느 쪽에 있어도 된다(한국어는 "90,000건 넘게"처럼 뒤에 붙는 경우가 많다).
@@ -124,7 +124,10 @@ def number_warnings(field_text, pairs, target, scope, figure=False):
         e1 = re.compile(r"\S*").match(field_text, m.start()).end()      # 단위가 붙은 어절 끝
         nxt = re.compile(r"\s+\S+").match(field_text, e1)                # 다음 어절 하나까지가 수정안 범위
         old = field_text[m.start():(e1 if figure else (nxt.end() if nxt else e1))]
+        src_tok = tok
         if not _num_in(tok, joined):
+            src_tok = scaled_match(field_text, m.start(), tok, joined)     # '9만' ↔ '90,000'처럼 단위만 다른 같은 값
+        if src_tok is None:
             fix = None
             if field_text[m.end():m.end() + 1] in ("%", "％"):
                 cands = {x for x in _NUM.findall(joined) if re.search(rf"(?<![\d.]){re.escape(x)}\s*[%％]", joined)}
@@ -133,11 +136,11 @@ def number_warnings(field_text, pairs, target, scope, figure=False):
             out.append({"scope": scope, "quote": old, "kind": "숫자",
                         "message": f"숫자 {tok}이(가) 인용한 근거 블록({first_id or '없음'} 등)에 없음", "fix": fix})
             continue
-        q = _qual_in_source(tok, joined)
+        q = _qual_in_source(src_tok, joined)
         if q and not _qual_in_draft(q[0], field_text, m.start(), m.end()):
             new = _fix_text(q[0], old, figure)
             fix = {"target": target, "old": old, "new": new} if new and field_text.count(old) == 1 else None
-            eid = next((e for e, t in pairs if _num_re(tok).search(t.replace(",", ""))), first_id)
+            eid = next((e for e, t in pairs if _num_re(src_tok).search(t.replace(",", ""))), first_id)
             out.append({"scope": scope, "quote": old, "kind": "숫자",
                         "message": f"근거 {eid}은(는) \"{q[1]}\" — 한정어 누락", "fix": fix})
     return out
@@ -167,11 +170,33 @@ def company_candidates(text):
     return out
 
 
-def company_warnings(text, source_norm, scope):
+# 영문·한글 표기가 다른 같은 회사(v4.7 개편). 경쟁사는 설정(internal.competitors)의 별칭을 함께 쓴다.
+CO_ALIASES = [["Samsung Electronics", "Samsung", "삼성전자", "삼성"], ["SK hynix", "SK하이닉스", "하이닉스"],
+              ["Applied Materials", "어플라이드 머티어리얼즈", "어플라이드머티어리얼즈"], ["Lam Research", "램리서치"],
+              ["Tokyo Electron", "TEL", "도쿄일렉트론"], ["ASML", "에이에스엠엘"], ["KLA", "케이엘에이"],
+              ["NVIDIA", "엔비디아"], ["Siemens", "지멘스"], ["Boston Dynamics", "보스턴 다이내믹스", "보스턴다이내믹스"]]
+
+
+def alias_groups(cfg=None):
+    groups = [list(g) for g in CO_ALIASES]
+    for c in (cfg or {}).get("competitors") or []:
+        groups.append([c["name"]] + list(c.get("aliases") or []))
+    return groups
+
+
+def _in_source(name, source_norm):
+    n = norm(name)
+    return n in source_norm or n.replace(" ", "") in source_norm.replace(" ", "")
+
+
+def company_warnings(text, source_norm, scope, aliases=None):
     out = []
     for c in dict.fromkeys(company_candidates(text)):
-        n = norm(c)
-        if n in source_norm or n.replace(" ", "") in source_norm.replace(" ", ""):
+        if _in_source(c, source_norm):
+            continue
+        nc = norm(c).replace(" ", "")
+        same = [g for g in (aliases or []) if any(norm(x).replace(" ", "") == nc for x in g)]
+        if any(_in_source(x, source_norm) for g in same for x in g):     # '삼성전자' ↔ 근거의 'Samsung Electronics'
             continue
         out.append({"scope": scope, "quote": c, "kind": "기업명", "message": "근거 자료에 없는 기업명", "fix": None})
     return out
@@ -405,6 +430,7 @@ def hard_violations(draft, events_by_id, records, cfg, issue_type):
 def soft_warnings(draft, events_by_id, records, cfg, issue_type):
     """경고만 내는 검사: 숫자, 기업명, 게재 상한, 본문 합계."""
     warns = []
+    al = alias_groups(cfg)
     labels = {i: lab for lab, i in article_labels(draft).items()}
     all_src, all_pairs = "", []
     for i, a in enumerate(draft["articles"]):
@@ -415,10 +441,10 @@ def soft_warnings(draft, events_by_id, records, cfg, issue_type):
         all_src += "\n" + src
         for path, text in article_fields(a):
             warns += number_warnings(text, pairs, ["articles", i, *path], labels[i])
-            warns += company_warnings(text, src, labels[i])
+            warns += company_warnings(text, src, labels[i], al)
         for k_i, k in enumerate(a.get("key_figures") or []):
             warns += number_warnings(k["value"], pairs, ["articles", i, "key_figures", k_i, "value"], labels[i], figure=True)
-            warns += company_warnings(k["label"], src, labels[i])
+            warns += company_warnings(k["label"], src, labels[i], al)
         if a.get("figure"):
             warns += number_warnings(a["figure"]["value"], pairs, ["articles", i, "figure", "value"], labels[i], figure=True)
         if a["slot"] == "core" and ev["cap"] == "brief" and not ev["cap_override"]:
@@ -434,16 +460,16 @@ def soft_warnings(draft, events_by_id, records, cfg, issue_type):
         all_src += "\n" + more_source(m, events_by_id, records)
     for fld in ("issue_title", "summary"):
         warns += number_warnings(draft[fld], all_pairs, [fld], "머리부")
-        warns += company_warnings(draft[fld], all_src, "머리부")
+        warns += company_warnings(draft[fld], all_src, "머리부", al)
     p = draft.get("punch")
     if p:
         for fld in ("text", "twist"):
             warns += number_warnings(p[fld], all_pairs, ["punch", fld], "머리부")
-            warns += company_warnings(p[fld], all_src, "머리부")
+            warns += company_warnings(p[fld], all_src, "머리부", al)
     for j, m in enumerate(draft.get("more") or []):
         pairs = [(e, evidence_text(e, records)) for e in m["evidence_ids"]]
         warns += number_warnings(m["line"], pairs, ["more", j, "line"], f"F{j + 1}")
-        warns += company_warnings(m["line"], more_source(m, events_by_id, records), f"F{j + 1}")
+        warns += company_warnings(m["line"], more_source(m, events_by_id, records), f"F{j + 1}", al)
     total = body_total(draft)
     if total > cfg["issue_body_max"]:
         warns.append({"scope": "머리부", "quote": "", "kind": "글자 수",
