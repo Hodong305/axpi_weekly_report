@@ -16,7 +16,7 @@
 #   (분야 적합성 판정은 사내에서 한다. 설계서 3장).
 # 아래 URL은 공개 정보 기준의 초기값이며 모두 verified: false다. 첫 실행 전에 check-sources로 확인한다.
 
-registry_version: "2026-11-26.3"
+registry_version: "2026-11-27.1"
 
 sources:
   # ── ① 칩메이커 ───────────────────────────────────────────────
@@ -303,7 +303,8 @@ sources:
     language: en
     source_type: company_official
     source_tier: primary
-    method: llm_only
+    method: rss                         # 2026-11-27 llm_only → rss(피드 200, 12건 확인). verified: false라 LLM 프롬프트에도 계속 나온다
+    feed_url: https://www.pdf.com/feed/
     home_url: https://www.pdf.com/
     verified: false
 
@@ -476,8 +477,35 @@ sources:
     language: ko
     source_type: press
     source_tier: named_secondary
-    method: llm_only
+    method: rss                         # 2026-11-27 llm_only → rss. '전자' 분야 피드(06, 50건). 전체·통신 피드는 무관 기사가 많아 쓰지 않는다
+    feed_url: https://rss.etnews.com/06.xml
     home_url: https://www.etnews.com/
+    verified: false
+
+  # 2026-11-27 추가(보수적 확대): 제조 기사가 나오는 업계 매체 피드. 2주 시험 후 게재·더 볼 거리 기여가 없으면 뺀다.
+  - id: semiconductor-digest
+    publisher: Semiconductor Digest
+    domains: [semiconductor-digest.com]
+    topics: []
+    track: A
+    language: en
+    source_type: press
+    source_tier: named_secondary
+    method: llm_only                    # 피드는 있으나 수집기 User-Agent를 막는다(check-sources HTTP 520, 2026-11-27). LLM 프롬프트의 '우선 확인 발행처'로 둔다
+    home_url: https://www.semiconductor-digest.com/
+    verified: false
+
+  - id: the-robot-report
+    publisher: The Robot Report
+    domains: [therobotreport.com]
+    topics: [T4_PHYSICAL_AI]
+    track: A
+    language: en
+    source_type: press
+    source_tier: named_secondary
+    method: rss
+    feed_url: https://www.therobotreport.com/feed/
+    home_url: https://www.therobotreport.com/
     verified: false
 
   # ── B 경로: 제조로 전이 가능한 기반기술 ─────────────────────────
