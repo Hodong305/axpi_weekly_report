@@ -183,25 +183,52 @@ def write_csv(path, events, records):
 TOPIC_ORDER = ["T1_CHIPMAKER", "T2_EQUIPMENT", "T3_SOLUTION", "T4_PHYSICAL_AI", "B"]
 
 
-def more_candidates(events, fit, records, cfg):
+def _group_held(judge, out, records, title_max):
+    """보류 자료 항목을 같은 사건끼리 하나로 묶는다(9.6, v4.7 개편). S3의 묶음 단계(s3_group)를 그대로 써서
+    모델이 묶음을 제안하고 코드가 모든 자료가 정확히 한 묶음에 있는지 검증한다. 두 번 실패하면 묶지 않는다.
+    PASS 사건 항목은 이미 사건 단위라 그대로 둔다. 묶인 항목의 대표 자료는 S3와 같은 규칙(representative)으로 고른다."""
+    from .common import representative
+    from .events import propose_groups
+    held = [t for t in out if t[0]["kind"] == "hold_doc"]
+    if judge is None or len(held) < 2:
+        return out
+    groups, _ok = propose_groups(judge, [t[1] for t in held], title_max)
+    by_doc = {t[1]["doc_id"]: t for t in held}
+    merged = [t for t in out if t[0]["kind"] != "hold_doc"]
+    for g in groups:
+        parts = [by_doc[d] for d in g["doc_ids"] if d in by_doc]
+        if not parts:
+            continue
+        rep = representative([t[1] for t in parts])
+        base = next(t for t in parts if t[1]["doc_id"] == rep["doc_id"])
+        topic = base[2] or next((t[2] for t in parts if t[2]), None)
+        docs = sorted({d for t in parts for d in t[5]})
+        merged.append((base[0], base[1], topic, any(t[3] for t in parts), None, docs))
+    return merged
+
+
+def more_candidates(events, fit, records, cfg, judge=None):
     """'더 볼 거리' 후보(9.6): 편성되지 않은 PASS 사건(점수 무관)과, 본문 재분류에서 한 분야 이상 1을 받았거나 WATCH_TRANSFER인 보류 자료.
-    제외(EXCLUDE) 자료는 넣지 않는다. 순서: 분야(T1→T4, 그다음 B 경로 전이 사례) 안에서 점수 높은 순, 점수가 없으면 발행일 최신 순.
-    반환: (항목 목록, more_max를 넘어 빠진 건수). 항목: {ref, topic, doc_id, title, event_id, score}"""
+    제외(EXCLUDE) 자료는 넣지 않는다. 보류 자료는 judge가 있으면 같은 사건끼리 한 항목으로 묶는다(같은 소식이 여러 줄로 나오지 않게).
+    순서: 분야(T1→T4, 그다음 B 경로 전이 사례) 안에서 점수 높은 순, 점수가 없으면 발행일 최신 순.
+    반환: (항목 목록, more_max를 넘어 빠진 건수). 항목: {ref, topic, doc_id, doc_ids, title, event_id, score}"""
     out = []
     for e in events:
         rec = records[e["rep_doc_id"]]
         if e["kind"] == "event" and e["status"] == "PASS" and e["slot"] == "out":
             transfer = "B 경로 전이 사례" in e.get("cap_reasons", [])
-            out.append((e, rec, e["primary_topic"], transfer, e["score"]["total"] if e.get("score") else None))
+            out.append((e, rec, e["primary_topic"], transfer, e["score"]["total"] if e.get("score") else None, list(e["doc_ids"])))
         elif e["kind"] == "hold_doc" and e["slot"] == "hold":
             f = fit.get(e["rep_doc_id"], {})
             st2 = f.get("stage2") or f.get("stage1") or {}
             signal = "1" in (st2.get("fit") or {}).values() or f.get("route") == "WATCH_TRANSFER"
             if signal:
                 one = next((t for t, v in (st2.get("fit") or {}).items() if v == "1"), None)
-                out.append((e, rec, one, f.get("route") == "WATCH_TRANSFER", None))
+                out.append((e, rec, one, f.get("route") == "WATCH_TRANSFER", None, list(e["doc_ids"])))
+    out = _group_held(judge, out, records, cfg.get("article_title_max", 50))
+
     def key(t):
-        e, rec, topic, transfer, score = t
+        e, rec, topic, transfer, score, _docs = t
         grp = TOPIC_ORDER.index("B") if transfer else (TOPIC_ORDER.index(topic) if topic in TOPIC_ORDER else len(TOPIC_ORDER))
         date = rec.get("published_date") or ""
         # 점수가 있는 항목이 먼저(높은 순), 없으면 발행일 최신 순
@@ -209,10 +236,10 @@ def more_candidates(events, fit, records, cfg):
     out.sort(key=key)
     overflow = max(0, len(out) - cfg["more_max"])
     items = []
-    for e, rec, topic, transfer, score in out[:cfg["more_max"]]:
+    for e, rec, topic, transfer, score, docs in out[:cfg["more_max"]]:
         sc = e.get("score")
         items.append({"ref": rec["doc_id"] if e["kind"] == "hold_doc" else e["event_id"], "topic": "B" if transfer else (topic or ""),
-                      "doc_id": rec["doc_id"], "doc_ids": list(e["doc_ids"]), "title": rec["title"], "event_id": e["event_id"],
+                      "doc_id": rec["doc_id"], "doc_ids": docs, "title": rec["title"], "event_id": e["event_id"],
                       "score": score,
                       # 사건 항목의 입력은 S4의 대표 주장과 근거 블록이다(대표 자료 첫 문단이 사건과 무관할 수 있다)
                       "claim": sc["claim"] if sc else None, "evidence_ids": [x["id"] for x in sc["evidence"]] if sc else []})

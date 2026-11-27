@@ -307,7 +307,7 @@ def test_more_input_for_events_uses_claim_and_evidence_not_rep_lead():
     # 근거 ID는 사건의 자료 어느 것이든 허용하고, 출처 정보는 첫 근거 자료의 것이다
     c = FakeClient({"s6_more": lambda u: {"ref": item["ref"], "line": "한 줄이다.", "evidence_ids": [f"{other['doc_id']}/P2"]}})
     m, bad = draftmod.gen_more(Judge(c), item, recs, CFG)
-    assert not bad and m["credit"] == draftmod.format_credit(other)
+    assert not bad and m["credit"] == draftmod.format_credit(other) + " 외 1건"        # 자료가 2건인 사건: 나머지 건수를 붙인다
     c = FakeClient({"s6_more": lambda u: {"ref": item["ref"], "line": "x", "evidence_ids": ["url1_" + "0" * 64 + "/P1"]}})
     m, bad = draftmod.gen_more(Judge(c), item, recs, CFG)
     assert bad and m["evidence_ids"] == [f"{other['doc_id']}/P2"]                                   # 실패하면 S4 근거로 대체

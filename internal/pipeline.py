@@ -398,7 +398,7 @@ class Pipeline:
             self.state["failed_gen"] = []
         else:
             self.step_header("S6")
-            more, overflow = sel.more_candidates(evs, self.state["fit"], self.records, self.cfg)
+            more, overflow = sel.more_candidates(evs, self.state["fit"], self.records, self.cfg, self.judge)
             self.state["more_overflow"] = overflow
             d, failed = draftmod.generate_draft(self.judge, evs, self.records, self.week, self.cfg, it, self.header_counts(),
                                                 more, excluded)

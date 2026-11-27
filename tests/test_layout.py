@@ -88,6 +88,28 @@ def test_more_candidates_rules():
     assert len(items) == 2 and overflow == 2
 
 
+def test_more_candidates_group_held_docs_of_same_event():
+    """같은 사건을 다룬 보류 자료 여러 건은 더 볼 거리 한 항목으로 묶는다(W48 트리니티 팹 7건 사례)."""
+    recs = {r["doc_id"]: r for r in sample_records()}
+    ids = sorted(recs)[:3]
+    holds = []
+    for n, d in enumerate(ids):
+        h = hold_doc(f"h{n}", d)
+        h["rep_doc_id"] = d
+        holds.append(h)
+    fit = {d: {"stage2": {"fit": {"T1_CHIPMAKER": "1", "T2_EQUIPMENT": "0", "T3_SOLUTION": "0", "T4_PHYSICAL_AI": "0"}}, "route": "REVIEW"}
+           for d in ids}
+    grp = {"groups": [{"doc_ids": ids[:2], "subject": "S", "site_task": "t", "title_draft": "같은 사건", "primary_topic": "T1_CHIPMAKER"},
+                      {"doc_ids": ids[2:], "subject": "U", "site_task": "t", "title_draft": "다른 사건", "primary_topic": "T1_CHIPMAKER"}]}
+    c = FakeClient({"s3_group": lambda u: grp})
+    items, overflow = sel.more_candidates(holds, fit, recs, CFG, Judge(c))
+    assert len(items) == 2 and overflow == 0 and c.steps() == ["s3_group"]
+    merged = next(i for i in items if len(i["doc_ids"]) == 2)
+    assert set(merged["doc_ids"]) == set(ids[:2]) and merged["ref"] in ids[:2]
+    items, _ = sel.more_candidates(holds, fit, recs, CFG)                 # judge가 없으면 묶지 않는다
+    assert len(items) == 3
+
+
 # 수치 카드 ---------------------------------------------------------------------------
 
 def test_key_figure_validation():

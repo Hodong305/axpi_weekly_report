@@ -335,7 +335,8 @@ def gen_more(judge, item, records, cfg, feedback=None):
     cue_text = " ".join(evidence_text(e, records) for e in r["evidence_ids"]) + " " + " ".join(
         b["text"] for b in rec["body"]["blocks"] if b["id"] in rec["body"]["lead_ids"])
     return {"ref": item["ref"], "topic": item["topic"], "line": r["line"].strip() + more_suffix(rec, cue_text),
-            "credit": format_credit(rec), "evidence_ids": list(r["evidence_ids"])}, failed
+            "credit": format_credit(rec) + (f" 외 {len(docs) - 1}건" if len(docs) > 1 else ""),   # 같은 사건으로 묶인 자료 수
+            "evidence_ids": list(r["evidence_ids"])}, failed
 
 
 # 머리부: 헤드라인·총론·한 방(기사와 더 볼 거리 원고를 모두 쓴 뒤 그 원고만 입력으로 쓴다) ------------------------
