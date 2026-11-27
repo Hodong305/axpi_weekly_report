@@ -319,7 +319,8 @@ def _build(draft, ctx, imgs, mode):
     gl = [g for g in draft.get("glossary") or [] if g.get("meaning")]
     big = punch["big"] if punch else ""
     t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark", "template", "name_em_words", "name_em_color", "show_body",
-                                                     "gloss_top", "numbers_panel")},
+                                                     "gloss_top", "numbers_panel", "footer")},
+         "show_footer": th.get("footer", True),
          "tldr": tldr, "has_tldr": bool(tldr), "read_min": mins, "skim_sec": secs, "skim_min": max(1, round(secs / 60)),
          "numbers": numbers, "has_numbers": bool(numbers), "summary_html": summary_html, "preheader": first,
          "index": index, "n_core": len(core), "n_brief": len(brief),
@@ -385,7 +386,7 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
         if figs:
             L.append("  수치: " + " / ".join(f"{k['value']} {k['label']}" + (f"(왜 중요: {k['why']})" if k.get("why") else "") for k in figs))
         if ("articles", i, "watch") in segs:
-            L.append(f"  MTC가 볼 것 · {to_plain(segs[('articles', i, 'watch')])}")
+            L.append(f"  MTC AX Insight · {to_plain(segs[('articles', i, 'watch')])}")
         L.append(f"  출처 · {tc['credit']}")
         if a.get("search_terms"):
             L.append("  검색어 · " + ", ".join(a["search_terms"]))
@@ -412,6 +413,8 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
         L += [f"- {g['term']}: {g['meaning']}" for g in gl] + [""]
     if t["has_corr"]:
         L += ["[정정]"] + [c["text"] for c in t["corrections"]] + [""]
+    if not t.get("show_footer", True):      # B6·S4: 꼬리말(받는 이유·만드는 방식·링크·의견)을 싣지 않는다(9.8 중언부언 지양)
+        return "\n".join(_s(x) for x in L).rstrip() + "\n"
     L += [f"{ctx['newsletter_name']}는 {ctx['newsletter_team']}이 매주 화요일 보내는 제조 AI 동향 소식지입니다. 이번 호는 공개 자료 {ctx['n_docs']}건을 검토해 "
           f"{ctx['counts']['published']}건을 골랐고, 사내 AI가 초안을 쓰고 편집자가 검토했습니다. 원문 링크는 보안 정책상 싣지 않으니 출처의 발행처·제목으로 검색해 보세요."
           + (" 이미지는 각 발행처의 공개 자료이며 저작권은 발행처에 있습니다." if imgs else ""),

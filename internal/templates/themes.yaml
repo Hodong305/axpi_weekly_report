@@ -113,7 +113,7 @@ B3:
   watch_ink: "#00685f"
 B4:
   name: B4 · 요점 카드(v4.7 기본)
-  template: newsletter-b4.html       # 30초 브리핑 + 핵심 카드(한 줄 핵심 · 요점 3줄 · 수치 · 자세히 · MTC가 볼 것)
+  template: newsletter-b4.html       # 30초 브리핑 + 핵심 카드(한 줄 핵심 · 요점 3줄 · 수치 · 자세히 · MTC AX Insight)
   show_body: true
   hero_dark: true
   name_em_words: 2
@@ -307,6 +307,7 @@ B6:
   show_body: true
   gloss_top: true                    # 한 줄 요약·브리핑의 첫 등장부터 용어 풀이
   numbers_panel: true
+  footer: false                      # 꼬리말 없음(9.8)
   hero_dark: true
   name_em_words: 2
   name_em_color: "#0b2b3c"
@@ -342,6 +343,7 @@ S4:
   show_body: true
   gloss_top: true
   numbers_panel: true
+  footer: false                      # 꼬리말 없음(9.8)
   hero_dark: true
   name_em_words: 2
   name_em_color: "#ffd60a"

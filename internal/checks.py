@@ -243,7 +243,7 @@ def autofix(draft, records):
         a["title"] = clean(a["title"], labels[i], "제목")
         a["body"] = clean(a["body"], labels[i], "본문")
         if a.get("watch"):
-            a["watch"] = clean(a["watch"], labels[i], "MTC가 볼 것")
+            a["watch"] = clean(a["watch"], labels[i], "MTC AX Insight")
         if a.get("deck"):
             a["deck"] = clean(a["deck"], labels[i], "한 줄 핵심")
         for pk in list(a.get("points") or {}):
@@ -297,7 +297,7 @@ def length_violations(draft, cfg, issue_type):
         if a.get("image") and len(a["image"]["caption"]) > cfg["image_caption_chars"]:
             v.append((("article", i), f"이미지 설명 {len(a['image']['caption'])}자 > 한도 {cfg['image_caption_chars']}자"))
         if a["slot"] == "core" and len(a.get("watch") or "") > cfg["watch_chars"]:
-            v.append((("article", i), f"MTC가 볼 것 {len(a['watch'])}자 > 한도 {cfg['watch_chars']}자"))
+            v.append((("article", i), f"MTC AX Insight {len(a['watch'])}자 > 한도 {cfg['watch_chars']}자"))
         dmax, pmax, wmax = cfg.get("deck_chars", 60), cfg.get("point_chars", 90), cfg.get("figure_why_chars", 40)
         for k in list(a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else []):
             if len(k.get("why") or "") > wmax:
@@ -315,7 +315,7 @@ def length_violations(draft, cfg, issue_type):
 
 
 def body_total(draft):
-    """9.8의 4~6: 이번 주 한 방(text+twist) + 핵심 한 줄 핵심·요점·본문·MTC가 볼 것 + 단신 본문(더 볼 거리·꼬리말은 넣지 않는다)"""
+    """9.8의 4~6: 이번 주 한 방(text+twist) + 핵심 한 줄 핵심·요점·본문·MTC AX Insight + 단신 본문(더 볼 거리·꼬리말은 넣지 않는다)"""
     p = draft.get("punch")
     return ((len(p["text"]) + len(p["twist"]) if p else 0)
             + sum(len(a["body"]) + len(a.get("watch") or "") + len(a.get("deck") or "") + sum(len(x) for x in (a.get("points") or {}).values())
@@ -472,7 +472,7 @@ PLACEHOLDER_PATTERNS = [
 
 
 def placeholder_fields(draft):
-    """검사할 모든 글 칸: [(위치 이름, 텍스트)]. 머리부·기사(제목·한 줄 핵심·요점·본문·MTC가 볼 것·수치·출처·검색어)·더 볼 거리·용어."""
+    """검사할 모든 글 칸: [(위치 이름, 텍스트)]. 머리부·기사(제목·한 줄 핵심·요점·본문·MTC AX Insight·수치·출처·검색어)·더 볼 거리·용어."""
     out = [("헤드라인", draft.get("issue_title") or ""), ("한 줄 요약", draft.get("summary") or "")]
     p = draft.get("punch")
     if p:

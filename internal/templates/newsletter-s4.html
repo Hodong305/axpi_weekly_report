@@ -9,8 +9,7 @@
 <tr><td style="background:{{ink}};padding:26px 30px 22px 30px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
     <td valign="bottom">
-      <div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:{{accent}};">{{team}} 주간 소식지</div>
-      <div style="font-size:32px;font-weight:900;letter-spacing:-1.2px;line-height:1.1;color:#ffffff;margin-top:6px;">{{{name_html}}}</div>
+      <div style="font-size:32px;font-weight:900;letter-spacing:-1.2px;line-height:1.1;color:#ffffff;">{{{name_html}}}</div>
       <div style="font-size:13px;color:#bdbdbd;margin-top:8px;">{{tagline}}</div>
     </td>
     <td valign="bottom" align="right" width="110" style="font-size:44px;font-weight:900;letter-spacing:-2px;line-height:1;color:{{accent}};">{{issue_no}}<div style="font-size:11px;letter-spacing:1px;color:#bdbdbd;margin-top:4px;">ISSUE</div></td>
@@ -23,11 +22,6 @@
   </tr></table>
 </td></tr>
 
-<!-- 이번 호 구성 -->
-<tr><td style="background:#f4f4f4;padding:11px 30px;font-size:13px;line-height:1.8;">
-  <b>이번 호 ▸</b>&nbsp;
-  <!--LOOP index--><span style="white-space:nowrap;margin-right:12px;">{{name}} <b style="background:{{ink}};color:{{accent}};padding:0 5px;">{{count}}</b></span><!--END index-->
-</td></tr>
 
 <!-- 헤드라인 -->
 <tr><td style="padding:28px 30px 6px 30px;">
@@ -41,7 +35,7 @@
 <!-- 브리핑 -->
 <tr><td style="padding:22px 30px 6px 30px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{ink}};"><tr><td style="padding:18px 22px 10px 22px;">
-    <div style="font-size:13px;font-weight:900;letter-spacing:1px;color:{{accent}};">이번 주 브리핑 <span style="font-weight:normal;letter-spacing:0;color:#a0a0a0;">· 바쁘면 여기까지만 · 약 {{skim_sec}}초</span></div>
+    <div style="font-size:13px;font-weight:900;letter-spacing:1px;color:{{accent}};">이번 주 브리핑</div>
     <!--LOOP tldr-->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #3a3a3a;"><tr>
       <td width="50" valign="top" style="font-size:24px;font-weight:900;letter-spacing:-1px;color:{{accent}};padding:10px 0;">{{num}}</td>
@@ -67,7 +61,7 @@
 <!--IF has_numbers-->
 <!-- 숫자로 보는 이번 주: 2열 타일 -->
 <tr><td style="padding:24px 30px 4px 30px;">
-  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;">숫자로 보는 이번 주 <span style="font-weight:normal;font-size:12.5px;color:#777777;">· 무엇을 잰 숫자이고 왜 중요한지</span></div>
+  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;">숫자로 보는 이번 주</div>
 </td></tr>
 <tr><td style="padding:4px 24px 4px 24px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -110,7 +104,7 @@
     <td width="80" valign="top" style="font-size:50px;font-weight:900;letter-spacing:-3px;line-height:1;padding-top:10px;">{{num}}</td>
     <td valign="top" style="padding-top:12px;">
       <span style="display:inline-block;background:{{ink}};color:{{accent}};font-size:11.5px;font-weight:900;letter-spacing:0.5px;padding:3px 8px;">{{topic_name}}</span>
-      <!--IF tags_text--><span style="font-size:12px;color:#777777;">&nbsp;{{tags_text}}</span><!--END tags_text-->
+      
       <!--IF followup--><span style="font-size:12px;color:#777777;">&nbsp;· ↻ {{followup}}</span><!--END followup-->
       <div style="font-size:23px;font-weight:900;line-height:1.32;letter-spacing:-0.7px;margin-top:8px;">{{title}}</div>
     </td>
@@ -134,10 +128,10 @@
   <!--END show_body-->
   <!--IF watch_html-->
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;"><tr>
-    <td style="background:#f4f4f4;border-left:6px solid {{accent}};padding:12px 14px;font-size:14px;line-height:1.7;"><b>MTC가 볼 것 →</b> {{{watch_html}}}</td>
+    <td style="background:#f4f4f4;border-left:6px solid {{accent}};padding:12px 14px;font-size:14px;line-height:1.7;"><b>MTC AX Insight →</b> {{{watch_html}}}</td>
   </tr></table>
   <!--END watch_html-->
-  <div style="font-size:12px;color:#888888;margin-top:10px;">출처 · {{credit}} &nbsp;·&nbsp; 이 기사의 숫자는 위 '숫자로 보는 이번 주'에 모았습니다</div>
+  <div style="font-size:12px;color:#888888;margin-top:10px;">출처 · {{credit}}</div>
   <!--IF terms_text--><div style="font-size:12px;color:#888888;margin-top:3px;">{{terms_text}}</div><!--END terms_text-->
 </td></tr>
 <!--END core-->
@@ -145,7 +139,7 @@
 
 <!--IF has_brief-->
 <tr><td style="padding:30px 30px 0 30px;">
-  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;"><span>단신</span> <span style="font-weight:normal;font-size:12.5px;color:#777777;">· 무슨 일이고 왜 볼 만한지 두 문장으로</span></div>
+  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;"><span>단신</span></div>
 </td></tr>
 <tr><td style="padding:0 30px;">
   <!--LOOP brief-->
@@ -165,7 +159,7 @@
 
 <!--IF has_more-->
 <tr><td style="padding:28px 30px 4px 30px;">
-  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;">더 볼 거리 <span style="font-weight:normal;font-size:12.5px;color:#777777;">· 싣지는 않았지만 관심 있는 분께</span></div>
+  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;">더 볼 거리</div>
   <!--LOOP more-->
   <div style="font-size:12px;font-weight:900;margin-top:12px;"><span style="background:{{accent}};padding:1px 5px;">{{heading}}</span></div>
   <!--LOOP items-->
@@ -193,13 +187,7 @@
 </td></tr>
 <!--END has_corr-->
 
-<tr><td style="padding:22px 30px 0 30px;"><div style="border-top:6px solid {{ink}};"></div></td></tr>
-<tr><td style="padding:12px 30px 28px 30px;font-size:12.5px;line-height:1.75;color:#666666;">
-    <b style="color:{{ink}};">이 메일을 받는 이유</b> · {{name}}는 {{team}}이 MTC 임직원께 매주 화요일 보내는 제조 AI 동향 소식지입니다.<br>
-    <b style="color:{{ink}};">만드는 방식</b> · 이번 호는 공개 자료 {{n_docs}}건을 검토해 {{n_pub}}건을 골랐습니다. 사내 AI가 초안을 쓰고 편집자가 사실과 표현을 검토했습니다. 이 밖에 검토했으나 싣지 않은 자료는 {{excluded_count}}건입니다.<br>
-    <b style="color:{{ink}};">링크가 없는 이유</b> · 사내 보안 정책상 외부 링크를 싣지 않습니다. 출처의 발행처·제목으로 검색해 보세요.<!--IF has_image--> 이미지는 각 발행처의 공개 자료이며 저작권은 발행처에 있습니다.<!--END has_image--><br>
-    <b style="color:{{ink}};">의견·제보</b> · 이 메일에 회신해 주세요. 다뤄 줬으면 하는 주제도 환영합니다.
-</td></tr>
+<tr><td style="padding:22px 30px 28px 30px;"><div style="border-top:6px solid {{ink}};"></div></td></tr>
 
 </table>
 </td></tr></table>

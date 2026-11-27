@@ -157,7 +157,7 @@ def test_s7_checks_watch_key_figures_and_more():
     draft["articles"][0]["watch"] = "가" * 170                                          # 한도 160자 초과
     draft["more"][0]["line"] = "나" * 125 + " (보도)"                                    # 한도 120자 초과(접미어 제외, v4.7)
     v = checks.length_violations(draft, CFG, "정규호")
-    assert any("MTC가 볼 것" in m for _, m in v) and any(t[0] == "more" for t, _ in v)
+    assert any("MTC AX Insight" in m for _, m in v) and any(t[0] == "more" for t, _ in v)
     draft["more"][0]["line"] = "나" * 120 + " (보도)"
     assert not any(t[0] == "more" for t, _ in checks.length_violations(draft, CFG, "정규호"))
     # 합계: 핵심 본문 + watch (더 볼 거리는 넣지 않는다)
@@ -256,7 +256,7 @@ def render_ctx(issue_type="정규호", theme="A"):
 
 
 SECTIONS = ("FAB", "제3호 · 2026-W49", "11.15 ~ 11.21", "칩 · 장비 · 솔루션 · 로봇, 네 박자로 읽는 제조 AI", "🏭 칩메이커", "이번 주 헤드라인", "한 줄 요약",
-            "이번 주 가장 놀라운 숫자", "99%", "이번 주 핵심", "⚡ 단신", "📚 더 볼 거리", "MTC가 볼 것", "임무 성공률 ≠ 검출률", "875건", "현장 실증·적용",
+            "이번 주 가장 놀라운 숫자", "99%", "이번 주 핵심", "⚡ 단신", "📚 더 볼 거리", "MTC AX Insight", "임무 성공률 ≠ 검출률", "875건", "현장 실증·적용",
             "2026-W47 보도 후속", "출처 · 발행처, 「원제」", "칩메이커 항목 요약 (보도)", "솔루션 항목 요약 (논문)", "📖 이번 호 용어 사전",
             "이 밖에 검토했으나 싣지 않은 자료는 10건", "사내 AI가 초안을 쓰고 편집자가 검토", "회신", "검토해 3건을 골랐고", "공개 자료 39건")
 
@@ -300,7 +300,7 @@ def test_plain_text_mirrors_sections_and_glossary():
     d["articles"][0]["event_id"], d["articles"][1]["event_id"] = "e1", "e2"
     html_doc, text = render.build(d, render_ctx())
     for must in ("이번 주 헤드라인", "[한 줄 요약]", "[이번 주 가장 놀라운 숫자]", "99% —", "[이번 주 핵심]", "[단신]", "[더 볼 거리]", "<칩메이커>", "<제조 솔루션>",
-                 "수치: 99% 임무 성공률 ≠ 검출률", "MTC가 볼 것 · 유효 경보로 이어진 비율", "출처 · 발행처, 「원제」", "[이번 호 용어 사전]", "- AMHS: 웨이퍼를 자동으로",
+                 "수치: 99% 임무 성공률 ≠ 검출률", "MTC AX Insight · 유효 경보로 이어진 비율", "출처 · 발행처, 「원제」", "[이번 호 용어 사전]", "- AMHS: 웨이퍼를 자동으로",
                  "이 밖에 검토했으나 싣지 않은 자료는 10건", "제3호", "FAB4 위클리"):
         assert must in text, must
     assert "http" not in text
@@ -374,7 +374,7 @@ def test_pipeline_more_section_end_to_end(tmp_path):
     assert d["more"][0]["credit"].startswith("Example News(Lee Reporter), 「Foundry tests") and d["excluded_count"] == 1
     assert "F1 장비사 · 더 볼 거리 한 줄 요약이다. (보도)" in io.text
     html_doc = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
-    assert "더 볼 거리" in html_doc and "제1호" in html_doc and "자료는 1건" in html_doc and "http" not in html_doc
+    assert "더 볼 거리" in html_doc and "제1호" in html_doc and "http" not in html_doc
     txt = (tmp_path / "out_internal" / WEEK / "newsletter.txt").read_text(encoding="utf-8")
     assert "[더 볼 거리]" in txt and "[이번 주 핵심]" in txt
     assert client.steps().count("s6_more") == 1

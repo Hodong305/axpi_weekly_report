@@ -75,7 +75,7 @@ def test_b3_layout_elements_without_image():
     fg, bg = th["topic"]["T1"]
     assert f"background:{fg};color:#ffffff;font-size:11px;font-weight:bold;padding:2px 6px;border-radius:4px" in h
     assert f"background:{bg};border-radius:10px;padding:10px 4px;text-align:center" in h and f"color:{fg};\">99%" in h            # 수치 카드는 꼭지 색으로
-    assert "MTC가 볼 것" in h and "출처 · 발행처, 「원제」" in h and ">350개<" in h and "공정 파라미터" in h and "이번 호 용어 사전" in h
+    assert "MTC AX Insight" in h and "출처 · 발행처, 「원제」" in h and ">350개<" in h and "공정 파라미터" in h and "이번 호 용어 사전" in h
     assert "(논문)" in h and "(보도)" in h and "더 볼 거리" in h and ">단신<" in h and "이번 주 핵심" in h
     # 약어 풀이는 첫 등장에만, 제목에는 없다
     gl = '<span style="color:#7a8597;font-size:12.5px;">(웨이퍼를 자동으로 실어 나르는 팹 물류 시스템)</span>'
@@ -93,7 +93,7 @@ def test_b3_image_first_in_card_with_credit_and_footer_sentence():
     for doc in (h, e):
         card = doc[doc.index("이번 주 핵심"):]
         img = card.index("<img")
-        assert img < card.index(">01</span>") and img < card.index("AMHS 제목에는") and img < card.index("MTC가 볼 것")      # 이미지가 카드 맨 위
+        assert img < card.index(">01</span>") and img < card.index("AMHS 제목에는") and img < card.index("MTC AX Insight")      # 이미지가 카드 맨 위
         assert 'width="624"' in doc and "max-width:100%" in doc and "border-radius:15px 15px 0 0" in doc and "padding:10px 18px 16px 18px" in doc
         assert "삼성 에이전트 구성도를 새로 설명한 문장" in doc and "이미지 · 삼성반도체" in doc
         assert "이미지는 각 발행처의 공개 자료이며 저작권은 발행처에 있습니다." in doc

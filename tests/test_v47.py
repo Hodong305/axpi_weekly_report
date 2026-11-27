@@ -1,4 +1,4 @@
-"""v4.7 요약층과 작성 수준(설계서 9.6·9.8): 한 줄 핵심(deck)·요점 4개(points)·숫자의 의미(why)·브리핑·숫자로 보는 이번 주·이번 호 구성,
+"""v4.7 요약층과 작성 수준(설계서 9.6·9.8): 한 줄 핵심(deck)·요점 4개(points)·숫자의 의미(why)·브리핑·숫자로 보는 이번 주·MTC AX Insight·중언부언 지양,
 B6(브리핑 리포트)·S4(매거진) 후보 레이아웃과 이전 시안(B4·B5·E·S·S2·S3)."""
 import copy
 import re
@@ -63,17 +63,20 @@ def test_b6_sections_in_reading_order_and_static():
     out = build("B6")
     h, t = out["html_preview"], out["text"]
     render.verify_static(h)
-    order = ["이번 호 구성", "이번 주 헤드라인", "한 줄 요약", "이번 주 브리핑", "이번 주 가장 놀라운 숫자", "숫자로 보는 이번 주", "이번 주 핵심",
-             ">단신<", "더 볼 거리", "이번 호 용어 사전", "이 메일을 받는 이유"]
+    order = ["이번 주 헤드라인", "한 줄 요약", "이번 주 브리핑", "이번 주 가장 놀라운 숫자", "숫자로 보는 이번 주", "이번 주 핵심",
+             ">단신<", "더 볼 거리", "이번 호 용어 사전"]
     pos = [h.index(order[0])]
-    for x in order[1:]:                       # '이번 호 구성'에도 구역 이름이 나오므로 앞 구역 뒤에서 찾는다
+    for x in order[1:]:
         pos.append(h.index(x, pos[-1] + 1))
     assert pos == sorted(pos)
     for lab in ("무슨 일", "얼마나", "왜 중요", "어디까지"):
         assert f">{lab}</span>" in h
-    assert CORE_BODY in h and "MTC가 볼 것" in h and "●" not in h
-    # 이번 호 구성: 구역별 건수
-    assert re.search(r"이번 주 핵심 <b[^>]*>4</b>", h) and re.search(r"단신 <b[^>]*>4</b>", h) and re.search(r"숫자로 보는 이번 주 <b[^>]*>7</b>", h)
+    assert CORE_BODY in h and "MTC AX Insight" in h and "●" not in h
+    # 중언부언 지양: 구역 건수 목록·섹션 부연 설명·성숙도 꼬리표·꼬리말·팀 이름 중복 줄이 없다
+    for gone in ("이번 호 구성", "무엇을 잰 숫자이고 왜 중요한지", "원문을 보지 않아도", "바쁘면 여기까지만", "싣지는 않았지만",
+                 "현장 실증·적용 · 운영사 발표", "이 메일을 받는 이유", "만드는 방식", "링크가 없는 이유", "주간 소식지</td>"):
+        assert gone not in h, gone
+    assert "💡 MTC AX Insight" in h and "MTC가 볼 것" not in h and "이 메일을 받는 이유" not in t and "회신해 주세요" not in t
     # 받은편지함 미리 보기 글(숨김)은 총론 첫 문장
     assert 'display:none;max-height:0' in h and "이번 주에는 경쟁 칩메이커 두 곳이" in h
     # 텍스트본도 같은 순서, 숫자 구역 포함
@@ -91,7 +94,10 @@ def test_s4_number_tiles_and_core_cards():
     render.verify_static(h)
     assert h.count("border-top:4px solid #ffd60a") == 7                          # 숫자 타일 7개(핵심 6 + 단신 1)
     assert "기사 02 · Physical AI" in h and ">왜 중요</span>" in h and CORE_BODY in h
-    assert "이 기사의 숫자는 위 '숫자로 보는 이번 주'에 모았습니다" in h
+    assert "모았습니다" not in h and "MTC AX Insight →" in h
+    for gone in ("이번 호 ▸", "주간 소식지</div>", "현장 실증·적용", "무엇을 잰 숫자이고", "이 메일을 받는 이유"):
+        assert gone not in h, gone
+    assert h.count(CFG["newsletter_tagline"]) == 1                                   # 부제는 한 번만
 
 
 def test_jargon_is_explained_at_first_appearance_at_the_top():
@@ -172,3 +178,10 @@ def test_prompt_requires_fuller_writing():
     steps = (ROOT / "prompts" / "internal-steps.md").read_text(encoding="utf-8")
     for must in ("points{what, how_much, why, scope}", "why(왜 중요)", "4~6문장", "단신은 2문장", "쉬운 수식어", "key_figures[{value, label, why}]"):
         assert must in steps, must
+
+
+def test_insight_prompt_and_doc_definition():
+    steps = (ROOT / "prompts" / "internal-steps.md").read_text(encoding="utf-8")
+    doc = (ROOT / "docs" / "MTC-AX-Unified-Design-v4.7.md").read_text(encoding="utf-8")
+    assert "MTC AX Insight" in steps and "생각해 볼 화두" in steps and "의미 있게 볼 지점" in steps
+    assert "MTC AX Insight(v4.7)" in doc and "중언부언 지양" in doc and "MTC가 볼 것" not in steps

@@ -41,7 +41,7 @@ CORE_FIGURE_SCHEMA = {      # 핵심 수치 카드: why(왜 중요한지)는 v4.
     "type": "object", "additionalProperties": False, "required": ["value", "label"],
     "properties": {**FIGURE_SCHEMA["properties"], "why": {"type": "string"}}}
 
-CORE_ARTICLE_SCHEMA = {     # 핵심: 한 줄 핵심(deck) + 요점(points) + 본문 + MTC가 볼 것(watch) + 수치 카드(key_figures 0~3개) + 대표 이미지(image, 후보가 있을 때)
+CORE_ARTICLE_SCHEMA = {     # 핵심: 한 줄 핵심(deck) + 요점(points) + 본문 + MTC AX Insight(watch) + 수치 카드(key_figures 0~3개) + 대표 이미지(image, 후보가 있을 때)
     "type": "object", "additionalProperties": False,
     "required": ["event_id", "title", "title_alternatives", "body", "watch", "key_figures", "evidence_ids"],
     "properties": {**{k: v for k, v in ARTICLE_SCHEMA["properties"].items() if k != "figure"},

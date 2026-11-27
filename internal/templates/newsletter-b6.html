@@ -8,7 +8,6 @@
 <!-- 보내는 곳 -->
 <tr><td style="padding:0 4px 8px 4px;font-size:12px;color:{{muted}};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-    <td>{{team}} 주간 소식지</td>
     <td align="right">제{{issue_no}}호 · {{issue_week}} · {{period}}</td>
   </tr></table>
 </td></tr>
@@ -24,15 +23,6 @@
   </tr></table>
 </td></tr>
 
-<!-- 이번 호 구성 -->
-<tr><td style="background:#ffffff;border-bottom:1px solid {{card_border}};padding:12px 30px;">
-  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-    <td style="font-size:12px;font-weight:800;color:{{ink}};padding-right:10px;white-space:nowrap;">이번 호 구성</td>
-    <td style="font-size:12.5px;line-height:1.9;color:{{muted}};">
-      <!--LOOP index--><span style="display:inline-block;background:{{soft}};border:1px solid {{card_border}};border-radius:999px;padding:1px 9px;margin:0 4px 0 0;white-space:nowrap;">{{name}} <b style="color:{{accent}};">{{count}}</b></span><!--END index-->
-    </td>
-  </tr></table>
-</td></tr>
 
 <!-- 헤드라인 · 총론 -->
 <tr><td style="background:#ffffff;padding:24px 30px 6px 30px;">
@@ -47,7 +37,7 @@
 <!-- 브리핑 -->
 <tr><td style="background:#ffffff;padding:18px 30px 6px 30px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{soft}};border:1px solid {{card_border}};border-radius:16px;"><tr><td style="padding:16px 20px 10px 20px;">
-    <div style="font-size:14px;font-weight:800;color:{{ink}};">⚡ 이번 주 브리핑 <span style="font-weight:normal;font-size:12.5px;color:{{muted}};">· 바쁘면 여기까지만 · 약 {{skim_sec}}초</span></div>
+    <div style="font-size:14px;font-weight:800;color:{{ink}};">⚡ 이번 주 브리핑</div>
     <!--LOOP tldr-->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid {{card_border}};"><tr>
       <td width="34" valign="top" style="font-size:16px;font-weight:800;color:{{accent}};padding:10px 0;">{{num}}</td>
@@ -72,7 +62,7 @@
 <!--IF has_numbers-->
 <!-- 숫자로 보는 이번 주 -->
 <tr><td style="background:#ffffff;padding:20px 30px 4px 30px;">
-  <div style="font-size:16px;font-weight:800;">숫자로 보는 이번 주 <span style="font-weight:normal;font-size:12.5px;color:{{muted}};">· 무엇을 잰 숫자이고 왜 중요한지</span></div>
+  <div style="font-size:16px;font-weight:800;">숫자로 보는 이번 주</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
     <!--LOOP numbers-->
     <tr><td width="150" valign="top" style="padding:11px 10px 11px 0;border-top:1px solid {{card_border}};font-size:{{vsize}}px;font-weight:800;letter-spacing:-0.6px;line-height:1.2;color:{{topic_fg}};">{{value}}</td>
@@ -96,7 +86,7 @@
 <!--END has_status-->
 
 <!--IF has_core-->
-<tr><td style="background:#ffffff;padding:24px 30px 0 30px;font-size:16px;font-weight:800;">이번 주 핵심 <span style="font-weight:normal;font-size:12.5px;color:{{muted}};">· 원문을 보지 않아도 내용을 알 수 있게 정리했습니다</span></td></tr>
+<tr><td style="background:#ffffff;padding:24px 30px 0 30px;font-size:16px;font-weight:800;">이번 주 핵심</td></tr>
 <!--LOOP core-->
 <tr><td style="background:#ffffff;padding:10px 30px 10px 30px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid {{card_border}};border-top:4px solid {{topic_fg}};border-radius:16px;"><tr><td style="padding:0;">
@@ -105,7 +95,7 @@
     <div style="font-size:12.5px;line-height:1.5;color:{{ink}};margin:6px 20px 0 20px;">{{image_caption}} <span style="font-size:11.5px;color:{{muted}};">· 이미지 · {{image_credit}}</span></div>
     <!--END image_src-->
     <div style="padding:16px 20px 18px 20px;">
-      <div><span style="font-size:13px;font-weight:800;color:{{topic_fg}};">{{num}}</span> &nbsp;{{{pill_html}}}<!--IF tags_text--> <span style="font-size:12px;color:{{muted}};">· {{tags_text}}</span><!--END tags_text--><!--IF followup--> <span style="font-size:12px;color:{{accent}};">· ↻ {{followup}}</span><!--END followup--></div>
+      <div><span style="font-size:13px;font-weight:800;color:{{topic_fg}};">{{num}}</span> &nbsp;{{{pill_html}}}<!--IF followup--> <span style="font-size:12px;color:{{accent}};">· ↻ {{followup}}</span><!--END followup--></div>
       <div style="font-size:21px;font-weight:800;line-height:1.4;letter-spacing:-0.4px;margin-top:8px;">{{title}}</div>
       <!--IF deck--><div style="font-size:15.5px;font-weight:bold;line-height:1.65;color:{{topic_fg}};margin-top:8px;">{{deck}}</div><!--END deck-->
       <!--IF has_points-->
@@ -129,7 +119,7 @@
       <div style="font-size:14.5px;line-height:1.85;color:#3f4e58;margin-top:3px;">{{{body_html}}}</div>
       <!--END show_body-->
       <!--IF watch_html-->
-      <div style="background:{{watch_bg}};border-radius:10px;padding:11px 14px;font-size:14px;line-height:1.7;color:{{watch_ink}};margin-top:12px;"><b>👀 MTC가 볼 것</b> · {{{watch_html}}}</div>
+      <div style="background:{{watch_bg}};border-radius:10px;padding:11px 14px;font-size:14px;line-height:1.7;color:{{watch_ink}};margin-top:12px;"><b>💡 MTC AX Insight</b> · {{{watch_html}}}</div>
       <!--END watch_html-->
       <div style="font-size:12px;color:{{muted}};margin-top:10px;">출처 · {{credit}}</div>
       <!--IF terms_text--><div style="font-size:12px;color:{{muted}};margin-top:3px;">{{terms_text}}</div><!--END terms_text-->
@@ -141,7 +131,7 @@
 
 <!--IF has_brief-->
 <!-- 단신: 2열 격자 -->
-<tr><td style="background:#ffffff;padding:20px 30px 0 30px;font-size:16px;font-weight:800;"><span>단신</span> <span style="font-weight:normal;font-size:12.5px;color:{{muted}};">· 무슨 일이고 왜 볼 만한지 두 문장으로</span></td></tr>
+<tr><td style="background:#ffffff;padding:20px 30px 0 30px;font-size:16px;font-weight:800;"><span>단신</span></td></tr>
 <tr><td style="background:#ffffff;padding:8px 24px 4px 24px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <!--LOOP brief_rows-->
@@ -169,7 +159,7 @@
 <!--IF has_more-->
 <tr><td style="background:#ffffff;padding:20px 30px 4px 30px;">
   <div style="background:{{soft}};border-radius:14px;padding:16px 18px;">
-    <div style="font-size:15px;font-weight:800;">더 볼 거리 <span style="font-weight:normal;font-size:12.5px;color:{{muted}};">· 싣지는 않았지만 관심 있는 분께</span></div>
+    <div style="font-size:15px;font-weight:800;">더 볼 거리</div>
     <!--LOOP more-->
     <div style="margin-top:12px;">{{{pill_html}}}</div>
     <!--LOOP items-->
@@ -198,14 +188,7 @@
 </td></tr>
 <!--END has_corr-->
 
-<tr><td style="background:#ffffff;border-radius:0 0 18px 18px;padding:18px 30px 26px 30px;">
-  <div style="border-top:1px solid {{card_border}};padding-top:12px;font-size:12.5px;line-height:1.75;color:{{muted}};">
-    <b style="color:{{ink}};">이 메일을 받는 이유</b> · {{name}}는 {{team}}이 MTC 임직원께 매주 화요일 보내는 제조 AI 동향 소식지입니다.<br>
-    <b style="color:{{ink}};">만드는 방식</b> · 이번 호는 공개 자료 {{n_docs}}건을 검토해 {{n_pub}}건을 골랐습니다. 사내 AI가 초안을 쓰고 편집자가 사실과 표현을 검토했습니다. 이 밖에 검토했으나 싣지 않은 자료는 {{excluded_count}}건입니다.<br>
-    <b style="color:{{ink}};">링크가 없는 이유</b> · 사내 보안 정책상 외부 링크를 싣지 않습니다. 출처의 발행처·제목으로 검색해 보세요.<!--IF has_image--> 이미지는 각 발행처의 공개 자료이며 저작권은 발행처에 있습니다.<!--END has_image--><br>
-    <b style="color:{{ink}};">의견·제보</b> · 이 메일에 회신해 주세요. 다뤄 줬으면 하는 주제도 환영합니다.
-  </div>
-</td></tr>
+<tr><td style="background:#ffffff;border-radius:0 0 18px 18px;padding:0 0 18px 0;"></td></tr>
 
 </table>
 </td></tr></table>

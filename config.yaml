@@ -54,7 +54,7 @@ internal:
   punch_chars: 320            # 이번 주 한 방(text+twist, big 제외): 무엇을 잰 숫자인지 + 무엇과 비교해 왜 중요한지
   core_chars: [400, 640]      # 핵심 본문(자세히: 배경·방식·조건·업계 맥락 4~6문장). 요점(points)과 겹치지 않게
   brief_chars: [90, 150]      # 단신 2문장: 무슨 일 + 왜 볼 만한지
-  issue_body_max: 9000        # 한 방 + 핵심(한 줄 핵심·요점·본문·MTC가 볼 것·수치 의미) + 단신 합계(핵심 4건 기준)
+  issue_body_max: 9000        # 한 방 + 핵심(한 줄 핵심·요점·본문·MTC AX Insight·수치 의미) + 단신 합계(핵심 4건 기준)
   deck_chars: 120             # 핵심 기사 한 줄 핵심(30초 브리핑에도 쓴다): 주체·사건·결과 + 왜 중요한지
   point_chars: 180            # 핵심 기사 요점(무슨 일 · 얼마나 · 왜 중요 · 어디까지) 각 1~2문장
   figure_why_chars: 80        # 수치의 "왜 중요"(비교 기준·업무상 의미)
@@ -81,7 +81,7 @@ internal:
   brief_max: 4                # 단신 최대 건수
   search_terms_max: 3         # 기사(핵심·단신)당 검색어 최대 개수. 근거 블록에 그대로 있는 원문 표기만 남긴다(9.7)
   same_subject_max: 2         # 핵심+단신에서 같은 주체 최대 건수
-  watch_chars: 160            # 핵심 기사 'MTC가 볼 것' 1~2문장
+  watch_chars: 160            # 핵심 기사 'MTC AX Insight' 1~2문장
   more_max: 20                # 더 볼 거리 최대 건수
   more_line_chars: 120        # 더 볼 거리: 무슨 자료인지 + 왜 볼 만한지
   newsletter_name: "MTC AX Tech Brief"            # 후보, 확정 전. B3 테마는 끝 두 단어(Tech Brief)를 강조색으로 쓴다
