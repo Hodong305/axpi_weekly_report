@@ -200,3 +200,38 @@ def test_tooltip_mode_wraps_only_the_term_and_inline_mode_unchanged():
     assert "gloss_mode" not in render.load_themes()["B4"]                # 이전 시안은 괄호 풀이 그대로
     t = build("S4")["text"]
     assert "서브팹(클린룸 아래층의 배관·전력·가스 설비 공간)" in t           # 텍스트본·마우스 없는 환경 대비
+
+
+# S6 레이아웃: 경쟁사 레이더 · 숫자 섹션 맨 앞의 가장 놀라운 숫자 -----------------------------------------
+
+def _radar_draft():
+    d = sample()
+    core = [a for a in d["articles"] if a["slot"] == "core"]
+    core[0].update(area="defect", stage="deployed", company="삼성 표시 이름")       # 표시 이름을 바꿔도
+    core[1].update(area="maintenance", stage="scaled")
+    return d, core
+
+
+def test_s6_radar_quiet_list_uses_competitor_name_not_display_name():
+    d, core = _radar_draft()
+    c = ctx("S6")
+    c["events"] = [{"event_id": core[0]["event_id"], "competitor": "SK hynix", "subject": "x", "primary_topic": "T1_CHIPMAKER", "ledger": None},
+                   {"event_id": core[1]["event_id"], "competitor": "", "subject": "GlobalFoundries", "primary_topic": "T4_PHYSICAL_AI", "ledger": None}]
+    c["competitors"] = ["SK hynix", "TSMC"]
+    out = render.build_all(d, c)
+    h, t = out["html_preview"], out["text"]
+    assert "경쟁사 레이더" in h and "삼성 표시 이름" in h and "팹 지도" not in h
+    quiet = t.split("이번 주 제조 AI 소식 없음:")[1].splitlines()[0]
+    assert "TSMC" in quiet and "SK hynix" not in quiet                 # 표시 이름이 달라도 소식 있는 경쟁사로 본다
+    assert "GlobalFoundries" not in t.split("[경쟁사 레이더]")[1].split("이번 주 제조 AI")[0]   # 칩메이커가 아닌 사건은 레이더에 없다
+
+
+def test_s6_punch_heads_numbers_section_and_is_not_repeated():
+    d = sample()
+    out = build("S6", d)
+    h, t = out["html_preview"], out["text"]
+    big = d["punch"]["big"]
+    assert h.index("숫자로 보는 이번 주") < h.index(d["punch"]["label"])
+    sec = t.split("[숫자로 보는 이번 주]")[1].split("[이번 주 핵심]")[0]
+    assert sec.lstrip().startswith(d["punch"]["label"]) and sec.count(f"- {big} ") == 0
+    assert "[이번 주 가장 놀라운 숫자]" not in t and "경쟁사 레이더" not in h          # area·stage가 없으면 레이더도 없다

@@ -250,7 +250,8 @@ def overview_items(draft, nums, by_id=None):
         company = a.get("company") or ev.get("competitor") or ev.get("subject") or ""
         chip = a["chipmaker"] if "chipmaker" in a else (bool(ev.get("competitor")) or ev.get("primary_topic") == "T1_CHIPMAKER")
         if i in nums and a.get("area") in AREA_NAME and a.get("stage") in STAGES and company:
-            out.append({"num": nums[i], "company": _s(company), "chipmaker": bool(chip), "area": a["area"], "stage": a["stage"]})
+            out.append({"num": nums[i], "company": _s(company), "chipmaker": bool(chip), "area": a["area"], "stage": a["stage"],
+                        "key": ev.get("competitor") or _s(company)})     # 소식 유무 판정은 경쟁사 목록 이름으로(표시 이름은 바꿀 수 있다)
     return sorted(out, key=lambda x: x["num"])
 
 
@@ -275,10 +276,10 @@ def radar_html(items, th, competitors=()):
                       + "<br>".join(stage_chip(x["stage"], x["num"], th) for x in cells.get(k, [])) + "</td>" for k, _ in cols)
         body += (f'<tr><td align="left" height="40" style="{cell}text-align:left;padding:4px 10px;font-size:13px;font-weight:800;line-height:1.3;">'
                  f'{html.escape(name)}</td>{tds}</tr>')
-    seen = {r[0] for r in rows}
+    seen = {x["key"] for x in items if x["chipmaker"]}
     quiet = [c for c in competitors if c not in seen]
     quiet_html = (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;"><tr>'
-                  f'<td width="112" valign="top" style="font-size:12.5px;font-weight:bold;color:{th["ink"]};padding:0 0 0 10px;">소식 없는 경쟁사</td>'
+                  f'<td width="112" valign="top" style="font-size:12.5px;font-weight:bold;color:{th["ink"]};padding:0 0 0 10px;">제조 AI 소식 없음</td>'
                   f'<td valign="top" style="font-size:12.5px;line-height:1.6;color:{th.get("muted", "#777777")};">{html.escape(" · ".join(quiet))}</td></tr></table>'
                   if quiet else "")
     return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:fixed;">'
@@ -327,7 +328,7 @@ def overview_text(items, competitors=(), with_map=True):
     L = ["[이번 주 판도]", "칩메이커 레이더 (회사 · 영역 · 단계 · 브리핑 번호)"] if with_map else ["[경쟁사 레이더] (회사 · 영역 · 단계 · 브리핑 번호)"]
     chips = [x for x in items if x["chipmaker"]]
     L += [f"- {x['company']}: {AREA_NAME[x['area']]} · {STAGES[x['stage']][0]} ({x['num']})" for x in chips]
-    quiet = [c for c in competitors if c not in {x["company"] for x in chips}]
+    quiet = [c for c in competitors if c not in {x["key"] for x in chips}]
     if quiet:
         L.append("이번 주 제조 AI 소식 없음: " + " · ".join(quiet))
     if not with_map:
