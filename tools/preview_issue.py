@@ -28,11 +28,13 @@ def main():
     ap.add_argument("--overlay")
     ap.add_argument("--out")
     ap.add_argument("--eml", action="store_true")
+    ap.add_argument("--draft", help="원고 대신 쓸 사본(예: 문체만 고친 원고). 생략하면 review/{week}-draft.yaml")
+    ap.add_argument("--suffix", default="", help="결과 파일 이름 끝에 붙일 말(예: -humanized)")
     a = ap.parse_args()
     s = settings_mod.load()
     cfg = s.internal
     week = a.issue_week
-    d = load_draft(s.draft_path(week))
+    d = load_draft(Path(a.draft) if a.draft else s.draft_path(week))
     if a.overlay:
         over = yaml.safe_load(Path(a.overlay).read_text(encoding="utf-8")) or {}
         for art in d["articles"]:
@@ -63,7 +65,7 @@ def main():
         raise SystemExit("가상·견본 데이터 흔적이 있어 만들지 않았습니다: " + ", ".join(f"{h['scope']} '{h['quote']}'" for h in left[:10]))
     out = Path(a.out) if a.out else s.out_dir(week).parent / f"{week}-preview"
     out.mkdir(parents=True, exist_ok=True)
-    html_path = out / f"{week}-{a.theme}.html"
+    html_path = out / f"{week}-{a.theme}{a.suffix}.html"
     html_path.write_text(built["html_preview"], encoding="utf-8")
     html_path.with_suffix(".txt").write_text(built["text"], encoding="utf-8")
     if a.eml:
