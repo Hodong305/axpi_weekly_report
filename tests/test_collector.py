@@ -266,3 +266,34 @@ def test_placeholder_dates_are_rejected_and_fall_through():
     only_bad = html.replace('<meta property="article:published_time" content="2026-11-17T09:00:00+08:00">', "")
     m2 = html_metadata(only_bad, "https://pr.example.com/english/news/3355")
     assert m2["published_date"] is None and m2["date_rejected"]
+
+
+def test_epoch_date_is_not_dropped_and_prior_drop_is_rechecked(site):
+    """2026-W48 TSMC 사례: JSON-LD datePublished=1970-01-01(사이트 기본값).
+    ① 새 수집기는 OUT_OF_WINDOW가 아니라 DATE_UNCERTAIN(수동 보완)으로 둔다.
+    ② 이전 revision에 그 값으로 drop된 기록이 있어도, overrides.yaml로 날짜를 확인하면 다시 조회해 complete가 된다(7.1-4 예외)."""
+    base, tmp = site
+    (tmp / "www" / "news" / "epoch").write_text(article("Supplier forum", "1970-01-01T08:00:00+08:00", paras(LONG_EN)), encoding="utf-8")
+    st = make_settings(tmp, base)
+    d = st.candidates_dir(WEEK)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "gemini-T1.json").write_text(json.dumps({"candidates": [{"url": f"{base}/news/epoch"}]}), encoding="utf-8")
+    docs, _ = run(st, WEEK, force=True, log=lambda *a: None)
+    r = recs(docs["merged"])["news/epoch"]
+    assert r["status"] == "partial" and r["reason_codes"] == ["DATE_UNCERTAIN"]
+    assert any("버린 발행일" in a["observation"] and "1970-01-01" in a["observation"] for a in r["attempts"])
+
+    # 예전 수집기가 만든 r1처럼 drop/OUT_OF_WINDOW/1970-01-01로 바꿔 두고, 담당자가 날짜를 확인해 준다
+    out = st.out_dir(WEEK)
+    f = next(out.glob("*merged-r1.json"))
+    doc = json.loads(f.read_text(encoding="utf-8"))
+    for rec in doc["records"]:
+        if rec["source_url"].endswith("news/epoch"):
+            rec.update(status="drop", reason_codes=["OUT_OF_WINDOW"], published_date="1970-01-01", published_at="1970-01-01T08:00:00+08:00")
+            epoch_id = rec["doc_id"]
+    f.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    (st.manual_dir(WEEK) / "overrides.yaml").write_text(yaml.safe_dump({epoch_id: {
+        "published_date": "2026-11-24", "note": "원문 Issued on 확인"}}, allow_unicode=True), encoding="utf-8")
+    docs2, _ = run(st, WEEK, force=True, log=lambda *a: None)
+    r2 = recs(docs2["merged"])["news/epoch"]
+    assert r2["status"] == "complete" and r2["published_date"] == "2026-11-24" and r2["reason_codes"] == []

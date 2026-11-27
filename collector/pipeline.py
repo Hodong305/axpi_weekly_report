@@ -11,6 +11,7 @@ import yaml
 from . import __version__
 from .build import build_record, doc_key, failed_record, sort_attempts, sorted_discovery
 from .candidates import load_candidate_files, load_manual_urls
+from .extract import plausible_date
 from .fetch import Fetched, Fetcher, now_kst
 from .ref import KST, weekly_window
 from .registry import crawl_source
@@ -160,7 +161,11 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
         for did in sorted(groups):
             g = groups[did]
             pid = did if did in prev else alias_to_prev.get(did)
-            if pid and prev[pid]["status"] in ("complete", "drop"):
+            # 7.1-4 예외(v4.7): 담당자가 overrides.yaml로 값을 확인했거나, 이전 기록의 발행일이 말이 안 되는 값(1970-01-01 등)이면
+            # 이전 complete·drop을 그대로 가져오지 않고 다시 조회해 판정한다(보정이 반영될 기회를 막지 않는다)
+            recheck = bool(pid) and (bool(overrides.get(did) or overrides.get(pid))
+                                     or (prev[pid].get("published_date") and not plausible_date(prev[pid]["published_date"])))
+            if pid and prev[pid]["status"] in ("complete", "drop") and not recheck:
                 rec = copy.deepcopy(prev[pid])
                 rec["discovery"] = sorted_discovery(rec["discovery"] + g["discovery"])
                 _put(records, rec, meta, g)
@@ -253,7 +258,9 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
                 records[pid] = keep
             elif p["status"] == "complete" and n["status"] == "complete" and p["body"]["sha256"] != n["body"]["sha256"]:
                 n["change_note"] = f"r{revision - 1} 대비 본문 변경(이전 sha256 {p['body']['sha256'][:12]})"
-            if p.get("published_date") and n.get("published_date") and p["published_date"] != n["published_date"] and records[pid]["status"] == "complete":
+            # 발행일 불일치 → MERGE_CONFLICT. 단 이전 값이 말이 안 되는 날짜였거나 담당자가 overrides.yaml로 확인한 문서는 새 값을 따른다(v4.7)
+            if (p.get("published_date") and n.get("published_date") and p["published_date"] != n["published_date"]
+                    and records[pid]["status"] == "complete" and plausible_date(p["published_date"]) and not overrides.get(pid)):
                 c = records[pid]
                 c["status"], c["reason_codes"] = "partial", ["MERGE_CONFLICT"]
                 c["body"]["extent"] = "partial"

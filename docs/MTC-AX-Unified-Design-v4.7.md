@@ -25,7 +25,7 @@
 
 견본: `docs/samples/sample-draft-v4.7.yaml`을 `python tools/render_sample.py --png`로 B3·B4·B5 각각 만들어 비교한다(`out_internal/samples/`).
 
-**수집 단계 보완(v4.7, 2026-W48 사례).** TSMC 뉴스룸(`pr.tsmc.com`) 기사가 JSON-LD `datePublished`에 사이트 기본값 `1970-01-01`을 담고 있었고, 수집기가 이를 그대로 믿어 11월 17일 기사를 `OUT_OF_WINDOW`로 제외했다. 이제 발행일 후보마다 타당성(1995-01-01 이후, 수집일 +2일 이내)을 확인해 아닌 값은 버리고 다음 출처로 넘어가며, 남는 출처가 없으면 제외하지 않고 수동 보완 큐로 보낸다(4.4, 6.2).
+**수집 단계 보완(v4.7, 2026-W48 사례).** TSMC 뉴스룸(`pr.tsmc.com`) 기사가 JSON-LD `datePublished`에 사이트 기본값 `1970-01-01`을 담고 있었고, 수집기가 이를 그대로 믿어 11월 17일 기사를 `OUT_OF_WINDOW`로 제외했다. 이제 발행일 후보마다 타당성(1995-01-01 이후, 수집일 +2일 이내)을 확인해 아닌 값은 버리고 다음 출처로 넘어가며, 남는 출처가 없으면 제외하지 않고 수동 보완 큐로 보낸다(4.4, 6.2). 또 재실행 때 이전 drop을 그대로 가져오는 규칙(7.1-4) 때문에 담당자가 날짜를 확인해도 반영되지 않던 문제를 고쳐, 확인한 문서와 날짜가 말이 안 되던 문서는 다시 조회한다(7.1-4·7.1-6 예외).
 
 ### v4.6 개정 요약 (v4.5 대비)
 
@@ -482,9 +482,9 @@ def lead_ids(blocks, lead_min_chars):
 1. 같은 `issue_week`·`window_weeks`끼리만 병합한다. 기간이 다른 revision을 이어 실행하면 수집기가 거부한다.
 2. pass2 결과가 complete·drop이거나 본문이 더 길면 pass1 레코드를 **완전한 스냅샷으로 대체**한다. 아니면 pass1 내용을 두고 시도 이력만 더한다.
 3. partial → complete는 한 번의 조회에서 얻은 본문 전체가 4.4 판정을 통과할 때만 승격한다. 서로 다른 조회의 발췌를 이어 붙이지 않는다.
-4. 이전 revision에서 complete·drop인 레코드는 다시 조회하지 않고 그대로 가져온다. 새 후보가 같은 문서를 가리키면 `discovery`만 합친다.
+4. 이전 revision에서 complete·drop인 레코드는 다시 조회하지 않고 그대로 가져온다. 새 후보가 같은 문서를 가리키면 `discovery`만 합친다. **예외(v4.7)**: 담당자가 `overrides.yaml`로 값을 확인한 문서, 이전 기록의 발행일이 말이 안 되는 값(4.4)인 문서는 다시 조회해 판정한다. 그래야 수동 보완과 날짜 규칙 개선이 이전 drop에도 반영된다.
 5. 이전 revision이 complete이고 새 시도가 `FETCH_FAILED`·`ACCESS_BLOCKED`뿐이면 이전 complete를 유지한다.
-6. 둘 다 complete인데 해시가 다르면 새 본문을 채택하고, `change_note`에 `r{n} 대비 본문 변경`과 이전 해시를 남긴다. `published_date`가 서로 다르면 partial / `MERGE_CONFLICT`로 둔다.
+6. 둘 다 complete인데 해시가 다르면 새 본문을 채택하고, `change_note`에 `r{n} 대비 본문 변경`과 이전 해시를 남긴다. `published_date`가 서로 다르면 partial / `MERGE_CONFLICT`로 둔다. 단 이전 발행일이 말이 안 되는 값이었거나 담당자가 `overrides.yaml`로 확인한 문서는 새 값을 따른다(v4.7).
 7. 이전 revision에만 있는 레코드는 그대로 보존한다(후보 파일이 바뀌어도 이미 수집한 자료를 잃지 않는다).
 8. attempts·discovery는 같은 객체를 한 번만 남기고 정렬한다. records는 doc_id 오름차순이다. 같은 입력을 다시 처리하면 record 수·본문·ID가 같아야 한다.
 
