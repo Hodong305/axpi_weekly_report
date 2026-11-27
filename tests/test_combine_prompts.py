@@ -46,3 +46,12 @@ def test_split_truncated_exit_code(tmp_path):
     r = subprocess.run([sys.executable, str(ROOT / "tools" / "combine_prompts.py"), "split",
                         "--issue-week", "2099-W01", str(ans)], capture_output=True, text=True)
     assert r.returncode == 2 and "이어서 계속 출력해줘" in r.stdout
+
+
+def test_unescaped_quotes_in_text_fields_are_repaired():
+    raw = ('{"agent":"Google Gemini","T1":{"candidates":[{"url":"https://x.example/a","title":"t","publisher":"p",'
+           '"published_date_hint":"2026-11-17","topic_hints":["T1"],"track":"A",'
+           '"found_via":""semiconductor" AI "November 17, 2026"","note":"a "quoted" note"}]}}')
+    obj = cp.parse_answer(raw)
+    c = obj["T1"]["candidates"][0]
+    assert c["found_via"] == '"semiconductor" AI "November 17, 2026"' and c["note"] == 'a "quoted" note' and c["url"] == "https://x.example/a"

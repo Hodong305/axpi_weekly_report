@@ -75,8 +75,29 @@ def join_parts(texts):
     return "".join(_strip_fences(t) for t in texts)
 
 
+# 글 칸 안에 이스케이프하지 않은 큰따옴표가 들어오는 경우(예: Gemini가 found_via에 검색어를 "따옴표"째 넣음)를 고친다.
+# 칸 값은 다음 키(또는 객체 끝) 바로 앞의 따옴표에서 끝난다고 보고, 그 사이의 따옴표만 이스케이프한다. URL·숫자 칸은 건드리지 않는다.
+TEXT_KEYS = ("title", "publisher", "found_via", "note")
+_NEXT = r'(?="\s*(?:,\s*"(?:url|title|publisher|published_date_hint|topic_hints|track|found_via|note)"\s*:|\}))'
+_FIELD = re.compile(r'("(?:' + "|".join(TEXT_KEYS) + r')"\s*:\s*")(.*?)' + _NEXT, re.S)
+
+
+def repair_quotes(body):
+    """반환: (고친 글, 고친 칸 수)."""
+    n = 0
+
+    def fix(m):
+        nonlocal n
+        inner = m.group(2)
+        fixed = re.sub(r'(?<!\\)"', r'\\"', inner)
+        if fixed != inner:
+            n += 1
+        return m.group(1) + fixed
+    return _FIELD.sub(fix, body), n
+
+
 def parse_answer(text):
-    """반환: 통합 답 객체. 끝이 잘렸으면 Truncated."""
+    """반환: 통합 답 객체. 끝이 잘렸으면 Truncated. 글 칸의 이스케이프 안 된 따옴표는 한 번 고쳐서 다시 읽는다."""
     start = text.find("{")
     if start < 0:
         raise ValueError("JSON 객체를 찾지 못했습니다")
@@ -87,6 +108,14 @@ def parse_answer(text):
     except json.JSONDecodeError as e:
         if body.count("{") > body.count("}") or body.count("[") > body.count("]") or e.pos >= len(body.rstrip()) - 1:
             raise Truncated(f"답이 {len(body):,}자에서 끊겼습니다") from e
+        fixed, n = repair_quotes(body)
+        if n:
+            try:
+                obj, _ = json.JSONDecoder().raw_decode(fixed)
+                print(f"알림: 글 칸 {n}곳의 이스케이프 안 된 따옴표를 고쳐 읽었습니다(원문은 raw/에 그대로 보관).")
+                return obj
+            except json.JSONDecodeError:
+                pass
         raise ValueError(f"JSON 형식 오류: {e}") from e
 
 
