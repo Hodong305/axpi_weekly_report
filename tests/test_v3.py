@@ -36,8 +36,8 @@ def test_annotate_first_occurrence_only_and_longest_term():
     assert [m for _, m in first if m] == [TERMS["GF"], TERMS["AMHS"]] and "".join(t for t, _ in first) == "GF가 AMHS를 넓혔다. AMHS는 다시 나온다."
     assert [m for _, m in segs[("articles", 1, "body")] if m] == [TERMS["Physical AI"], TERMS["FDC"]]     # GF·AMHS는 이미 풀었으므로 다시 붙이지 않는다
     assert [m for _, m in segs[("more", 0, "line")] if m] == []
-    # 풀이는 용어 바로 뒤에 붙는다
-    assert first[0] == ("GF", None) and first[1] == ("", TERMS["GF"])
+    # 풀이는 용어 조각에 붙는다(괄호 표시는 용어 바로 뒤, 툴팁은 용어 위)
+    assert first[0] == ("GF", TERMS["GF"]) and first[1] == ("가 ", None) and first[2] == ("AMHS", TERMS["AMHS"])
 
 
 def test_annotate_skips_when_parenthesis_follows_and_word_boundaries():
@@ -116,7 +116,11 @@ def test_s7_proposes_glossary_for_unknown_acronym_and_pipeline_appends(tmp_path)
     assert "  QWXZ: 직접 고친 풀이" in gfile and "검토 요청 ②에서 확정" in gfile
     assert "  # 제조·공정" in gfile and (ROOT / "glossary.yaml").read_text(encoding="utf-8").count("QWXZ") == 0        # 저장소 파일은 건드리지 않았다
     html_doc = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
-    assert "QWXZ<span" in html_doc and "(직접 고친 풀이)" in html_doc and "이번 호 용어 사전" in html_doc and "시험용" not in html_doc
+    # 기본 B6는 툴팁: 용어에 title로 풀이를 단다. 용어 사전에도 싣는다
+    assert '<span title="직접 고친 풀이" style="border-bottom:1px dotted #8a94a6;cursor:help;">QWXZ</span>' in html_doc
+    assert "이번 호 용어 사전" in html_doc and "시험용" not in html_doc
+    txt = (tmp_path / "out_internal" / WEEK / "newsletter.txt").read_text(encoding="utf-8")
+    assert "QWXZ(직접 고친 풀이)" in txt                    # 텍스트본은 괄호 풀이 그대로
 
 
 def test_glossary_proposal_failure_is_listed_for_manual_input():

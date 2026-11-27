@@ -102,10 +102,13 @@ def test_s4_number_tiles_and_core_cards():
 
 def test_jargon_is_explained_at_first_appearance_at_the_top():
     """B6·S4: '서브팹'은 맨 위 한 줄 요약에서 처음 풀이하고, 아래에서는 되풀이하지 않는다. 제목에는 쉬운 수식어가 있다."""
+    tip = 'title="클린룸 아래층의 배관·전력·가스 설비 공간"'
     for th in ("B6", "S4"):
         h = build(th)["html_preview"]
-        first = h.index("(클린룸 아래층의 배관·전력·가스 설비 공간)")
-        assert first < h.index("이번 주 브리핑") and h.count("(클린룸 아래층의 배관·전력·가스 설비 공간)") == 1
+        first = h.index(tip)                                          # B6·S4는 툴팁(마우스를 올리면 풀이)
+        assert first < h.index("이번 주 브리핑") and h.count(tip) == 1 and "(클린룸 아래층의" not in h
+        assert h[first:first + 140].endswith("서브팹</span>") or ">서브팹</span>" in h[first:first + 140]
+        assert ">클린룸 아래층의 배관·전력·가스 설비 공간<" in h          # 용어 사전에는 그대로 실린다
     assert "클린룸 아래 설비층 ‘서브팹’" in sample()["articles"][1]["title"]
     # 이전 시안(B4)은 맨 위에서 풀이하지 않고 본문 첫 등장에서 풀이한다
     h4 = build("B4")["html_preview"]
@@ -185,3 +188,14 @@ def test_insight_prompt_and_doc_definition():
     doc = (ROOT / "docs" / "MTC-AX-Unified-Design-v4.7.md").read_text(encoding="utf-8")
     assert "MTC AX Insight" in steps and "생각해 볼 화두" in steps and "의미 있게 볼 지점" in steps
     assert "MTC AX Insight(v4.7)" in doc and "중언부언 지양" in doc and "MTC가 볼 것" not in steps
+
+
+def test_tooltip_mode_wraps_only_the_term_and_inline_mode_unchanged():
+    from internal.render import to_html
+    segs = [("우리 ", None), ("RCA", "근본 원인 분석"), ("를 본다", None)]
+    assert to_html(segs) == '우리 RCA<span style="color:#7a8597;font-size:12.5px;">(근본 원인 분석)</span>를 본다'
+    assert to_html(segs, "tooltip") == ('우리 <span title="근본 원인 분석" style="border-bottom:1px dotted #8a94a6;cursor:help;">RCA</span>를 본다')
+    assert render.load_themes()["B6"]["gloss_mode"] == render.load_themes()["S4"]["gloss_mode"] == "tooltip"
+    assert "gloss_mode" not in render.load_themes()["B4"]                # 이전 시안은 괄호 풀이 그대로
+    t = build("S4")["text"]
+    assert "서브팹(클린룸 아래층의 배관·전력·가스 설비 공간)" in t           # 텍스트본·마우스 없는 환경 대비

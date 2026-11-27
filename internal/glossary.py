@@ -47,7 +47,8 @@ def gloss_fields(draft, top=False):
 
 def annotate(fields, meanings):
     """첫 등장에만 풀이를 붙인다. fields: [(키, 텍스트)], meanings: {용어: 풀이}.
-    반환: ({키: [(조각, 풀이 또는 None), ...]}, 쓴 용어 목록(첫 등장 순서)). 풀이 조각은 직전 조각 바로 뒤에 붙는다."""
+    반환: ({키: [(조각, 풀이 또는 None), ...]}, 쓴 용어 목록(첫 등장 순서)). 풀이를 다는 용어는 그 용어만으로 된 조각이고
+    풀이는 그 조각에 붙는다(괄호 표시든 툴팁이든 용어에 정확히 붙이도록)."""
     pats = {t: _pattern(t) for t in meanings}
     seen, used, out = set(), [], {}
     for key, text in fields:
@@ -65,9 +66,10 @@ def annotate(fields, meanings):
                 continue
             seen.add(t)
             used.append(t)
-            segs.append((text[pos:end], None))
+            if start > pos:
+                segs.append((text[pos:start], None))
             nxt = text[end:end + 1]
-            segs.append(("", meanings[t] if nxt != "(" else None))      # 이미 괄호 설명이 붙어 있으면 풀이를 달지 않는다
+            segs.append((text[start:end], meanings[t] if nxt != "(" else None))      # 이미 괄호 설명이 붙어 있으면 풀이를 달지 않는다
             pos, last_end = end, end
         segs.append((text[pos:], None))
         out[key] = segs
