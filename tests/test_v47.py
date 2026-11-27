@@ -80,7 +80,8 @@ def test_b6_sections_in_reading_order_and_static():
     # 받은편지함 미리 보기 글(숨김)은 총론 첫 문장
     assert 'display:none;max-height:0' in h and "이번 주에는 경쟁 칩메이커 두 곳이" in h
     # 텍스트본도 같은 순서, 숫자 구역 포함
-    assert t.index("[30초 브리핑]") < t.index("[숫자로 보는 이번 주]") < t.index("[이번 주 핵심]")
+    assert "꼬리표:" not in t and "[30초 브리핑]" not in t
+    assert t.index("[이번 주 브리핑]") < t.index("[숫자로 보는 이번 주]") < t.index("[이번 주 핵심]")
     assert "- 99% 임무 성공률(≠ 이상 검출률) (기사 02) — 로봇이 멈추지 않고" in t
 
 

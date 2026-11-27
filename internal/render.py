@@ -363,7 +363,8 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
          "🏭 칩메이커 · ⚙️ 장비사 · 📊 제조 솔루션 · 🤖 Physical AI", "",
          "[이번 주 헤드라인]", draft["issue_title"], "", "[한 줄 요약]", to_plain(segs[("summary",)]) if ("summary",) in segs else draft["summary"], ""]
     if t["tldr"]:
-        L.append(f"[30초 브리핑] 전체 약 {t['read_min']}분 · 이것만 읽으면 약 {t['skim_sec']}초")
+        brief_name = "30초 브리핑" if t.get("show_footer", True) else "이번 주 브리핑"   # B6·S4는 HTML과 같은 이름
+        L.append(f"[{brief_name}] 전체 약 {t['read_min']}분 · 이것만 읽으면 약 {t['skim_sec']}초")
         L += [f"{x['num']} {x.get('line_plain', x['line'])}" for x in t["tldr"]] + [""]
     if note:
         L += [note, ""]
@@ -381,7 +382,7 @@ def build_text(draft, ctx, t, segs, core, brief, groups, gl, note, imgs=None, b3
     def article(i, a, tc):
         fu = tc["followup"]
         L.append((f"({fu}) " if fu else "") + a["title"])
-        if a.get("tags"):
+        if a.get("tags") and t.get("show_footer", True):     # B6·S4는 꼬리표 글을 싣지 않는다(9.8 중언부언 지양)
             L.append("  꼬리표: " + " · ".join(a["tags"]))
         if i in imgs:
             L.append(f"  [이미지] {imgs[i]['caption']} · 이미지 · {imgs[i]['credit']}")
