@@ -227,11 +227,17 @@ STAGES = {"plan": ("계획", "#eceef2", "#3f4652", "발표·계획·연구 소�
           "deployed": ("적용", "#d5f3df", "#14532d", "일부 현장 적용"), "scaled": ("확대", "#15803d", "#ffffff", "여러 팹 확대·상시 운영")}
 
 
-def stage_chip(stage, num=""):
+def stage_chip(stage, num="", th=None):
+    """단계 꼬리표. 테마의 stage_colors({단계: [바탕, 글자, 테두리]})가 있으면 그 색을 쓴다(S 계열 흑백·노랑)."""
     lab, bg, fg, _ = STAGES[stage]
+    sc = ((th or {}).get("stage_colors") or {}).get(stage)
+    border = ""
+    if sc:
+        bg, fg = sc[0], sc[1]
+        border = f"border:1px solid {sc[2]};" if len(sc) > 2 else ""
     n = f' <span style="font-weight:normal;opacity:.8;">{html.escape(num)}</span>' if num else ""
     return (f'<span style="display:inline-block;background:{bg};color:{fg};font-size:11.5px;font-weight:bold;padding:2px 7px;'
-            f'border-radius:5px;white-space:nowrap;margin:1px 0;">{lab}{n}</span>')
+            f'border-radius:{(th or {}).get("stage_radius", "5px")};white-space:nowrap;margin:1px 0;{border}">{lab}{n}</span>')
 
 
 def overview_items(draft, nums, by_id=None):
@@ -258,18 +264,18 @@ def radar_html(items, th, competitors=()):
     if not rows:
         return ""
     cols = AREAS + (AREA_FABWIDE,)
-    b = th["card_border"]
+    b = th.get("ov_grid", th["card_border"])
     head = "".join(f'<td align="center" valign="bottom" style="padding:6px 2px;font-size:11.5px;font-weight:bold;line-height:1.3;color:{th["ink"]};'
                    f'background:{th["soft"]};border:1px solid {b};">{html.escape(n)}</td>' for _, n in cols)
     body = ""
     for name, cells in rows:
         tds = "".join(f'<td align="center" valign="middle" style="padding:6px 2px;border:1px solid {b};">'
-                      + "<br>".join(stage_chip(x["stage"], x["num"]) for x in cells.get(k, [])) + "</td>" for k, _ in cols)
+                      + "<br>".join(stage_chip(x["stage"], x["num"], th) for x in cells.get(k, [])) + "</td>" for k, _ in cols)
         body += (f'<tr><td valign="middle" style="padding:6px 8px;border:1px solid {b};font-size:13px;font-weight:800;line-height:1.3;">'
                  f'{html.escape(name)}</td>{tds}</tr>')
     seen = {r[0] for r in rows}
     quiet = [c for c in competitors if c not in seen]
-    quiet_html = (f'<div style="font-size:12.5px;color:{th["muted"]};margin-top:8px;">이번 주 제조 AI 소식 없음 · {html.escape(" · ".join(quiet))}</div>'
+    quiet_html = (f'<div style="font-size:12.5px;color:{th.get("muted", "#777777")};margin-top:8px;">이번 주 제조 AI 소식 없음 · {html.escape(" · ".join(quiet))}</div>'
                   if quiet else "")
     return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:fixed;">'
             f'<tr><td width="88" style="background:{th["soft"]};border:1px solid {b};"></td>{head}</tr>{body}</table>{quiet_html}')
@@ -279,7 +285,9 @@ def fabmap_html(items, th):
     """팹 지도: 공정 영역을 왼쪽에서 오른쪽으로 놓고, 영역마다 이번 주 기사(번호·회사)를 꽂는다. 소식 없는 영역은 흐리게."""
     if not items:
         return ""
-    on, off = th["accent"], "#c3cad3"
+    on, off = th.get("ov_line", th["accent"]), "#c3cad3"
+    num_c = th.get("ov_num", on)
+    pin_b = th.get("ov_pin_border", th["card_border"])
     cells, pins = "", ""
     for k, n in AREAS:
         here = [x for x in items if x["area"] == k]
@@ -289,19 +297,19 @@ def fabmap_html(items, th):
                   f'<div style="width:14px;height:14px;border-radius:50%;background:{"#ffffff" if not here else c};border:3px solid {c};margin:-9px auto 0 auto;"></div>'
                   f'<div style="font-size:12px;font-weight:800;line-height:1.3;margin-top:6px;color:{th["ink"] if here else "#9aa5b1"};">{html.escape(n)}</div></td>')
         pins += ('<td valign="top" style="padding:6px 3px 0 3px;">' + ("".join(
-            f'<div style="background:{th["soft"]};border:1px solid {th["card_border"]};border-radius:7px;padding:5px 6px;margin-bottom:5px;'
-            f'font-size:12px;line-height:1.4;"><b style="color:{on};">{html.escape(x["num"])}</b> {html.escape(x["company"])}<br>{stage_chip(x["stage"])}</div>'
+            f'<div style="background:{th["soft"]};border:1px solid {pin_b};border-radius:{th.get("stage_radius", "7px")};padding:5px 6px;margin-bottom:5px;'
+            f'font-size:12px;line-height:1.4;"><b style="color:{num_c};">{html.escape(x["num"])}</b> {html.escape(x["company"])}<br>{stage_chip(x["stage"], th=th)}</div>'
             for x in here) or f'<div style="font-size:11.5px;color:#a4adb8;text-align:center;">소식 없음</div>') + "</td>")
     wide = [x for x in items if x["area"] == AREA_FABWIDE[0]]
     wide_html = ("" if not wide else
                  f'<div style="font-size:12.5px;margin-top:8px;border-top:1px dashed {th["card_border"]};padding-top:7px;"><b>팹 전체</b> · '
-                 + " · ".join(f'<b style="color:{on};">{html.escape(x["num"])}</b> {html.escape(x["company"])} {stage_chip(x["stage"])}' for x in wide) + "</div>")
+                 + " · ".join(f'<b style="color:{num_c};">{html.escape(x["num"])}</b> {html.escape(x["company"])} {stage_chip(x["stage"], th=th)}' for x in wide) + "</div>")
     return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;"><tr>{cells}</tr><tr>{pins}</tr></table>'
             + wide_html)
 
 
-def stage_legend_html():
-    return " ".join(f'{stage_chip(k)} <span style="font-size:11.5px;color:#6b7480;">{STAGES[k][3]}</span>&nbsp;&nbsp;' for k in STAGES)
+def stage_legend_html(th=None):
+    return " ".join(f'{stage_chip(k, th=th)} <span style="font-size:11.5px;color:#6b7480;">{STAGES[k][3]}</span>&nbsp;&nbsp;' for k in STAGES)
 
 
 def overview_text(items, competitors=()):
@@ -443,9 +451,10 @@ def _build(draft, ctx, imgs, mode):
     gl = [g for g in draft.get("glossary") or [] if g.get("meaning")]
     big = punch["big"] if punch else ""
     t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark", "template", "name_em_words", "name_em_color", "show_body",
-                                                     "gloss_top", "numbers_panel", "footer", "gloss_mode", "overview", "core_layout")},
+                                                     "gloss_top", "numbers_panel", "footer", "gloss_mode", "overview", "core_layout",
+                                                     "stage_colors", "stage_radius", "ov_grid", "ov_line", "ov_num", "ov_pin_border")},
          "has_overview": bool(radar or fabmap), "has_radar": bool(radar), "radar_html": radar, "has_fabmap": bool(fabmap), "fabmap_html": fabmap,
-         "stage_legend_html": stage_legend_html(), "overview_text": overview_text(ov_items, competitors),
+         "stage_legend_html": stage_legend_html(th), "overview_text": overview_text(ov_items, competitors),
          "semaform": th.get("core_layout") == "semaform",
          "show_footer": th.get("footer", True),
          "tldr": tldr, "has_tldr": bool(tldr), "read_min": mins, "skim_sec": secs, "skim_min": max(1, round(secs / 60)),

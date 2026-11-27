@@ -412,3 +412,50 @@ S4:
   punch_twist: "#111111"
   watch_bg: "#f4f4f4"
   watch_ink: "#111111"
+S5:
+  name: S5 · 판도 매거진(v4.7 후보, S4 + 칩메이커 레이더·팹 지도·2단 핵심)
+  template: newsletter-s5.html       # S4 + 브리핑 아래 이번 주 판도(칩메이커 레이더 · 팹 지도), 핵심은 2단(확인된 사실 | 해석과 한계) + 자세히 + Insight
+  overview: true
+  core_layout: semaform
+  stage_colors:                      # 단계 꼬리표 [바탕, 글자, 테두리]: 흑백·노랑
+    plan: ["#ffffff", "#111111", "#111111"]
+    pilot: ["#dcdcdc", "#111111"]
+    deployed: ["#ffd60a", "#111111"]
+    scaled: ["#111111", "#ffd60a"]
+  stage_radius: 0px
+  ov_grid: "#cfcfcf"
+  ov_line: "#111111"
+  ov_num: "#111111"
+  ov_pin_border: "#cfcfcf"
+  show_body: true
+  gloss_top: true
+  numbers_panel: true
+  footer: false                      # 꼬리말 없음(9.8)
+  gloss_mode: tooltip                # 용어에 점선 밑줄 + 마우스를 올리면 풀이(title). 풀이는 용어 사전에도 싣는다
+  hero_dark: true
+  name_em_words: 2
+  name_em_color: "#ffd60a"
+  bg: "#e6e6e6"
+  hero: "#111111"
+  hero2: "#111111"
+  hero_text: "#ffffff"
+  hero_sub: "#bdbdbd"
+  accent: "#ffd60a"
+  ink: "#111111"
+  soft: "#f4f4f4"
+  card_border: "#111111"
+  radius: 0px
+  topic:
+    T1: ["#111111", "#ffd60a"]
+    T2: ["#111111", "#ffd60a"]
+    T3: ["#111111", "#ffd60a"]
+    T4: ["#111111", "#ffd60a"]
+    B: ["#111111", "#ffd60a"]
+  punch_bg: "#ffd60a"
+  punch_border: "#111111"
+  punch_big: "#111111"
+  punch_label: "#111111"
+  punch_text: "#111111"
+  punch_twist: "#111111"
+  watch_bg: "#f4f4f4"
+  watch_ink: "#111111"
