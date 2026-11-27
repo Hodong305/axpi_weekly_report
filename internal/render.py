@@ -255,7 +255,8 @@ def overview_items(draft, nums, by_id=None):
 
 
 def radar_html(items, th, competitors=()):
-    """칩메이커 레이더: 회사(행) × 영역(열), 칸에는 단계 꼬리표와 브리핑 번호. 이번 주 소식이 없는 경쟁사는 표 아래 한 줄로."""
+    """칩메이커 레이더: 회사(행) × 영역(열), 칸에는 단계 꼬리표와 브리핑 번호. 이번 주 소식이 없는 경쟁사는 표 아래 한 줄로.
+    정렬: 머리줄·칸은 가운데(가로·세로), 회사 칸은 왼쪽·세로 가운데, 줄 높이는 같게(40px)."""
     by_co = {}
     for it in items:
         if it["chipmaker"]:
@@ -265,20 +266,24 @@ def radar_html(items, th, competitors=()):
         return ""
     cols = AREAS + (AREA_FABWIDE,)
     b = th.get("ov_grid", th["card_border"])
-    head = "".join(f'<td align="center" valign="bottom" style="padding:6px 2px;font-size:11.5px;font-weight:bold;line-height:1.3;color:{th["ink"]};'
-                   f'background:{th["soft"]};border:1px solid {b};">{html.escape(n)}</td>' for _, n in cols)
+    cell = f"border:1px solid {b};vertical-align:middle;word-break:keep-all;"
+    head = "".join(f'<td align="center" height="40" style="{cell}text-align:center;padding:4px 3px;font-size:11.5px;font-weight:bold;line-height:1.3;'
+                   f'color:{th["ink"]};background:{th["soft"]};">{html.escape(n)}</td>' for _, n in cols)
     body = ""
     for name, cells in rows:
-        tds = "".join(f'<td align="center" valign="middle" style="padding:6px 2px;border:1px solid {b};">'
+        tds = "".join(f'<td align="center" height="40" style="{cell}text-align:center;padding:4px 3px;">'
                       + "<br>".join(stage_chip(x["stage"], x["num"], th) for x in cells.get(k, [])) + "</td>" for k, _ in cols)
-        body += (f'<tr><td valign="middle" style="padding:6px 8px;border:1px solid {b};font-size:13px;font-weight:800;line-height:1.3;">'
+        body += (f'<tr><td align="left" height="40" style="{cell}text-align:left;padding:4px 10px;font-size:13px;font-weight:800;line-height:1.3;">'
                  f'{html.escape(name)}</td>{tds}</tr>')
     seen = {r[0] for r in rows}
     quiet = [c for c in competitors if c not in seen]
-    quiet_html = (f'<div style="font-size:12.5px;color:{th.get("muted", "#777777")};margin-top:8px;">이번 주 제조 AI 소식 없음 · {html.escape(" · ".join(quiet))}</div>'
+    quiet_html = (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;"><tr>'
+                  f'<td width="112" valign="top" style="font-size:12.5px;font-weight:bold;color:{th["ink"]};padding:0 0 0 10px;">소식 없는 경쟁사</td>'
+                  f'<td valign="top" style="font-size:12.5px;line-height:1.6;color:{th.get("muted", "#777777")};">{html.escape(" · ".join(quiet))}</td></tr></table>'
                   if quiet else "")
     return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:fixed;">'
-            f'<tr><td width="88" style="background:{th["soft"]};border:1px solid {b};"></td>{head}</tr>{body}</table>{quiet_html}')
+            f'<tr><td width="112" align="left" height="40" style="{cell}text-align:left;padding:4px 10px;font-size:11.5px;font-weight:bold;'
+            f'color:{th.get("muted", "#777777")};background:{th["soft"]};">회사</td>{head}</tr>{body}</table>{quiet_html}')
 
 
 def fabmap_html(items, th):
@@ -309,7 +314,10 @@ def fabmap_html(items, th):
 
 
 def stage_legend_html(th=None):
-    return " ".join(f'{stage_chip(k, th=th)} <span style="font-size:11.5px;color:#6b7480;">{STAGES[k][3]}</span>&nbsp;&nbsp;' for k in STAGES)
+    """단계 범례: 네 칸 표(칸마다 꼬리표 위, 설명 아래, 왼쪽 정렬)로 줄을 맞춘다."""
+    tds = "".join(f'<td width="25%" valign="top" style="text-align:left;padding:0 8px 0 0;">{stage_chip(k, th=th)}'
+                  f'<div style="font-size:11.5px;line-height:1.45;color:#6b7480;margin-top:4px;">{STAGES[k][3]}</div></td>' for k in STAGES)
+    return f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;"><tr>{tds}</tr></table>'
 
 
 def overview_text(items, competitors=(), with_map=True):
