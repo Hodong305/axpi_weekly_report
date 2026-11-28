@@ -350,7 +350,7 @@ def test_config_v3_keys():
     for gone in ("one_line_max", "abstract_chars", "hook_chars"):
         assert gone not in cfg
     assert cfg["summary_chars"] == [140, 240] and cfg["punch_chars"] == 320 and cfg["article_title_max"] == 50
-    assert cfg["newsletter_name"] == "MTC AX Tech Brief" and cfg["newsletter_theme"] == "B6" and "팹 AI 브리프" in cfg["newsletter_tagline"]
+    assert cfg["newsletter_name"] == "MTC AX Tech Brief" and cfg["newsletter_theme"] == "S6" and "팹 AI 브리프" in cfg["newsletter_tagline"]
     assert cfg["newsletter_team"].endswith("AX/PI팀")
     assert settings_mod.load().config["config_version"] == "11"
 

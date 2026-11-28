@@ -255,6 +255,35 @@ def stage_chip(stage, num="", th=None):
             f'border-radius:{(th or {}).get("stage_radius", "5px")};white-space:nowrap;margin:1px 0;{border}">{lab}{n}</span>')
 
 
+def num_badge(num, th, size="14px"):
+    """기사 번호 배지: 이번 주 브리핑의 번호와 같은 색(진한 바탕에 강조색 굵은 숫자), 모서리는 테마 stage_radius(S6은 사각)."""
+    return (f'<span style="display:inline-block;background:{th.get("ink", "#111111")};color:{th.get("accent", "#ffd60a")};font-size:{size};'
+            f'font-weight:900;line-height:1.25;padding:2px 7px;border-radius:{th.get("stage_radius", "5px")};white-space:nowrap;'
+            f'letter-spacing:-0.3px;">{html.escape(num)}</span>')
+
+
+def radar_cell(x, th):
+    """레이더 칸 하나. 테마 radar_cell로 고른다.
+    chip(기본): 단계 꼬리표 안에 번호 / badge(S6): 위에 기사 번호 배지(브리핑 번호와 같은 색), 아래에 단계 꼬리표 /
+    stack: 큰 기사 번호 위, 단계 꼬리표 아래 / fill: 칸을 단계 색 타일로 칠하고 기사 번호만 크게."""
+    mode = th.get("radar_cell", "chip")
+    if mode == "badge":
+        return f'<div>{num_badge(x["num"], th)}</div><div style="margin-top:4px;">{stage_chip(x["stage"], th=th)}</div>'
+    if mode == "stack":
+        return (f'<div style="font-size:19px;font-weight:900;line-height:1.05;letter-spacing:-0.5px;color:{th.get("ink", "#111111")};">{html.escape(x["num"])}</div>'
+                f'<div style="margin-top:3px;">{stage_chip(x["stage"], th=th)}</div>')
+    if mode == "fill":
+        lab, bg, fg, _ = STAGES[x["stage"]]
+        sc = (th.get("stage_colors") or {}).get(x["stage"])
+        border = f"border:1px solid {fg};"
+        if sc:
+            bg, fg = sc[0], sc[1]
+            border = f"border:1px solid {sc[2] if len(sc) > 2 else sc[0]};"
+        return (f'<div style="background:{bg};color:{fg};{border}font-size:17px;font-weight:900;line-height:28px;height:28px;'
+                f'text-align:center;letter-spacing:-0.3px;">{html.escape(x["num"])}</div>')
+    return stage_chip(x["stage"], x["num"], th)
+
+
 def overview_items(draft, nums, by_id=None):
     """판도에 쓸 기사: [{num, company, chipmaker, area, stage}] (area·stage가 알려진 코드인 것만, 브리핑 번호 순).
     회사는 원고의 company(편집자가 고친 값)가 우선이고, 없으면 사건의 경쟁사 이름 → 주체(subject). 칩메이커 여부도 같은 순서
@@ -288,8 +317,9 @@ def radar_html(items, th, competitors=()):
                    f'color:{th["ink"]};background:{th["soft"]};">{html.escape(n)}</td>' for _, n in cols)
     body = ""
     for name, cells in rows:
-        tds = "".join(f'<td align="center" height="40" style="{cell}text-align:center;padding:4px 3px;">'
-                      + "<br>".join(stage_chip(x["stage"], x["num"], th) for x in cells.get(k, [])) + "</td>" for k, _ in cols)
+        tds = "".join(f'<td align="center" height="40" style="{cell}text-align:center;padding:6px 3px;">'
+                      + ("<br>" if th.get("radar_cell", "chip") == "chip" else '<div style="height:8px;"></div>').join(radar_cell(x, th) for x in cells.get(k, []))
+                      + "</td>" for k, _ in cols)
         body += (f'<tr><td align="left" height="40" style="{cell}text-align:left;padding:4px 10px;font-size:13px;font-weight:800;line-height:1.3;">'
                  f'{html.escape(name)}</td>{tds}</tr>')
     seen = {x["key"] for x in items if x["chipmaker"]}
@@ -449,6 +479,8 @@ def _build(draft, ctx, imgs, mode):
     core_ctx, brief_ctx = [art(i, a) for i, a in core], [art(i, a) for i, a in brief]
     for n, c in enumerate(core_ctx + brief_ctx, 1):       # 30초 브리핑과 같은 번호(E·S 디자인이 기사 앞에 쓴다)
         c["num"] = f"{n:02d}"
+    for k, c in enumerate(core_ctx):                      # S6: 섹션 제목 바로 아래 첫 기사는 위 선을 겹쳐 긋지 않는다
+        c["is_first"], c["not_first"] = k == 0, k > 0
     numbers = []      # v4.7 '숫자로 보는 이번 주': 게재 기사의 수치를 기사 번호와 함께 모은다(핵심 수치 카드 → 단신 수치)
     for c, (i, a) in zip(core_ctx + brief_ctx, core + brief):
         figs = list(a.get("key_figures") or []) + ([a["figure"]] if a.get("figure") else [])
@@ -481,7 +513,7 @@ def _build(draft, ctx, imgs, mode):
     big = punch["big"] if punch else ""
     t = {**{k: v for k, v in th.items() if k not in ("topic", "name", "hero_dark", "template", "name_em_words", "name_em_color", "show_body",
                                                      "gloss_top", "numbers_panel", "footer", "gloss_mode", "overview", "core_layout",
-                                                     "stage_colors", "stage_radius", "ov_grid", "ov_line", "ov_num", "ov_pin_border", "punch_in_numbers")},
+                                                     "stage_colors", "stage_radius", "ov_grid", "ov_line", "ov_num", "ov_pin_border", "punch_in_numbers", "radar_cell")},
          "has_overview": bool(radar or fabmap), "has_radar": bool(radar), "radar_html": radar, "has_fabmap": bool(fabmap), "fabmap_html": fabmap,
          "stage_legend_html": stage_legend_html(th), "overview_text": overview_text(ov_items, competitors, bool(fabmap)),
          "overview_both": bool(radar and fabmap), "overview_title": "이번 주 판도" if (radar and fabmap) else "경쟁사 레이더",

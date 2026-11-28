@@ -49,7 +49,7 @@ def strip_data(html_doc):
 
 def test_b3_is_default_theme_and_config():
     cfg = settings_mod.load().internal
-    assert cfg["newsletter_theme"] == "B6" and cfg["newsletter_name"] == "MTC AX Tech Brief"     # v4.7: 기본은 B4, B3는 그대로 고를 수 있다
+    assert cfg["newsletter_theme"] == "S6" and cfg["newsletter_name"] == "MTC AX Tech Brief"     # v4.7: 기본은 B4, B3는 그대로 고를 수 있다
     assert render.load_themes()["B3"]["template"] == "newsletter-b3.html"
     assert {"A", "B", "C", "B3", "B4", "B5", "B6", "S4"} <= set(render.load_themes())
 

@@ -396,7 +396,7 @@ def test_pipeline_more_section_end_to_end(tmp_path):
     assert d["more"][0]["credit"].startswith("Example News(Lee Reporter), 「Foundry tests") and d["excluded_count"] == 1
     assert "F1 장비사 · 더 볼 거리 한 줄 요약이다. (보도)" in io.text
     html_doc = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
-    assert "더 볼 거리" in html_doc and "제1호" in html_doc and "http" not in html_doc
+    assert "더 볼 거리" in html_doc and "ISSUE" in html_doc and "http" not in html_doc       # S6 머리띠: 호수는 큰 숫자 + ISSUE
     txt = (tmp_path / "out_internal" / WEEK / "newsletter.txt").read_text(encoding="utf-8")
     assert "[더 볼 거리]" in txt and "[이번 주 핵심]" in txt
     assert client.steps().count("s6_more") == 1

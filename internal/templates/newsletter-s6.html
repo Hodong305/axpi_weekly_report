@@ -50,7 +50,7 @@
 <!-- 경쟁사 레이더 -->
 <tr><td style="padding:24px 30px 4px 30px;">
   <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;">{{overview_title}}</div>
-  <div style="font-size:12.5px;color:#777777;margin:3px 0 10px 0;">칸 안의 숫자는 위 브리핑 번호. 단계는 공개 자료로 확인된 가장 앞선 단계.</div>
+  <div style="font-size:12.5px;color:#777777;margin:3px 0 10px 0;">칸의 숫자는 기사 번호(브리핑·본문 번호와 같음). 단계는 공개 자료로 확인된 가장 앞선 단계.</div>
   {{{radar_html}}}
   <div style="margin-top:12px;line-height:1.9;">{{{stage_legend_html}}}</div>
 </td></tr>
@@ -121,9 +121,12 @@
 <!--END has_status-->
 
 <!--IF has_core-->
+<tr><td style="padding:30px 30px 0 30px;">
+  <div style="border-top:6px solid {{ink}};padding-top:8px;font-size:15px;font-weight:900;">이번 주 핵심</div>
+</td></tr>
 <!--LOOP core-->
-<tr><td style="padding:28px 30px 6px 30px;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:6px solid {{ink}};"><tr>
+<tr><td style="padding:<!--IF is_first-->6px<!--END is_first--><!--IF not_first-->28px<!--END not_first--> 30px 6px 30px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="<!--IF not_first-->border-top:6px solid {{ink}};<!--END not_first-->"><tr>
     <td width="80" valign="top" style="font-size:50px;font-weight:900;letter-spacing:-3px;line-height:1;padding-top:10px;">{{num}}</td>
     <td valign="top" style="padding-top:12px;">
       <span style="display:inline-block;background:{{ink}};color:{{accent}};font-size:11.5px;font-weight:900;letter-spacing:0.5px;padding:3px 8px;">{{topic_name}}</span>
@@ -194,7 +197,7 @@
 
 <!--IF has_gloss-->
 <tr><td style="padding:20px 30px 4px 30px;">
-  <div style="font-size:13px;font-weight:900;letter-spacing:1px;">이번 호 용어</div>
+  <div style="font-size:13px;font-weight:900;letter-spacing:1px;">이번 호 용어 사전</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px;">
     <!--LOOP glossary-->
     <tr><td width="96" valign="top" style="font-size:13px;font-weight:900;padding:4px 10px 4px 0;border-top:1px solid #dddddd;">{{term}}</td><td style="font-size:13px;color:#555555;padding:4px 0;border-top:1px solid #dddddd;">{{meaning}}</td></tr>

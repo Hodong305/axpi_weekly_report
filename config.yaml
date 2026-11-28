@@ -92,7 +92,7 @@ internal:
   image_caption_chars: 40       # 대표 이미지 설명(새로 쓴 문장)
   image_max_kb: 300             # 발송본 이미지 한 장의 파일 크기 상한(표시 폭 624px)
   newsletter_from: ""           # newsletter.eml의 From. 비우면 헤더를 넣지 않는다(편집자가 메일 프로그램에서 정한다)
-  newsletter_theme: B6                               # B6 브리핑 리포트(기본 후보) / S4 매거진(후보) / B4·S·S2·S3·B5·E 이전 시안 / B3 / A·B·C(v4.4 구조)
+  newsletter_theme: S6                               # S6 레이더 매거진(기본, S4 + 경쟁사 레이더) / B6 브리핑 리포트 / S4 매거진 / B4·S·S2·S3·B5·E 이전 시안 / B3 / A·B·C(v4.4 구조)
   # 사내 모델 접속(OpenAI 호환 /v1/chat/completions, 예: vLLM·Ollama). 모든 LLM 단계가 같은 모델을 쓴다.
   llm:
     backend: http                         # http(OpenAI 호환 서버) | file(요청·응답 파일을 주고받음, 사람·에이전트가 모델 역할)

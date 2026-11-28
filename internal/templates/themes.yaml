@@ -464,6 +464,7 @@ S6:
   template: newsletter-s6.html       # S4 + 브리핑 아래 경쟁사 레이더, 가장 놀라운 숫자는 숫자로 보는 이번 주 맨 앞(팹 지도·2단 핵심 없음)
   overview: radar
   punch_in_numbers: true             # 같은 값의 숫자 타일은 빼고 한 번만 싣는다
+  radar_cell: badge                  # 레이더 칸: 위 기사 번호(브리핑 번호와 같은 검정 사각·노랑 숫자), 아래 진행 단계
   stage_colors:                      # 단계 꼬리표 [바탕, 글자, 테두리]: 흑백·노랑
     plan: ["#ffffff", "#111111", "#111111"]
     pilot: ["#dcdcdc", "#111111"]

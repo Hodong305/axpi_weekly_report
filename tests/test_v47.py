@@ -33,7 +33,7 @@ def build(theme, d=None):
 # 설정·견본 ---------------------------------------------------------------------------
 
 def test_config_v47_keys():
-    assert CFG["newsletter_theme"] == "B6"
+    assert CFG["newsletter_theme"] == "S6"
     assert (CFG["deck_chars"], CFG["point_chars"], CFG["figure_why_chars"], CFG["watch_chars"]) == (120, 180, 80, 160)
     assert CFG["core_chars"] == [400, 640] and CFG["brief_chars"] == [90, 150] and CFG["summary_chars"] == [140, 240]
     assert CFG["more_line_chars"] == 120 and CFG["punch_chars"] == 320 and CFG["issue_body_max"] == 11000 and CFG["article_title_max"] == 50
@@ -266,3 +266,16 @@ def test_writing_prompts_end_with_humanizer_review_and_examples_follow_it():
     examples = [ln for ln in art.splitlines() if "예:" in ln and "마지막 검토" not in ln]
     assert not any("뜻이다." in ln for ln in examples)                   # 예시가 맺음말 버릇을 가르치지 않는다
     assert "결함 검출 → 유형 분류" not in art
+
+
+def test_s6_is_default_and_radar_cell_puts_article_number_badge_above_stage():
+    th = render.load_themes()
+    assert CFG["newsletter_theme"] == "S6" and th["S6"]["radar_cell"] == "badge"
+    d, core = _radar_draft()
+    c = ctx("S6")
+    c["events"] = [{"event_id": core[0]["event_id"], "competitor": "SK hynix", "subject": "x", "primary_topic": "T1_CHIPMAKER", "ledger": None}]
+    h = render.build_all(d, c)["html_preview"]
+    radar = h[h.index("경쟁사 레이더"):h.index("숫자로 보는 이번 주")]
+    badge = f'color:{th["S6"]["accent"]};'                        # 브리핑 번호와 같은 색(강조색 숫자)
+    assert badge in radar and radar.index(">01</span>") < radar.index(">적용</span>")   # 번호 위, 단계 아래
+    assert "칸의 숫자는 기사 번호" in h and h.index("이번 주 핵심") < h.index(core[0]["title"])

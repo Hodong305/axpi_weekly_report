@@ -1044,7 +1044,7 @@ def test_full_run_outputs(tmp_path):
     html = (tmp_path / "out_internal" / WEEK / "newsletter.html").read_text(encoding="utf-8")
     assert "http" not in html.lower() and "<a " not in html.lower() and "<script" not in html.lower() and "<img" not in html.lower()
     assert "<style" not in html.lower() and 'style="' in html and "이번 주 헤드라인" in html and "한 줄 요약" in html and "출처 · " in html
-    assert html.index("이번 주 핵심") < html.index(">단신<") and "이 메일을 받는 이유" not in html          # 기본 B6: 꼬리말 없음
+    assert html.index("이번 주 핵심") < html.index(">단신<") and "이 메일을 받는 이유" not in html          # 기본 S6: 꼬리말 없음
     assert "http" not in (tmp_path / "out_internal" / WEEK / "newsletter.txt").read_text(encoding="utf-8")
     # 대장
     led = [json.loads(l) for l in (tmp_path / "ledger" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
