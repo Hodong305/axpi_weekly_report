@@ -242,7 +242,17 @@ STAGES = {"plan": ("계획", "#eceef2", "#3f4652", "발표·계획·연구 소�
           "deployed": ("적용", "#d5f3df", "#14532d", "일부 현장 적용"), "scaled": ("확대", "#15803d", "#ffffff", "여러 팹 확대·상시 운영")}
 
 
-def stage_chip(stage, num="", th=None):
+RADAR_BOX = (46, 24)      # 레이더 칸의 번호 배지·단계 꼬리표 공통 상자(가로, 세로 px)
+
+
+def _box_css(border_css):
+    """고정 상자 스타일: 테두리 두께를 빼고 글자를 세로 가운데에 둔다(테두리가 굵어도 바깥 크기는 같다)."""
+    bw = max([int(x) for x in re.findall(r"(\d+)px solid", border_css)] or [0])
+    w, h = RADAR_BOX
+    return f"box-sizing:border-box;width:{w}px;height:{h}px;line-height:{h - 2 * bw}px;padding:0;text-align:center;"
+
+
+def stage_chip(stage, num="", th=None, box=False):
     """단계 꼬리표. 테마의 stage_colors({단계: [바탕, 글자, 테두리, 그라데이션 끝 색(선택)]})가 있으면 그 색을 쓴다(S 계열 흑백·노랑)."""
     lab, bg, fg, _ = STAGES[stage]
     sc = ((th or {}).get("stage_colors") or {}).get(stage)
@@ -255,14 +265,17 @@ def stage_chip(stage, num="", th=None):
         if len(sc) > 3 and sc[3]:      # 4번째 값이 있으면 왼쪽→오른쪽 그라데이션(그라데이션을 못 그리는 메일 프로그램은 바탕색만)
             grad = f"background-image:linear-gradient(90deg,{sc[0]},{sc[3]});"
     n = f' <span style="font-weight:normal;opacity:.8;">{html.escape(num)}</span>' if num else ""
-    return (f'<span style="display:inline-block;background:{bg};color:{fg};font-size:11.5px;font-weight:bold;padding:2px 7px;'
+    size = _box_css(border) + "font-size:12.5px;" if box else "font-size:11.5px;padding:2px 7px;"
+    return (f'<span style="display:inline-block;background:{bg};color:{fg};{size}font-weight:bold;'
             f'border-radius:{(th or {}).get("stage_radius", "5px")};white-space:nowrap;margin:1px 0;{border}{grad}">{lab}{n}</span>')
 
 
-def num_badge(num, th, size="14px"):
+def num_badge(num, th, size="14px", box=False):
     """기사 번호 배지: 이번 주 브리핑의 번호와 같은 색(진한 바탕에 강조색 굵은 숫자), 모서리는 테마 stage_radius(S6은 사각)."""
-    return (f'<span style="display:inline-block;background:{th.get("ink", "#111111")};color:{th.get("accent", "#ffd60a")};font-size:{size};'
-            f'font-weight:900;line-height:1.25;padding:2px 7px;border-radius:{th.get("stage_radius", "5px")};white-space:nowrap;'
+    ink = th.get("ink", "#111111")
+    dims = _box_css(f"1px solid {ink}") + f"border:1px solid {ink};" if box else "line-height:1.25;padding:2px 7px;"
+    return (f'<span style="display:inline-block;background:{ink};color:{th.get("accent", "#ffd60a")};font-size:{size};'
+            f'font-weight:900;{dims}border-radius:{th.get("stage_radius", "5px")};white-space:nowrap;'
             f'letter-spacing:-0.3px;">{html.escape(num)}</span>')
 
 
@@ -272,7 +285,7 @@ def radar_cell(x, th):
     stack: 큰 기사 번호 위, 단계 꼬리표 아래 / fill: 칸을 단계 색 타일로 칠하고 기사 번호만 크게."""
     mode = th.get("radar_cell", "chip")
     if mode == "badge":
-        return f'<div>{num_badge(x["num"], th)}</div><div style="margin-top:4px;">{stage_chip(x["stage"], th=th)}</div>'
+        return f'<div>{num_badge(x["num"], th, box=True)}</div><div style="margin-top:3px;">{stage_chip(x["stage"], th=th, box=True)}</div>'
     if mode == "stack":
         return (f'<div style="font-size:19px;font-weight:900;line-height:1.05;letter-spacing:-0.5px;color:{th.get("ink", "#111111")};">{html.escape(x["num"])}</div>'
                 f'<div style="margin-top:3px;">{stage_chip(x["stage"], th=th)}</div>')
@@ -366,7 +379,8 @@ def fabmap_html(items, th):
 
 def stage_legend_html(th=None):
     """단계 범례: 네 칸 표(칸마다 꼬리표 위, 설명 아래, 왼쪽 정렬)로 줄을 맞춘다."""
-    tds = "".join(f'<td width="25%" valign="top" style="text-align:left;padding:0 8px 0 0;">{stage_chip(k, th=th)}'
+    box = (th or {}).get("radar_cell") == "badge"
+    tds = "".join(f'<td width="25%" valign="top" style="text-align:left;padding:0 8px 0 0;">{stage_chip(k, th=th, box=box)}'
                   f'<div style="font-size:11.5px;line-height:1.45;color:#6b7480;margin-top:4px;">{STAGES[k][3]}</div></td>' for k in STAGES)
     return f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;"><tr>{tds}</tr></table>'
 

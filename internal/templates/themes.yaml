@@ -465,11 +465,11 @@ S6:
   overview: radar
   punch_in_numbers: true             # 같은 값의 숫자 타일은 빼고 한 번만 싣는다
   radar_cell: badge                  # 레이더 칸: 위 기사 번호(브리핑 번호와 같은 검정 사각·노랑 숫자), 아래 진행 단계
-  stage_colors:                      # 단계 꼬리표 [바탕, 글자, 테두리]: 흑백·노랑
+  stage_colors:                      # 단계 꼬리표 [바탕, 글자, 테두리, 그라데이션 끝 색]: 노랑이 단계마다 진해지고, 확대는 굵은 검정 테두리
     plan: ["#ffffff", "#111111", "#111111"]
-    pilot: ["#dcdcdc", "#111111"]
-    deployed: ["#ffd60a", "#111111"]
-    scaled: ["#111111", "#ffd60a"]
+    pilot: ["#ffffff", "#111111", "#d8d8d8", "#fff3b8"]
+    deployed: ["#fff3b8", "#111111", "#e8c400", "#ffd60a"]
+    scaled: ["#ffd60a", "#111111", "css:border:2px solid #111111;", "#f2b600"]
   stage_radius: 0px
   ov_grid: "#cfcfcf"
   ov_line: "#111111"
