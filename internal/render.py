@@ -250,7 +250,8 @@ def stage_chip(stage, num="", th=None):
     grad = ""
     if sc:
         bg, fg = sc[0], sc[1]
-        border = f"border:1px solid {sc[2]};" if len(sc) > 2 and sc[2] else ""
+        b3 = sc[2] if len(sc) > 2 else ""
+        border = (b3[4:] if b3.startswith("css:") else f"border:1px solid {b3};") if b3 else ""   # "css:"로 시작하면 테두리 스타일 그대로
         if len(sc) > 3 and sc[3]:      # 4번째 값이 있으면 왼쪽→오른쪽 그라데이션(그라데이션을 못 그리는 메일 프로그램은 바탕색만)
             grad = f"background-image:linear-gradient(90deg,{sc[0]},{sc[3]});"
     n = f' <span style="font-weight:normal;opacity:.8;">{html.escape(num)}</span>' if num else ""
