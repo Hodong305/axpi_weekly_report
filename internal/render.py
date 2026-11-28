@@ -243,16 +243,19 @@ STAGES = {"plan": ("계획", "#eceef2", "#3f4652", "발표·계획·연구 소�
 
 
 def stage_chip(stage, num="", th=None):
-    """단계 꼬리표. 테마의 stage_colors({단계: [바탕, 글자, 테두리]})가 있으면 그 색을 쓴다(S 계열 흑백·노랑)."""
+    """단계 꼬리표. 테마의 stage_colors({단계: [바탕, 글자, 테두리, 그라데이션 끝 색(선택)]})가 있으면 그 색을 쓴다(S 계열 흑백·노랑)."""
     lab, bg, fg, _ = STAGES[stage]
     sc = ((th or {}).get("stage_colors") or {}).get(stage)
     border = ""
+    grad = ""
     if sc:
         bg, fg = sc[0], sc[1]
-        border = f"border:1px solid {sc[2]};" if len(sc) > 2 else ""
+        border = f"border:1px solid {sc[2]};" if len(sc) > 2 and sc[2] else ""
+        if len(sc) > 3 and sc[3]:      # 4번째 값이 있으면 왼쪽→오른쪽 그라데이션(그라데이션을 못 그리는 메일 프로그램은 바탕색만)
+            grad = f"background-image:linear-gradient(90deg,{sc[0]},{sc[3]});"
     n = f' <span style="font-weight:normal;opacity:.8;">{html.escape(num)}</span>' if num else ""
     return (f'<span style="display:inline-block;background:{bg};color:{fg};font-size:11.5px;font-weight:bold;padding:2px 7px;'
-            f'border-radius:{(th or {}).get("stage_radius", "5px")};white-space:nowrap;margin:1px 0;{border}">{lab}{n}</span>')
+            f'border-radius:{(th or {}).get("stage_radius", "5px")};white-space:nowrap;margin:1px 0;{border}{grad}">{lab}{n}</span>')
 
 
 def num_badge(num, th, size="14px"):
