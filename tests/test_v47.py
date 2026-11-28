@@ -251,3 +251,18 @@ def test_radar_columns_base_set_plus_this_weeks_new_area():
     core[1].update(area="maintenance")
     h2 = render.build_all(d, c)["html_preview"]
     assert "환경·안전" not in h2 and "설비 보전·" in h2       # 새 영역이 없는 주에는 기본 열만
+
+
+def test_writing_prompts_end_with_humanizer_review_and_examples_follow_it():
+    from internal.prompts import load_steps
+    steps = load_steps()
+    for st in ("s6_article", "s6_more", "s6_header", "s6_summary"):
+        body = steps[st]
+        assert "[마지막 검토: AI 글투 걷어내기(humanizer)]" in body, st
+        assert body.index("마지막 검토") < body.rindex("JSON 객체로 반환하라"), st   # 반환 지시 바로 앞
+    for st in ("s2_fit", "s6_glossary", "s6_image_caption"):            # 판정·풀이·캡션 단계에는 넣지 않는다
+        assert "마지막 검토" not in steps.get(st, ""), st
+    art = steps["s6_article"]
+    examples = [ln for ln in art.splitlines() if "예:" in ln and "마지막 검토" not in ln]
+    assert not any("뜻이다." in ln for ln in examples)                   # 예시가 맺음말 버릇을 가르치지 않는다
+    assert "결함 검출 → 유형 분류" not in art
