@@ -210,7 +210,7 @@ HBM·EUV·EDA·패키징 등은 검색 단서다. 공급사 공식 자료는 제
 | 형식 | 방법 | 블록 작성 |
 |---|---|---|
 | HTML | trafilatura(XML 출력, 표 포함). 버전을 `body.extractor`에 기록 | 제목·소제목 → heading, 문단·목록 항목·인용 → paragraph, 표 → table |
-| PDF | pdfplumber 페이지별 텍스트·표. 텍스트가 없는 페이지(스캔본)는 OCR 없이 `BODY_MISSING` | 빈 줄 또는 문장 끝 짧은 줄로 문단 구분. `page`에 물리 페이지 번호(1부터) |
+| PDF | MarkItDown(`markitdown[pdf]`)으로 쪽마다 따로 변환한 글자·표. 마크다운 표(`|` 줄)는 table, `#` 줄은 heading, 나머지는 문단. MarkItDown이 없거나 실패하면 pdfplumber로 대신하고 notes에 남긴다(`body.extractor`로 구분). 텍스트가 없는 페이지(스캔본)는 OCR 없이 `BODY_MISSING`. **MarkItDown은 그림·차트를 버린다**: 그림은 아래 '이미지 후보'에서 원본 PDF 쪽을 다시 열어 잘라 낸다 | 빈 줄 또는 문장 끝 짧은 줄로 문단 구분. `page`에 물리 페이지 번호(1부터) |
 | 영상 페이지 | JSON-LD `VideoObject`이면 `scope: video_description` | 설명문 문단 |
 
 블록 텍스트는 다음 규칙으로 정규화한다(`normalize_text`).
@@ -255,6 +255,7 @@ HBM·EUV·EDA·패키징 등은 검색 단서다. 공급사 공식 자료는 제
 **이미지 후보(`media[]`).**
 - 대상: 이미지 정책 대상 발행처(`media_source_types`, 기본 공식 발표 3종)의 complete 레코드만. 그 밖의 레코드는 `media: []`.
 - 후보: `og:image`(또는 `twitter:image`) 1개 + 본문 영역(`article`·`main`)의 `<img>` 중 캡션(`figcaption`)이나 대체 텍스트(`alt`)가 있는 것, 합쳐 최대 `media_max_per_doc`개. 로고·아이콘·아바타(파일명·클래스에 logo/icon/avatar/sprite), SVG, 추적 픽셀, 가로·세로가 `media_min_px` 미만인 것은 뺀다.
+- PDF 후보: MarkItDown 본문에는 그림이 없으므로, 수집기가 원본 PDF의 각 쪽을 다시 열어 그림 영역(삽입 이미지, 벡터로 그린 차트·도식 묶음과 그 주변의 축 이름·범례·제목 줄)만 이미지로 그린다. 차트는 PNG, 사진은 JPEG. 그림 바로 아래(없으면 위) 줄이 `Figure 1`·`그림 2`·`Chart 3`처럼 번호 붙은 캡션이면 `caption`으로 쓰고 잘라 낸 영역에서 캡션 글자는 뺀다. 캡션 있는 그림을 먼저 골라 쪽 순서로 최대 `media_max_per_doc`개. `url`은 `PDF주소#page=N`, `kind`는 figure. 자동 검출이 그림을 놓치면 `overrides.yaml`에 `{doc_id}: {media_pages: [3], note: "..."}`로 적는다. 재실행 시 그 쪽 전체를 맨 앞 후보로 넣는다(이전 revision 이미지를 재사용하지 않는다). 그림 추출 실패는 observation에만 남기고 본문 판정에는 영향을 주지 않는다.
 - 내려받기: 수집기가 같은 요청 규칙으로 받아 긴 변이 `media_max_px`를 넘으면 줄이고 JPEG(품질 82)로 저장한다(PNG 도식은 PNG 유지). 실패한 이미지는 후보에서 빼고 observation에 남긴다. 본문 판정(complete 여부)에는 영향을 주지 않는다.
 - 항목: `id`(M1부터), `kind`(og_image / figure), `url`(원본 주소), `caption`(원문 캡션, 없으면 null), `alt`(없으면 null), `file`(패키지 안 경로 `media/{doc_id 앞 12자}-M1.jpg`), `mime`, `bytes`, `sha256`, `width`, `height`.
 
@@ -305,6 +306,7 @@ pass2 뒤에도 partial로 남은 건은 리포트의 **수동 보완 큐**에 `
 | 유료 결제 필수 확인 | `overrides.yaml`에 `{doc_id}: {paywall: true, note: "..."}` | drop / PAYWALL |
 | `DATE_UNCERTAIN`·`MERGE_CONFLICT` | 원문에서 날짜 확인 후 `overrides.yaml`에 `published_date`(필요하면 `published_at`)와 `note` | 근거가 observation에 남음 |
 | 원래 짧은 공지(`BODY_TRUNCATED` 오탐) | `overrides.yaml`에 `accept_short: true` | complete |
+| PDF 그림을 자동 검출이 놓침(이미지 정책 대상 발행처) | `overrides.yaml`에 `{doc_id}: {media_pages: [쪽 번호, …]}` | 그 쪽 전체가 `media[]` 맨 앞 후보(`url` = `PDF주소#page=N`) |
 | 수집기가 못 찾은 자료 | `manual/urls.txt`에 URL 추가 | `discovery.route = manual` |
 
 ### 4.7 패키징과 사내 발송

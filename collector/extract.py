@@ -288,10 +288,87 @@ def _pdf_paragraphs(page_text):
     return chunks
 
 
+_MD_TABLE_SEP = re.compile(r"^\|?[\s:|-]+\|?$")
+
+
+def _markitdown_pages(raw):
+    """PDF를 한 쪽씩 떼어 MarkItDown으로 변환한다(쪽 번호를 블록에 남기기 위해). 반환: [(쪽, 마크다운)]
+    MarkItDown은 글자·표만 옮기고 그림·차트는 버린다. 그림은 media.pdf_candidates가 원본 PDF 쪽에서 따로 잘라 낸다."""
+    import pypdfium2 as pdfium
+    from markitdown import MarkItDown, StreamInfo
+    md = MarkItDown(enable_plugins=False)
+    info = StreamInfo(extension=".pdf", mimetype="application/pdf")
+    src = pdfium.PdfDocument(raw)
+    out = []
+    try:
+        for i in range(len(src)):
+            one = pdfium.PdfDocument.new()
+            one.import_pages(src, [i])
+            buf = io.BytesIO()
+            one.save(buf)
+            one.close()
+            out.append((i + 1, md.convert_stream(io.BytesIO(buf.getvalue()), stream_info=info).markdown or ""))
+    finally:
+        src.close()
+    return out
+
+
+def _markdown_blocks(text, page):
+    """한 쪽 분량 마크다운 → 블록. 표(| 줄)는 table, # 줄은 heading, 나머지는 문단으로 나눈다."""
+    blocks, prose = [], []
+
+    def flush_prose():
+        if prose:
+            for para in _pdf_paragraphs("\n".join(prose)):
+                t = normalize_text(para)
+                if t:
+                    blocks.append({"id": "", "kind": "paragraph", "text": t, "page": page})
+            prose.clear()
+
+    rows = []
+
+    def flush_table():
+        if rows:
+            t = normalize_text("\n".join(rows), keep_newlines=True)
+            if t:
+                blocks.append({"id": "", "kind": "table", "text": t, "page": page})
+            rows.clear()
+
+    for ln in text.replace("\x0c", "\n").split("\n"):
+        s = ln.strip()
+        if s.startswith("|"):
+            flush_prose()
+            if not _MD_TABLE_SEP.match(s):
+                cells = [normalize_text(c) for c in s.strip("|").split("|")]
+                if any(cells):
+                    rows.append(" | ".join(cells))
+            continue
+        flush_table()
+        if s.startswith("#"):
+            flush_prose()
+            t = normalize_text(s.lstrip("#"))
+            if t:
+                blocks.append({"id": "", "kind": "heading", "text": t, "page": page})
+            continue
+        prose.append(s)
+    flush_table()
+    flush_prose()
+    return blocks
+
+
 def extract_pdf(raw):
+    """PDF 본문: MarkItDown(쪽 단위)으로 글자·표를 옮긴다. MarkItDown이 없거나 실패하면 pdfplumber로 대신하고 notes에 남긴다.
+    메타데이터(제목·작성자·CreationDate·쪽 수)는 pdfplumber로 읽는다."""
     import pdfplumber
     blocks, notes, meta = [], [], {}
     missing_pages = []
+    try:
+        md_pages = _markitdown_pages(raw)
+        extractor = f"markitdown {_ver('markitdown')}"
+    except Exception as e:      # 설치 안 됨·변환 실패
+        md_pages = None
+        extractor = f"pdfplumber {_ver('pdfplumber')}"
+        notes.append(f"MarkItDown 변환 실패, pdfplumber로 대신함: {type(e).__name__}: {str(e)[:120]}")
     with pdfplumber.open(io.BytesIO(raw)) as pdf:
         info = pdf.metadata or {}
         meta["title"] = normalize_text(info.get("Title", "")) or None
@@ -299,25 +376,31 @@ def extract_pdf(raw):
         cd = info.get("CreationDate") or ""
         m = re.match(r"D:(\d{4})(\d{2})(\d{2})", cd)
         meta["pdf_creation_date"] = f"{m[1]}-{m[2]}-{m[3]}" if m else None
-        for i, page in enumerate(pdf.pages, start=1):
-            txt = page.extract_text() or ""
-            if not txt.strip():
-                missing_pages.append(i)
-                continue
-            for para in _pdf_paragraphs(txt):
-                t = normalize_text(para)
-                if t:
-                    blocks.append({"id": "", "kind": "paragraph", "text": t, "page": i})
-            for tbl in page.extract_tables() or []:
-                rows = [" | ".join(normalize_text(c or "") for c in row) for row in tbl if any(c for c in row)]
-                t = normalize_text("\n".join(rows), keep_newlines=True)
-                if t:
-                    blocks.append({"id": "", "kind": "table", "text": t, "page": i})
         meta["pages"] = len(pdf.pages)
+        if md_pages is not None:
+            for i, text in md_pages:
+                got = _markdown_blocks(text, i)
+                if not got:
+                    missing_pages.append(i)
+                blocks += got
+        else:
+            for i, page in enumerate(pdf.pages, start=1):
+                txt = page.extract_text() or ""
+                if not txt.strip():
+                    missing_pages.append(i)
+                    continue
+                for para in _pdf_paragraphs(txt):
+                    t = normalize_text(para)
+                    if t:
+                        blocks.append({"id": "", "kind": "paragraph", "text": t, "page": i})
+                for tbl in page.extract_tables() or []:
+                    rows = [" | ".join(normalize_text(c or "") for c in row) for row in tbl if any(c for c in row)]
+                    t = normalize_text("\n".join(rows), keep_newlines=True)
+                    if t:
+                        blocks.append({"id": "", "kind": "table", "text": t, "page": i})
     if missing_pages:
         notes.append(f"텍스트 없는 페이지(스캔본 추정): {missing_pages}")
     meta["missing_pages"] = missing_pages
     if not meta.get("title") and blocks:
         meta["title"] = blocks[0]["text"][:200]
-    return {"meta": meta, "blocks": assign_ids(blocks), "extractor": f"pdfplumber {_ver('pdfplumber')}",
-            "scope": "pdf", "notes": notes}
+    return {"meta": meta, "blocks": assign_ids(blocks), "extractor": extractor, "scope": "pdf", "notes": notes}

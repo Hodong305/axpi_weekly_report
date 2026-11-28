@@ -102,9 +102,20 @@ def load_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def _media_cands(media_cands, rec, f, cfg):
-    """complete이고 이미지 정책 대상인 새 본문(HTML)에서 이미지 후보를 뽑아 둔다."""
-    if rec["status"] == "complete" and rec["source_type"] in cfg["collection"]["media_source_types"] and not f.is_pdf:
+def _media_cands(media_cands, rec, f, cfg, override=None):
+    """complete이고 이미지 정책 대상인 새 본문에서 이미지 후보를 뽑아 둔다.
+    HTML은 og:image·본문 <img>, PDF는 원본 PDF 쪽에서 그림 영역을 잘라 낸다(MarkItDown 본문 변환은 그림을 버리므로).
+    overrides.yaml의 media_pages: [쪽, …]가 있으면 그 쪽 전체를 먼저 후보로 넣는다."""
+    if rec["status"] != "complete" or rec["source_type"] not in cfg["collection"]["media_source_types"]:
+        return
+    if f.is_pdf:
+        try:
+            media_cands[rec["doc_id"]] = media_mod.pdf_candidates(f.content, f.final_url or rec["source_url"], cfg,
+                                                                  (override or {}).get("media_pages"))
+        except Exception as e:      # 그림 추출 실패는 본문 판정에 영향을 주지 않는다
+            rec["attempts"] = sort_attempts(rec["attempts"] + [{"pass": 1, "agent": "script", "at": now_kst(), "url": rec["source_url"],
+                                                                "http_status": None, "observation": f"PDF 그림 추출 실패: {type(e).__name__}"}])
+    else:
         media_cands[rec["doc_id"]] = media_mod.extract_candidates(f.content, f.final_url, cfg)
 
 
@@ -182,7 +193,7 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
             if rec["doc_id"] in overrides and rec["doc_id"] != did:
                 rec, where = build_record(g, f, 1, settings, window, overrides.get(rec["doc_id"]))
             _put(records, rec, meta, g)
-            _media_cands(media_cands, rec, f, cfg)
+            _media_cands(media_cands, rec, f, cfg, overrides.get(rec["doc_id"]))
         pass1 = copy.deepcopy(records)
         log(f"  pass1: {summarize(list(pass1.values()))}")
 
@@ -206,7 +217,7 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
             if where == "FUTURE":
                 continue
             new["attempts"] = sort_attempts(rec["attempts"] + new["attempts"])
-            _media_cands(media_cands, new, f, cfg)
+            _media_cands(media_cands, new, f, cfg, overrides.get(new["doc_id"]))
             replace = new["status"] in ("complete", "drop") or new["body"]["utf8_bytes"] > rec["body"]["utf8_bytes"]
             if replace:
                 if new["doc_id"] != did:
@@ -274,7 +285,8 @@ def run(settings, issue_week, weeks=1, force=False, log=print, skip_registry=Fal
                 r["media"] = []
                 continue
             pv = prev.get(did)
-            if pv and pv["status"] == "complete" and pv["body"]["sha256"] == r["body"]["sha256"]:
+            if (pv and pv["status"] == "complete" and pv["body"]["sha256"] == r["body"]["sha256"]
+                    and not (overrides.get(did) or {}).get("media_pages")):
                 # 같은 본문이면 이전 revision의 이미지를 그대로 쓴다(파일은 out/{주차}/media/에 이미 있다)
                 r["media"] = [m for m in pv.get("media", []) if (out_dir / m["file"]).is_file()]
             elif did in media_cands:

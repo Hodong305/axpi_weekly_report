@@ -11,6 +11,10 @@
 4. `--weeks 2`는 사용자가 "지난주 발행을 건너뛰었다"고 말한 경우에만 쓴다. `--force`·`--skip-registry`는 시험용이며 운영에서 쓰지 않는다.
 5. `config.yaml`·`sources.yaml`·`queries.yaml`·`prompts/`는 사용자 승인 없이 바꾸지 않는다.
 6. 아래 **[검토 요청]** 지점에서는 제시된 형식으로 사용자에게 묻고, 사용자가 고른 대로 진행한다.
+7. **PDF 소스는 반드시 MarkItDown으로 읽는다.** 수집기는 PDF 본문을 MarkItDown으로 자동 변환한다. 에이전트가 PDF 내용을 직접 파악해야 할 때(수동 보완, 소식지 원고 확인 등)도 PDF를 바로 읽지 말고
+   `.venv/bin/markitdown 파일.pdf`(또는 `python -m markitdown 파일.pdf`)로 변환한 마크다운을 읽는다.
+   MarkItDown은 그림·차트를 버린다. 소식지에 PDF 그림을 넣으려면 그 쪽만 원본 PDF에서 다시 연다. 이미지 정책 대상 발행처의 PDF면 수집기가 그림 영역을 `media[]`에 자동으로 잘라 넣는다(`url`이 `…#page=N`).
+   놓친 그림은 `work/YYYY-Www/manual/overrides.yaml`에 `{doc_id}: {media_pages: [쪽], note: "..."}`를 적고 `run`을 다시 실행해 넣는다. 결과 JSON을 직접 고치지 않는다.
 
 ## 매주 일요일 절차
 

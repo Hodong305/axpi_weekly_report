@@ -6,6 +6,8 @@ beautifulsoup4>=4.12
 trafilatura>=2.0
 feedparser>=6.0
 pdfplumber>=0.11
+# PDF 본문 변환(글자·표). 그림·차트는 버리므로 collector/media.py가 원본 PDF 쪽에서 따로 잘라 낸다
+markitdown[pdf]>=0.1.9
 PyYAML>=6.0
 jsonschema[format-nongpl]>=4.20
 # 선택: 자바스크립트 렌더링·봇 차단 페이지 재시도(pass2). 설치 후 `playwright install chromium`
